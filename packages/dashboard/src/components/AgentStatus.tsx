@@ -1,10 +1,10 @@
 import { useApi } from "../hooks/useApi";
 
 interface AgentStatus {
-  status: "ready" | "unavailable";
-  persona: string;
-  facts: number;
-  episodes: number;
+  status: string;
+  personas: { name: string; role: string }[];
+  tools: number;
+  eventRules: number;
 }
 
 export function AgentStatus() {
@@ -12,14 +12,13 @@ export function AgentStatus() {
 
   if (!data) return null;
 
-  const ready = data.status === "ready";
+  const ready = data.status === "active";
 
   return (
-    <div className="agent-status-widget" title={`${data.facts} facts · ${data.episodes} episodes`}>
+    <div className="agent-status-widget" title={`${data.tools} tools · ${data.eventRules} event rules · ${data.personas.length} personas`}>
       <div className={`status-dot${ready ? "" : " down"}`} />
-      <span className="agent-status-persona">{data.persona}</span>
       <span className="agent-status-mem">
-        {data.facts}f · {data.episodes}ep
+        {data.tools}t · {data.personas.length}p
       </span>
     </div>
   );

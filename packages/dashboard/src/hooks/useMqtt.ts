@@ -16,9 +16,13 @@ export function useMqtt({ url, topics, onMessage }: UseMqttOptions) {
   onMessageRef.current = onMessage;
 
   useEffect(() => {
-    // Port 9002 (TLS WebSocket) is disabled; always use plain WS on 9001.
-    // Caddy terminates TLS and proxies to the internal broker.
-    const brokerUrl = url || `ws://${window.location.hostname}:9001`;
+    // On HTTPS, connect via Caddy's /mqtt proxy (wss) to avoid mixed-content blocks.
+    // On plain HTTP (local dev), connect directly to mosquitto on port 9001.
+    const brokerUrl = url || (
+      window.location.protocol === "https:"
+        ? `wss://${window.location.hostname}/mqtt`
+        : `ws://${window.location.hostname}:9001`
+    );
     const client = mqtt.connect(brokerUrl, {
       clientId: `maisie-dashboard-${Date.now()}`,
       clean: true,
