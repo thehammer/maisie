@@ -339,13 +339,13 @@ function PersonaCard({
 }
 
 export function PersonasPage({ onBack }: Props) {
-  const personasApi = useApi<{ personas: PersonaConfig[] }>("/api/personas", 60_000);
+  const personasApi = useApi<PersonaConfig[]>("/api/personas", 60_000);
   const [personas, setPersonas] = useState<PersonaConfig[] | null>(null);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<PersonaConfig | null>(null);
   const [deleting, setDeleting] = useState<PersonaConfig | null>(null);
 
-  const effective = personas ?? personasApi.data?.personas ?? null;
+  const effective = personas ?? personasApi.data ?? null;
 
   const handleCreate = useCallback(
     async (data: ReturnType<typeof formToPayload>) => {

@@ -6,6 +6,7 @@ interface EnvVarSpec {
   required: boolean;
   description: string;
   example?: string;
+  currentValue?: string | null;
 }
 
 interface PluginInfo {
@@ -92,7 +93,7 @@ function ConfigureModal({
   onSave: (name: string, overrides: Record<string, string>) => Promise<void>;
 }) {
   const seedPairs = plugin.envVars?.length
-    ? plugin.envVars.map((v) => ({ key: v.name, value: "", spec: v }))
+    ? plugin.envVars.map((v) => ({ key: v.name, value: v.currentValue ?? "", spec: v }))
     : [{ key: "", value: "", spec: undefined as EnvVarSpec | undefined }];
 
   const [pairs, setPairs] = useState<Array<{ key: string; value: string; spec?: EnvVarSpec }>>(seedPairs);
