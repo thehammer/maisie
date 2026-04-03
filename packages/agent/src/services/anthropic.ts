@@ -25,7 +25,7 @@ interface CompletionResponse {
 export function createAnthropicClient(config: AnthropicConfig) {
   async function complete(options: CompletionOptions): Promise<CompletionResponse> {
     const body: Record<string, unknown> = {
-      model: options.model || "claude-haiku-4-5-20251001",
+      model: options.model || "claude-haiku-4-5",
       max_tokens: options.maxTokens || 1024,
       messages: options.messages,
     };

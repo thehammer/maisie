@@ -31,7 +31,7 @@ export async function classifyGenre(
   const result = await claude.generate({
     schema: z.object({ tags: z.array(z.string()).max(5) }),
     schemaName: "GenreClassification",
-    model: "claude-haiku-4-5-20251001",
+    model: "claude-haiku-4-5",
     system: `You classify books into genre tags. Available tags: ${CONTROLLED_TAGS.join(", ")}. Return 1-5 tags that best fit the book.`,
     messages: [
       {
@@ -69,7 +69,7 @@ export async function detectSeries(
       index: z.number().nullable(),
     }),
     schemaName: "SeriesDetection",
-    model: "claude-haiku-4-5-20251001",
+    model: "claude-haiku-4-5",
     system: `You detect if a book belongs to a series. Given a book title and other titles by the same author, determine if the book is part of a series. If yes, return the series name and index. If no, return null for both fields.`,
     messages: [
       {

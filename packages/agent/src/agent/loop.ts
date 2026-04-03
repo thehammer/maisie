@@ -52,7 +52,7 @@ export function createAgentLoop(config: {
 
     try {
       const useThinking = classified.tier === 'advise' || classified.tier === 'act'
-      const modelId = useThinking ? 'claude-sonnet-4-5-20251001' : 'claude-haiku-4-5-20251001'
+      const modelId = useThinking ? 'claude-sonnet-4-5' : 'claude-haiku-4-5'
 
       const result = await generateText({
         model: config.ai.getModel(modelId),
@@ -112,7 +112,7 @@ export function createAgentLoop(config: {
 
     try {
       const result = streamText({
-        model: config.ai.getModel('claude-sonnet-4-5-20251001'),
+        model: config.ai.getModel('claude-sonnet-4-5'),
         system: systemPrompt + factContext,
         messages,
         tools: Object.keys(tools).length > 0 ? tools as any : undefined,

@@ -44,7 +44,7 @@ export function createAiClient(config: AiConfig) {
 
     if (config.provider === "anthropic") {
       const anthropic = createAnthropic({ apiKey: config.apiKey });
-      return anthropic(modelId ?? "claude-haiku-4-5-20251001");
+      return anthropic(modelId ?? "claude-haiku-4-5");
     }
 
     if (config.provider === "openai") {
@@ -91,7 +91,7 @@ export function createAiClient(config: AiConfig) {
     // and a Sonnet/Opus model. Build params explicitly to keep TS happy.
     if (options.thinking && config.provider === "anthropic") {
       const thinkingModel = getModel(
-        modelId?.includes("haiku") ? "claude-sonnet-4-5-20251001" : modelId
+        modelId?.includes("haiku") ? "claude-sonnet-4-5" : modelId
       );
       const result = await (generateObject as any)({
         model: thinkingModel,
