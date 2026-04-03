@@ -1,0 +1,31 @@
+{
+  "name": "@maisie/agent",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 bun run --watch src/index.ts",
+    "start": "NODE_TLS_REJECT_UNAUTHORIZED=0 bun run src/index.ts",
+    "test": "bun test",
+    "lint": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun run src/services/db.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.66",
+    "@ai-sdk/openai": "^3.0.50",
+    "@maisie/plugin-core": "workspace:*",
+    "@maisie/shared": "workspace:*",
+    "ai": "^6.0.145",
+    "dotenv": "^16.4.0",
+    "drizzle-orm": "^0.38.0",
+    "hono": "^4.7.0",
+    "mqtt": "^5.10.0",
+    "sharp": "^0.34.5",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "drizzle-kit": "^0.30.0",
+    "typescript": "^5.7.0"
+  }
+}

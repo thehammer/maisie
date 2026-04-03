@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "types": ["bun", "vite/client"],
+    "jsx": "react-jsx",
+    "paths": {
+      "@maisie/shared": ["../shared/src"]
+    }
+  },
+  "include": ["src"]
+}

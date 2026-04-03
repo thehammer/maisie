@@ -1,0 +1,7 @@
+{
+  "name": "@maisie/cli",
+  "version": "0.1.0",
+  "description": "Maisie home AI CLI",
+  "bin": { "maisie": "./src/index.ts" },
+  "scripts": { "start": "bun src/index.ts" }
+}

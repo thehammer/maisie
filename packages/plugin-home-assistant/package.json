@@ -1,0 +1,12 @@
+{
+  "name": "@maisie/plugin-home-assistant",
+  "version": "0.1.0",
+  "description": "Home Assistant integration for Maisie",
+  "main": "src/index.ts",
+  "maisie": { "plugin": true, "capabilities": ["smart-home"], "minCoreVersion": "0.1.0" },
+  "scripts": {
+    "test": "bun test",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": { "@maisie/shared": "workspace:*", "zod": "^4.3.6" }
+}

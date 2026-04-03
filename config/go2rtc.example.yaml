@@ -1,0 +1,31 @@
+# go2rtc configuration example
+# Copy to go2rtc.yaml and fill in your values
+# This file is gitignored — do not commit go2rtc.yaml
+
+streams:
+  # UniFi Protect camera streams
+  # Get your RTSP aliases from UniFi Protect → Camera → RTSP settings
+  front_door:
+    - rtsps://{UNIFI_HOST}:7441/{YOUR_RTSP_SESSION_ID}
+  back_yard:
+    - rtsps://{UNIFI_HOST}:7441/{YOUR_RTSP_SESSION_ID}
+  # Add more cameras following this pattern
+
+  # Bambu Lab printer camera (optional)
+  bambu_printer:
+    - rtsps://bblp:{BAMBU_ACCESS_CODE}@{BAMBU_HOST}:322/streaming/live/1?BackChannel=0
+
+  # HDHomeRun PRIME (optional — for cable channel snapshots)
+  # hdhr_tuner:
+  #   - http://{HDHR_HOST}/auto/v1
+
+api:
+  listen: ":1984"
+
+rtsp:
+  listen: ":8554"
+
+webrtc:
+  listen: ":8555/tcp"
+  candidates:
+    - {LAN_IP}:8555  # LAN IP must be reachable by browser clients

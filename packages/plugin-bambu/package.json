@@ -1,0 +1,12 @@
+{
+  "name": "@maisie/plugin-bambu",
+  "version": "0.1.0",
+  "description": "Bambu Lab 3D printer integration for Maisie",
+  "main": "src/index.ts",
+  "maisie": { "plugin": true, "capabilities": ["printer"], "minCoreVersion": "0.1.0" },
+  "scripts": {
+    "test": "bun test",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": { "@maisie/shared": "workspace:*", "zod": "^4.3.6", "mqtt": "^5.0.0" }
+}

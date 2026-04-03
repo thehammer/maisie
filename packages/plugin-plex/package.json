@@ -1,0 +1,19 @@
+{
+  "name": "@maisie/plugin-plex",
+  "version": "0.1.0",
+  "description": "Plex Media Server integration for Maisie",
+  "main": "src/index.ts",
+  "maisie": {
+    "plugin": true,
+    "capabilities": ["media-server"],
+    "minCoreVersion": "0.1.0"
+  },
+  "scripts": {
+    "test": "bun test",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@maisie/shared": "workspace:*",
+    "zod": "^4.3.6"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@maisie/plugin-unifi",
+  "version": "0.1.0",
+  "description": "UniFi network controller and Protect cameras for Maisie",
+  "main": "src/index.ts",
+  "maisie": {
+    "plugin": true,
+    "capabilities": ["network", "camera"],
+    "minCoreVersion": "0.1.0"
+  },
+  "scripts": {
+    "test": "bun test",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@maisie/shared": "workspace:*",
+    "zod": "^4.3.6"
+  }
+}

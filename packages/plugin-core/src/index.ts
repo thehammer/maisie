@@ -1,0 +1,44 @@
+import type { MaisiePlugin } from '@maisie/shared'
+import * as actionDefs from './actions'
+import { setDb, setPlugins } from './actions'
+
+const plugin: MaisiePlugin = {
+  name: 'core',
+  version: '0.1.0',
+  description: 'Core platform management — plugins, personas, and dashboard layout',
+  capabilities: [],
+  envVars: [],
+  actions: [
+    actionDefs.listPlugins,
+    actionDefs.installPlugin,
+    actionDefs.configurePlugin,
+    actionDefs.uninstallPlugin,
+    actionDefs.checkPluginHealth,
+    actionDefs.listPersonas,
+    actionDefs.getPersona,
+    actionDefs.createPersona,
+    actionDefs.updatePersona,
+    actionDefs.deletePersona,
+    actionDefs.getWidgetCatalog,
+    actionDefs.getLayout,
+    actionDefs.updateLayout,
+    actionDefs.resetLayout,
+  ],
+  events: [],
+
+  async init(core) {
+    setDb(core.db)
+    core.log('core', 'info', 'plugin-core initialized')
+  },
+
+  async shutdown() {
+    // No persistent connections to clean up
+  },
+
+  async healthCheck() {
+    return { status: 'healthy', lastCheck: new Date() }
+  },
+}
+
+export { setPlugins }
+export default plugin

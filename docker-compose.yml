@@ -1,0 +1,109 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+      - "9002:9002"
+    volumes:
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto-data:/mosquitto/data
+    restart: unless-stopped
+
+  maisie:
+    build: .
+    ports:
+      - "3001:3001"
+    env_file: .env
+    environment:
+      - MQTT_URL=mqtt://mosquitto:1883
+      - DB_PATH=/app/data/maisie.db
+      - GO2RTC_URL=http://${LAN_IP:-192.168.1.200}:1984
+      - SYNTHETIC_HDHR_URL=http://synthetic-hdhr:5004
+      - PRIME_HOST=${HDHR_HOST}
+      - PRIME_PORT=80
+      - TOKYO_STREAMER_URL=http://tokyo-streamer:5050
+    volumes:
+      - ./data:/app/data
+      - ${CERTS_DIR:-${HOME}/certs/config/live/${DOMAIN}}:/app/certs:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${MEDIA_PATH:-/mnt/nas/plex-library}/Audiobooks:/audiobooks
+      - ${TRANSMISSION_DATA:-/opt/docker/transmission/data}:/transmission-data
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
+  go2rtc:
+    image: alexxit/go2rtc
+    network_mode: host
+    volumes:
+      - ./config/go2rtc.yaml:/config/go2rtc.yaml
+    restart: unless-stopped
+
+  synthetic-hdhr:
+    build:
+      context: .
+      dockerfile: packages/synthetic-hdhr/Dockerfile
+    ports:
+      - "5004:5004"
+    environment:
+      - PRIME_HOST=${HDHR_HOST}
+      - PRIME_PORT=80
+      - GO2RTC_URL=http://${LAN_IP:-192.168.1.200}:1984
+      - GO2RTC_RTSP=rtsp://${LAN_IP:-192.168.1.200}:8554
+      - MAISIE_URL=http://maisie:3001
+      - DEVICE_ID=MAISIE01
+      - DEVICE_NAME=The Estate TV
+      - TUNER_COUNT=7
+      - CAMERA_CHANNEL_START=10001
+    depends_on:
+      - go2rtc
+      - maisie
+    restart: unless-stopped
+
+  tokyo-streamer:
+    build:
+      context: .
+      dockerfile: packages/tokyo-streamer/Dockerfile
+    ports:
+      - "5050:5050"
+    environment:
+      - PORT=5050
+      - MEDIA_ROOT=/media
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - ${MEDIA_PATH:-/mnt/nas/plex-library}:/media:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, video]
+    restart: unless-stopped
+
+  ssdp:
+    build:
+      context: ./packages/ssdp-advertiser
+    network_mode: host
+    environment:
+      - DEVICE_ID=MAISIE01
+      - LOCATION=http://${LAN_IP:-192.168.1.200}:5004/discover.json
+    depends_on:
+      - synthetic-hdhr
+    restart: unless-stopped
+
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:latest
+    ports:
+      - "13378:80"
+    volumes:
+      - ${MEDIA_PATH:-/mnt/nas/plex-library}/Audiobooks:/audiobooks
+      - audiobookshelf-config:/config
+      - audiobookshelf-metadata:/metadata
+    restart: unless-stopped
+
+volumes:
+  mosquitto-data:
+  audiobookshelf-config:
+  audiobookshelf-metadata:

@@ -1,0 +1,19 @@
+{
+  "name": "@maisie/plugin-core",
+  "version": "0.1.0",
+  "description": "Core platform management — plugins, personas, and dashboard layout",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "bun test",
+    "lint": "tsc --noEmit"
+  },
+  "maisie": {
+    "plugin": true,
+    "capabilities": []
+  },
+  "dependencies": {
+    "@maisie/shared": "workspace:*",
+    "drizzle-orm": "^0.38.0",
+    "zod": "^4.3.6"
+  }
+}

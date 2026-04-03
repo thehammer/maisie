@@ -1,0 +1,19 @@
+{
+  "name": "@maisie/synthetic-hdhr",
+  "version": "0.1.0",
+  "private": true,
+  "maisie": {
+    "capabilities": [],
+    "minCoreVersion": "0.1.0"
+  },
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@maisie/shared": "workspace:*",
+    "hono": "^4.7.0",
+    "zod": "^4.3.6"
+  }
+}

@@ -1,0 +1,6 @@
+[
+  { "name": "Living Room TV", "mac": "aa:bb:cc:dd:ee:01" },
+  { "name": "Sound System", "mac": "aa:bb:cc:dd:ee:02" },
+  { "name": "Network Switch", "mac": "aa:bb:cc:dd:ee:03" },
+  { "name": "Printer", "mac": "aa:bb:cc:dd:ee:04" }
+]

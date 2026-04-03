@@ -1,0 +1,19 @@
+{
+  "name": "@maisie/plugin-radarr",
+  "version": "0.1.0",
+  "description": "Radarr movie automation for Maisie",
+  "main": "src/index.ts",
+  "maisie": {
+    "plugin": true,
+    "capabilities": [],
+    "minCoreVersion": "0.1.0"
+  },
+  "scripts": {
+    "test": "bun test",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@maisie/shared": "workspace:*",
+    "zod": "^4.3.6"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@maisie/plugin-synology",
+  "version": "0.1.0",
+  "description": "Synology DSM integration for Maisie",
+  "main": "src/index.ts",
+  "maisie": {
+    "plugin": true,
+    "capabilities": ["storage"],
+    "minCoreVersion": "0.1.0"
+  },
+  "scripts": {
+    "test": "bun test",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@maisie/shared": "workspace:*",
+    "@maisie/plugin-unifi": "workspace:*",
+    "zod": "^4.3.6"
+  }
+}

@@ -1,0 +1,13 @@
+node_modules
+packages/*/node_modules
+packages/dashboard/dist
+data/
+.env
+*.db
+*.db-wal
+*.db-shm
+.git
+.gitignore
+.tool-versions
+docs/
+*.md

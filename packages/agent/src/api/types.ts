@@ -1,0 +1,53 @@
+import type { createUniFiClient } from "../skills/network/unifi-client";
+import type { createDsmClient } from "../skills/synology/dsm-client";
+import type { createPlexClient } from "../skills/media/plex-client";
+import type { createRadarrClient } from "../skills/media/radarr-client";
+import type { createSonarrClient } from "../skills/media/sonarr-client";
+import type { createHdhrClient } from "../skills/media/hdhr-client";
+import type { createDakboardClient } from "../skills/display/dakboard-client";
+import type { createHaClient } from "../skills/smarthome/ha-client";
+import type { BambuClient } from "../skills/printer/bambu-client";
+import type { GoogleAuth } from "../skills/google/google-auth";
+import type { createCalibreClient } from "../skills/calibre/calibre-client";
+import type { AiClient } from "../services/ai";
+import type { CalibreExec } from "../services/calibre-exec";
+import type { createPs4Client } from "../skills/gaming/ps4-client";
+import type { createProtectClient } from "../skills/network/protect-client";
+import type { ProwlarrClient } from "../skills/media/prowlarr-client";
+import type { ReadarrClient } from "../skills/media/readarr-client";
+import type { TransmissionClient } from "../skills/media/transmission-client";
+
+type Db = ReturnType<typeof import("../services/db").initDb>;
+type UniFi = ReturnType<typeof createUniFiClient>;
+type Dsm = ReturnType<typeof createDsmClient>;
+type Plex = ReturnType<typeof createPlexClient>;
+type Radarr = ReturnType<typeof createRadarrClient>;
+type Sonarr = ReturnType<typeof createSonarrClient>;
+type Hdhr = ReturnType<typeof createHdhrClient>;
+type Dakboard = ReturnType<typeof createDakboardClient>;
+type Ha = ReturnType<typeof createHaClient>;
+type Calibre = ReturnType<typeof createCalibreClient>;
+type Ps4 = ReturnType<typeof createPs4Client>;
+type Protect = ReturnType<typeof createProtectClient>;
+
+export interface Services {
+  db: Db;
+  unifi: UniFi | null;
+  dsm: Dsm | null;
+  plex: Plex | null;
+  radarr: Radarr | null;
+  sonarr: Sonarr | null;
+  hdhr: Hdhr | null;
+  dakboard: Dakboard | null;
+  ha: Ha | null;
+  bambu: BambuClient | null;
+  google: GoogleAuth | null;
+  calibre: Calibre | null;
+  claude: AiClient | null;
+  calibreExec: CalibreExec | null;
+  ps4: Ps4 | null;
+  protect: Protect | null;
+  prowlarr: ProwlarrClient | null;
+  transmission: TransmissionClient | null;
+  readarr: ReadarrClient | null;
+}

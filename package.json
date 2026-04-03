@@ -1,0 +1,18 @@
+{
+  "name": "maisie",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev": "bun run --filter '*' dev",
+    "agent": "bun run --filter @maisie/agent dev",
+    "dashboard": "bun run --filter @maisie/dashboard dev",
+    "test": "bun run --filter '*' test",
+    "lint": "bun run --filter '*' lint",
+    "typecheck": "bun x tsc --noEmit -p packages/agent/tsconfig.json && bun x tsc --noEmit -p packages/dashboard/tsconfig.json",
+    "build": "bun run --filter '*' build"
+  },
+  "dependencies": {
+    "basic-ftp": "^5.2.0",
+    "mqtt": "^5.15.0"
+  }
+}
