@@ -421,7 +421,9 @@ async function main() {
 
   // --- Reconnection loop ---
   // Every 2 minutes, retry services that failed initial connection.
-  // Only retries services that have env config but are currently null.
+  // UniFi and Protect use their own exponential-backoff loops (see below)
+  // because the UDM Pro has an aggressive login rate limit that a fixed
+  // interval can keep resetting.
   setInterval(async () => {
     // DSM
     if (!services.dsm && dsmClient) {
@@ -513,25 +515,66 @@ async function main() {
         console.log("[reconnect] ✓ Calibre reconnected");
       } catch { /* still down */ }
     }
-
-    // UniFi Protect
-    if (!services.protect && protectClient) {
-      try {
-        await protectClient.login();
-        services.protect = protectClient;
-        console.log("[reconnect] ✓ UniFi Protect reconnected");
-      } catch { /* still down */ }
-    }
-
-    // UniFi
-    if (!services.unifi && unifiClient) {
-      try {
-        await unifiClient.login();
-        services.unifi = unifiClient;
-        console.log("[reconnect] ✓ UniFi reconnected");
-      } catch { /* still down */ }
-    }
   }, RECONNECT_INTERVAL_MS);
+
+  // --- UniFi / Protect exponential-backoff reconnect ---
+  // The UDM Pro has an aggressive rolling-window rate limit (~2 logins per
+  // 15 min). A fixed interval can keep hitting it and resetting the window,
+  // locking us out indefinitely. Exponential backoff gives the window time
+  // to clear: 2 min → 4 → 8 → 16 → 30 (cap), reset to 2 on success.
+  const UNIFI_BACKOFF_MIN = 2 * 60 * 1000;   // 2 min
+  const UNIFI_BACKOFF_MAX = 30 * 60 * 1000;  // 30 min
+
+  function scheduleUnifiReconnect(delay: number) {
+    setTimeout(async () => {
+      let nextDelay = delay;
+
+      // UniFi Protect
+      if (!services.protect && protectClient) {
+        try {
+          await protectClient.login();
+          services.protect = protectClient;
+          console.log("[reconnect] ✓ UniFi Protect reconnected");
+          nextDelay = UNIFI_BACKOFF_MIN; // reset on success
+        } catch (err) {
+          const msg = String(err);
+          const is429 = msg.includes("429") || msg.includes("Too Many");
+          const next = Math.min(delay * 2, UNIFI_BACKOFF_MAX);
+          if (is429) {
+            console.warn(`[reconnect] UniFi Protect 429 — backing off to ${next / 60000}m`);
+          }
+          nextDelay = next;
+        }
+      }
+
+      // UniFi (same UDM controller, same rate limit)
+      if (!services.unifi && unifiClient) {
+        try {
+          await unifiClient.login();
+          services.unifi = unifiClient;
+          console.log("[reconnect] ✓ UniFi reconnected");
+          nextDelay = UNIFI_BACKOFF_MIN; // reset on success
+        } catch (err) {
+          const msg = String(err);
+          const is429 = msg.includes("429") || msg.includes("Too Many");
+          const next = Math.min(delay * 2, UNIFI_BACKOFF_MAX);
+          if (is429) {
+            console.warn(`[reconnect] UniFi 429 — backing off to ${next / 60000}m`);
+          }
+          nextDelay = Math.max(nextDelay, next); // take the longer delay
+        }
+      }
+
+      // If either service is still down, keep retrying
+      if (!services.protect || !services.unifi) {
+        scheduleUnifiReconnect(nextDelay);
+      }
+    }, delay);
+  }
+
+  if ((protectClient && !services.protect) || (unifiClient && !services.unifi)) {
+    scheduleUnifiReconnect(UNIFI_BACKOFF_MIN);
+  }
 
   // Discover plugins
   const rootDir = join(import.meta.dir, "../../..");

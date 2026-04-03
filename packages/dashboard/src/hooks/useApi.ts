@@ -18,9 +18,10 @@ export function useApi<T>(url: string | null, interval?: number) {
 
     let mounted = true;
 
+    const endpoint = url; // capture non-null for async closure (TS narrowing)
     async function fetchData() {
       try {
-        const res = await fetch(url);
+        const res = await fetch(endpoint);
         if (!res.ok) throw new Error(`${res.status}`);
         const json = await res.json();
         if (mounted) {
