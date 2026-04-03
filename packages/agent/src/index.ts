@@ -569,9 +569,39 @@ async function main() {
     },
   };
   await corePlugin.init(coreCore);
-  // Give core plugin access to the full plugin list (including itself) for catalog/health
-  setCorePlugins([corePlugin, ...loadedPlugins]);
-  loadedPlugins = [corePlugin, ...loadedPlugins];
+
+  // Channing's persona lives in synthetic-hdhr (a separate service, not a discoverable plugin).
+  // Inject it as a persona-only stub so it appears in /api/personas and the agent's router.
+  const channingStub: MaisiePlugin = {
+    name: 'synthetic-hdhr',
+    version: '0.1.0',
+    description: 'Synthetic HDHomeRun — TV channels persona stub',
+    capabilities: [],
+    envVars: [],
+    actions: [],
+    events: [],
+    persona: {
+      name: 'Channing',
+      role: 'TV & streaming specialist',
+      avatar: '📺',
+      defaultTier: 'advise',
+      eventSubscriptions: ['home/media/plex/#', 'home/tv/#', 'home/channels/#', 'home/synthetic-hdhr/#'],
+      toolScopes: ['get_lineup', 'get_channel_now_playing', 'get_channel_schedule', 'get_epg_guide', 'refresh_epg', 'add_library_channel', 'update_library_channel', 'remove_library_channel', 'get_library_channel_config'],
+      systemPrompt: 'You are Channing, the TV and streaming specialist for this home. Your domain is the synthetic TV lineup — a custom HDHomeRun emulator that unifies cable channels (1–999), library channels (20001–29999), and camera streams (90001–90999) into Plex Live TV.',
+    },
+    async init() {},
+    async shutdown() {},
+    async healthCheck() { return { status: 'healthy', lastCheck: new Date() } },
+  };
+
+  // Prepend core, add channing stub, deduplicate by name (discovery may have picked up plugin-core)
+  const allPlugins = [
+    corePlugin,
+    channingStub,
+    ...loadedPlugins.filter((p) => p.name !== 'core' && p.name !== 'synthetic-hdhr'),
+  ];
+  setCorePlugins(allPlugins);
+  loadedPlugins = allPlugins;
   console.log("  ✓ Core plugin initialized");
 
   // Agent runtime — wires MQTT events to the agent loop

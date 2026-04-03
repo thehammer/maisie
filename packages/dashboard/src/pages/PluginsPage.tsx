@@ -1,11 +1,19 @@
 import { useState, useCallback } from "react";
 import { useApi } from "../hooks/useApi";
 
+interface EnvVarSpec {
+  name: string;
+  required: boolean;
+  description: string;
+  example?: string;
+}
+
 interface PluginInfo {
   name: string;
   version: string;
   description: string;
   capabilities: string[];
+  envVars: EnvVarSpec[];
   enabled?: boolean;
 }
 
@@ -83,9 +91,11 @@ function ConfigureModal({
   onClose: () => void;
   onSave: (name: string, overrides: Record<string, string>) => Promise<void>;
 }) {
-  const [pairs, setPairs] = useState<Array<{ key: string; value: string }>>([
-    { key: "", value: "" },
-  ]);
+  const seedPairs = plugin.envVars?.length
+    ? plugin.envVars.map((v) => ({ key: v.name, value: "", spec: v }))
+    : [{ key: "", value: "", spec: undefined as EnvVarSpec | undefined }];
+
+  const [pairs, setPairs] = useState<Array<{ key: string; value: string; spec?: EnvVarSpec }>>(seedPairs);
   const [saving, setSaving] = useState(false);
 
   const addPair = () => setPairs((p) => [...p, { key: "", value: "" }]);
@@ -117,29 +127,43 @@ function ConfigureModal({
         <div className="tv-modal-body">
           <div className="tv-modal-label">Environment variable overrides</div>
           {pairs.map((pair, i) => (
-            <div key={i} style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-              <input
-                placeholder="KEY"
-                value={pair.key}
-                onChange={(e) => updatePair(i, "key", e.target.value)}
-                style={{ flex: 1, fontFamily: "monospace", fontSize: "0.82rem" }}
-              />
-              <input
-                placeholder="value"
-                value={pair.value}
-                onChange={(e) => updatePair(i, "value", e.target.value)}
-                style={{ flex: 2, fontFamily: "monospace", fontSize: "0.82rem" }}
-              />
-              <button
-                className="tv-manager-delete"
-                onClick={() => removePair(i)}
-                aria-label="Remove"
-              >
-                &times;
-              </button>
+            <div key={i} style={{ marginBottom: "0.5rem" }}>
+              {pair.spec && (
+                <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginBottom: "0.25rem" }}>
+                  <span style={{ color: pair.spec.required ? "#f87171" : "var(--muted)" }}>
+                    {pair.spec.required ? "required" : "optional"}
+                  </span>
+                  {" — "}{pair.spec.description}
+                  {pair.spec.example && <span style={{ opacity: 0.6 }}> (e.g. {pair.spec.example})</span>}
+                </div>
+              )}
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                <input
+                  placeholder="KEY"
+                  value={pair.key}
+                  readOnly={!!pair.spec}
+                  onChange={(e) => updatePair(i, "key", e.target.value)}
+                  style={{ flex: 1, fontFamily: "monospace", fontSize: "0.82rem", opacity: pair.spec ? 0.7 : 1 }}
+                />
+                <input
+                  placeholder={pair.spec?.example ?? "value"}
+                  value={pair.value}
+                  onChange={(e) => updatePair(i, "value", e.target.value)}
+                  style={{ flex: 2, fontFamily: "monospace", fontSize: "0.82rem" }}
+                />
+                {!pair.spec && (
+                  <button
+                    className="tv-manager-delete"
+                    onClick={() => removePair(i)}
+                    aria-label="Remove"
+                  >
+                    &times;
+                  </button>
+                )}
+              </div>
             </div>
           ))}
-          <button className="card-btn" onClick={addPair} style={{ alignSelf: "flex-start" }}>
+          <button className="card-btn" onClick={addPair} style={{ alignSelf: "flex-start", marginTop: "0.25rem" }}>
             + Add variable
           </button>
         </div>

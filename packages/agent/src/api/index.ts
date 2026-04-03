@@ -19,6 +19,7 @@ import { createPlexImageRouter } from "./plex-image";
 import { createDashboardRouter } from "./dashboard";
 import { createChatRouter } from "./chat";
 import { createPluginsRouter } from "./plugins";
+import { createPersonasRouter } from "./personas";
 import type { Agent } from "../agent/index";
 import type { MaisiePlugin } from "@maisie/shared";
 
@@ -46,6 +47,7 @@ export function createApi(services: Services, agent?: Agent, plugins: MaisiePlug
   app.route("/api", createMaintenanceRouter(services));
   app.route("/api", createBridgeRouter(services));
   app.route("/api", createPluginsRouter(plugins));
+  app.route("/api", createPersonasRouter());
 
   if (agent) {
     app.route("/api", createChatRouter(agent));

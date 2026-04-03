@@ -259,9 +259,11 @@ export const checkPluginHealth = defineAction({
 // ----------------------------------------------------------------
 
 function builtInPersonas(): PersonaConfig[] {
+  const seen = new Set<string>()
   const personas: PersonaConfig[] = []
   for (const plugin of _loadedPlugins) {
-    if (plugin.persona) {
+    if (plugin.persona && !seen.has(plugin.persona.name)) {
+      seen.add(plugin.persona.name)
       personas.push({
         id: `builtin:${plugin.persona.name}`,
         name: plugin.persona.name,

@@ -11,6 +11,7 @@ export function createPluginsRouter(plugins: MaisiePlugin[]) {
         version: p.version,
         description: p.description,
         capabilities: p.capabilities,
+        envVars: p.envVars,
       })),
     })
   })
