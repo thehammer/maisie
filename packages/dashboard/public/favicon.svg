@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- House silhouette: roof peak at top-center, walls to bottom corners -->
+  <!-- Roof: 16,4 → 28,14 → 28,28 → 4,28 → 4,14 → 16,4 -->
+  <path
+    d="M16 4 L28 14 L28 28 L4 28 L4 14 Z"
+    stroke="#6c8cff"
+    stroke-width="2"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+    fill="none"
+  />
+  <!-- AI core dot — centered in the lower body -->
+  <circle cx="16" cy="21" r="2.5" fill="#6c8cff" />
+</svg>
