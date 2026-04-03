@@ -49,6 +49,13 @@ export function createApi(services: Services, agent?: Agent, plugins: MaisiePlug
   app.route("/api", createPluginsRouter(plugins));
   app.route("/api", createPersonasRouter());
 
+  // Mount custom routes from plugins (OAuth flows, streaming endpoints, webhooks)
+  for (const plugin of plugins) {
+    if (plugin.customRoutes) {
+      app.route(`/api/${plugin.name}`, plugin.customRoutes);
+    }
+  }
+
   if (agent) {
     app.route("/api", createChatRouter(agent));
   }

@@ -93,6 +93,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@maisie/shared": "workspace:*",
+        "hono": "^4.7.0",
         "zod": "^4.3.6",
       },
     },
