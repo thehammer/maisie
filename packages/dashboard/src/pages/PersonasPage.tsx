@@ -280,6 +280,11 @@ function ConfirmDialog({
   );
 }
 
+function isEmojiAvatar(avatar: string) {
+  // If it doesn't start with http/https or /, treat it as an emoji/text avatar
+  return !/^https?:\/\/|^\//.test(avatar);
+}
+
 function PersonaCard({
   persona,
   onEdit,
@@ -292,10 +297,21 @@ function PersonaCard({
   return (
     <div className="persona-card">
       <div className="persona-card-top">
-        {persona.avatar ? (
+        {persona.avatar && !isEmojiAvatar(persona.avatar) ? (
           <img src={persona.avatar} alt={persona.name} className="persona-avatar persona-avatar-img" />
         ) : (
-          <InitialAvatar name={persona.name} />
+          <div
+            className="persona-avatar"
+            style={{
+              background: `${personaColor(persona.name)}22`,
+              color: personaColor(persona.name),
+              border: `1px solid ${personaColor(persona.name)}44`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: persona.avatar ? "1.2rem" : "1rem",
+            }}
+          >
+            {persona.avatar || persona.name.charAt(0).toUpperCase()}
+          </div>
         )}
         <div className="persona-card-info">
           <div className="persona-card-name">
@@ -320,11 +336,11 @@ function PersonaCard({
         <span className="persona-stat">{persona.eventSubscriptions.length} subscriptions</span>
       </div>
 
-      {persona.isCustom && (
-        <div className="persona-card-actions">
-          <button className="card-btn" onClick={() => onEdit(persona)}>
-            Edit
-          </button>
+      <div className="persona-card-actions">
+        <button className="card-btn" onClick={() => onEdit(persona)}>
+          Edit
+        </button>
+        {persona.isCustom && (
           <button
             className="card-btn"
             style={{ color: "var(--red)", borderColor: "var(--red)" }}
@@ -332,8 +348,8 @@ function PersonaCard({
           >
             Delete
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
