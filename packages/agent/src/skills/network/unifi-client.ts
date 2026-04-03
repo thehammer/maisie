@@ -82,23 +82,14 @@ export function createUniFiClient(config: UniFiConfig) {
     return res.json();
   }
 
-  // Shared login state — ensures only one login attempt at a time,
-  // and enforces a cooldown to avoid UDM rate limiting.
+  // Shared login state — ensures only one login attempt at a time.
+  // Rate limiting (backoff) is handled by the caller in index.ts, not here.
   let loginPromise: Promise<void> | null = null;
-  let lastLoginAttempt = 0;
-  const LOGIN_COOLDOWN_MS = 30 * 60 * 1000; // 30 min — UDM has aggressive rate limiting
 
   async function login(): Promise<void> {
     // If a login is already in flight, piggyback on it
     if (loginPromise) return loginPromise;
 
-    // Enforce cooldown between login attempts
-    const elapsed = Date.now() - lastLoginAttempt;
-    if (lastLoginAttempt > 0 && elapsed < LOGIN_COOLDOWN_MS) {
-      throw new Error(`UniFi login cooldown: ${Math.ceil((LOGIN_COOLDOWN_MS - elapsed) / 1000)}s remaining`);
-    }
-
-    lastLoginAttempt = Date.now();
     loginPromise = (async () => {
       try {
         cookies = [];
@@ -109,8 +100,6 @@ export function createUniFiClient(config: UniFiConfig) {
             password: config.password,
           }),
         });
-        // Successful login — reset cooldown so next one isn't delayed
-        lastLoginAttempt = 0;
       } finally {
         loginPromise = null;
       }

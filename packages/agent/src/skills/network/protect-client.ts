@@ -40,20 +40,13 @@ export function createProtectClient(config: ProtectConfig) {
     return res.json();
   }
 
-  // Login state — same pattern as unifi-client to avoid UDM rate limiting
+  // Login state — ensures only one login attempt at a time.
+  // Rate limiting (backoff) is handled by the caller in index.ts, not here.
   let loginPromise: Promise<void> | null = null;
-  let lastLoginAttempt = 0;
-  const LOGIN_COOLDOWN_MS = 30 * 60 * 1000;
 
   async function login(): Promise<void> {
     if (loginPromise) return loginPromise;
 
-    const elapsed = Date.now() - lastLoginAttempt;
-    if (lastLoginAttempt > 0 && elapsed < LOGIN_COOLDOWN_MS) {
-      throw new Error(`Protect login cooldown: ${Math.ceil((LOGIN_COOLDOWN_MS - elapsed) / 1000)}s remaining`);
-    }
-
-    lastLoginAttempt = Date.now();
     loginPromise = (async () => {
       try {
         cookies = [];
@@ -64,7 +57,6 @@ export function createProtectClient(config: ProtectConfig) {
             password: config.password,
           }),
         });
-        lastLoginAttempt = 0;
       } finally {
         loginPromise = null;
       }
