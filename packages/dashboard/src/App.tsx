@@ -271,7 +271,10 @@ export function App() {
     <div className="dashboard">
       <div className="dashboard-header">
         <div className="dashboard-nav">
-          <h1>Maisie</h1>
+          <h1 style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <img src="/favicon.svg" alt="" width="28" height="28" style={{ display: "block" }} />
+            Maisie
+          </h1>
           <nav className="nav-links">
             <a href="#media" className="nav-link">Media</a>
             <a href="#tv" className="nav-link">TV</a>
