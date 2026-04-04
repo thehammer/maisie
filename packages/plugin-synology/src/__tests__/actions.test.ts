@@ -59,9 +59,9 @@ describe('storageLow event', () => {
 })
 
 describe('plugin structure', () => {
-  test('plugin provides get_health — required storage capability action', () => {
+  test('plugin provides get_storage_health — required storage capability action', () => {
     const actionNames = Object.values(actionDefs).map(a => a.name)
-    expect(actionNames).toContain('get_health')
+    expect(actionNames).toContain('get_storage_health')
   })
 
   test('plugin provides list_files — required storage capability action', () => {

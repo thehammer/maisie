@@ -56,7 +56,7 @@ export const getAuthStatus = defineAction({
   output: z.object({ isAuthenticated: z.boolean(), email: z.string().optional() }),
   http: { method: 'GET' },
   ai: { tier: 'inform' },
-  ui: { label: 'Google Auth', section: 'integrations' },
+  ui: { type: 'data', label: 'Google Auth', section: 'integrations' },
   async execute(_input, _ctx) {
     if (!_auth) return { isAuthenticated: false }
     const isAuthenticated = _auth.isAuthorized()
@@ -72,13 +72,13 @@ export const getAuthStatus = defineAction({
 })
 
 export const getUnreadEmails = defineAction({
-  name: 'get_unread_emails',
+  name: 'list_unread_emails',
   description: 'Get count and preview of unread Gmail messages.',
   input: z.object({ limit: z.number().default(10) }),
   output: z.object({ unreadCount: z.number(), messages: z.array(z.any()) }),
   http: { method: 'GET' },
   ai: { tier: 'inform', description: 'Get count and preview of unread Gmail messages.' },
-  ui: { label: 'Inbox', section: 'personal' },
+  ui: { type: 'data', label: 'Inbox', section: 'personal' },
   async execute(input, _ctx) {
     const auth = getAuth()
     const [unreadCount, messages] = await Promise.all([
@@ -91,13 +91,13 @@ export const getUnreadEmails = defineAction({
 })
 
 export const searchEmails = defineAction({
-  name: 'search_emails',
+  name: 'list_emails',
   description: 'Search Gmail for messages matching a query.',
   input: z.object({ query: z.string(), limit: z.number().default(10) }),
   output: z.array(messageSchema),
   http: { method: 'GET' },
   ai: { tier: 'inform', description: 'Search Gmail for messages matching a query.' },
-  ui: { label: 'Search Email', section: 'personal' },
+  ui: { type: 'data', label: 'Search Email', section: 'personal' },
   async execute(input, _ctx) {
     const auth = getAuth()
     // getRecentEmails doesn't take a query — bridge via Gmail search API directly
@@ -133,39 +133,39 @@ export const searchEmails = defineAction({
 })
 
 export const getUpcomingCalendarEvents = defineAction({
-  name: 'get_upcoming_events',
+  name: 'list_upcoming_events',
   description: 'Get Google Calendar events for the next N days.',
   input: z.object({ days: z.number().default(7) }),
   output: z.array(eventSchema),
   http: { method: 'GET' },
   ai: { tier: 'inform', description: 'Get Google Calendar events for the next N days.' },
-  ui: { label: 'Calendar', section: 'personal', realtimeTopic: 'home/google/calendar/+' },
+  ui: { type: 'data', label: 'Calendar', section: 'personal', realtimeTopic: 'home/google/calendar/+' },
   async execute(input, _ctx) {
     return getUpcomingEvents(getAuth(), input.days)
   },
 })
 
 export const getYoutubeSubscriptions = defineAction({
-  name: 'get_youtube_subscriptions',
+  name: 'list_youtube_subscriptions',
   description: 'Get all YouTube channel subscriptions.',
   input: z.object({}),
   output: z.array(subscriptionSchema),
   http: { method: 'GET' },
   ai: { tier: 'inform' },
-  ui: { label: 'Subscriptions', section: 'personal' },
+  ui: { type: 'data', label: 'Subscriptions', section: 'personal' },
   async execute(_input, _ctx) {
     return getSubscriptions(getAuth())
   },
 })
 
 export const cleanupYoutube = defineAction({
-  name: 'cleanup_youtube',
+  name: 'invoke_cleanup_youtube',
   description: 'Run YouTube cleanup — removes old subscriptions and liked videos. Irreversible, requires confirmation.',
   input: z.object({ dryRun: z.boolean().default(true) }),
   output: z.object({ removed: z.number(), dryRun: z.boolean() }),
   http: { method: 'POST' },
   ai: { tier: 'advise', description: 'Run YouTube cleanup — removes old subscriptions and liked videos. Irreversible, requires confirmation.' },
-  ui: { label: 'Cleanup YouTube', section: 'personal' },
+  ui: { type: 'action', label: 'Cleanup YouTube', section: 'personal' },
   async execute(input, _ctx) {
     if (input.dryRun) {
       const status = getCleanupStatus()

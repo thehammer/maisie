@@ -64,8 +64,8 @@ describe('plugin structure', () => {
     const names = Object.values(actionDefs)
       .filter(v => typeof v === 'object' && 'name' in v)
       .map((a: any) => a.name)
-    expect(names).toContain('get_entities')
-    expect(names).toContain('call_service')
+    expect(names).toContain('list_entities')
+    expect(names).toContain('invoke_service')
   })
 
   test('all actions have http explicitly set', () => {

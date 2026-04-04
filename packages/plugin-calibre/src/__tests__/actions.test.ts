@@ -32,7 +32,7 @@ describe('apply_enrichment action', () => {
 describe('plugin structure', () => {
   test('provides required book-library capability actions', () => {
     const names = Object.values(actionDefs).map(a => a.name)
-    expect(names).toContain('search_books')
+    expect(names).toContain('list_books')
     expect(names).toContain('get_book_count')
   })
   test('all actions have http, ai, ui declared', () => {

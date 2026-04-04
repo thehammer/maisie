@@ -30,7 +30,7 @@ const movieSchema = z.object({
 })
 
 export const searchMovies = defineAction({
-  name: 'search_movies',
+  name: 'list_movies',
   description:
     'Search for movies in Radarr — searches both the local library and remote sources.',
   input: z.object({
@@ -40,7 +40,7 @@ export const searchMovies = defineAction({
   output: z.array(movieResultSchema),
   http: { method: 'GET' },
   ai: { tier: 'inform' },
-  ui: { label: 'Search Movies', section: 'media' },
+  ui: { type: 'data', label: 'Search Movies', section: 'media' },
   async execute(input, _ctx) {
     const radarr = getRadarrClient()
     if (!radarr) throw new Error('Radarr not configured')
@@ -57,7 +57,7 @@ export const searchMovies = defineAction({
 })
 
 export const addMovie = defineAction({
-  name: 'add_movie',
+  name: 'invoke_add_movie',
   description: 'Add a movie to the Radarr watchlist for automated downloading.',
   input: z.object({
     title: z.string(),
@@ -75,7 +75,7 @@ export const addMovie = defineAction({
     description:
       'Add a movie to the Radarr watchlist for automated downloading. Requires title and year. Use advise tier because this triggers automation.',
   },
-  ui: { label: 'Add Movie', section: 'media' },
+  ui: { type: 'action', label: 'Add Movie', section: 'media' },
   async execute(input, _ctx) {
     const radarr = getRadarrClient()
     if (!radarr) throw new Error('Radarr not configured')
@@ -117,7 +117,7 @@ export const addMovie = defineAction({
 })
 
 export const getUpcomingMovies = defineAction({
-  name: 'get_upcoming_movies',
+  name: 'list_upcoming_movies',
   description: 'Get movies releasing in the next N days from Radarr.',
   input: z.object({
     days: z.number().default(30),
@@ -126,6 +126,7 @@ export const getUpcomingMovies = defineAction({
   http: { method: 'GET' },
   ai: { tier: 'inform' },
   ui: {
+    type: 'data',
     label: 'Upcoming Movies',
     section: 'media',
     realtimeTopic: 'home/media/radarr/calendar',
@@ -147,7 +148,7 @@ export const getUpcomingMovies = defineAction({
 })
 
 export const getMonitoredMovies = defineAction({
-  name: 'get_monitored_movies',
+  name: 'list_monitored_movies',
   description: 'Get all monitored movies in the Radarr library.',
   input: z.object({
     downloaded: z.boolean().optional(),
@@ -155,7 +156,7 @@ export const getMonitoredMovies = defineAction({
   output: z.array(movieSchema),
   http: { method: 'GET' },
   ai: { tier: 'inform' },
-  ui: { label: 'Movie Library', section: 'media' },
+  ui: { type: 'data', label: 'Movie Library', section: 'media' },
   async execute(input, _ctx) {
     const radarr = getRadarrClient()
     if (!radarr) throw new Error('Radarr not configured')
@@ -177,7 +178,7 @@ export const getMonitoredMovies = defineAction({
 })
 
 export const checkMovieStatus = defineAction({
-  name: 'check_movie_status',
+  name: 'get_movie_status',
   description:
     "Check if a specific movie is in Radarr — whether it's monitored and if it's been downloaded.",
   input: z.object({

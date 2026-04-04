@@ -36,7 +36,7 @@ function padNum(n: number): string {
 }
 
 export const searchShows = defineAction({
-  name: 'search_shows',
+  name: 'list_shows',
   description: 'Search for TV shows in Sonarr — searches both the local library and remote sources.',
   input: z.object({
     query: z.string(),
@@ -45,7 +45,7 @@ export const searchShows = defineAction({
   output: z.array(showResultSchema),
   http: { method: 'GET' },
   ai: { tier: 'inform' },
-  ui: { label: 'Search Shows', section: 'media' },
+  ui: { type: 'data', label: 'Search Shows', section: 'media' },
   async execute(input, _ctx) {
     const sonarr = getSonarrClient()
     if (!sonarr) throw new Error('Sonarr not configured')
@@ -62,7 +62,7 @@ export const searchShows = defineAction({
 })
 
 export const addShow = defineAction({
-  name: 'add_show',
+  name: 'invoke_add_show',
   description: 'Add a TV show to the Sonarr watchlist for automated downloading.',
   input: z.object({
     title: z.string(),
@@ -79,7 +79,7 @@ export const addShow = defineAction({
     description:
       'Add a TV show to the Sonarr watchlist for automated downloading. Requires title. Use advise tier because this triggers automation.',
   },
-  ui: { label: 'Add Show', section: 'media' },
+  ui: { type: 'action', label: 'Add Show', section: 'media' },
   async execute(input, _ctx) {
     const sonarr = getSonarrClient()
     if (!sonarr) throw new Error('Sonarr not configured')
@@ -118,7 +118,7 @@ export const addShow = defineAction({
 })
 
 export const getUpcomingEpisodes = defineAction({
-  name: 'get_upcoming_episodes',
+  name: 'list_upcoming_episodes',
   description: 'Get episodes airing in the next N days from Sonarr.',
   input: z.object({
     days: z.number().default(7),
@@ -127,6 +127,7 @@ export const getUpcomingEpisodes = defineAction({
   http: { method: 'GET' },
   ai: { tier: 'inform' },
   ui: {
+    type: 'data',
     label: 'Upcoming Episodes',
     section: 'media',
     realtimeTopic: 'home/media/sonarr/calendar',
@@ -149,7 +150,7 @@ export const getUpcomingEpisodes = defineAction({
 })
 
 export const getMonitoredShows = defineAction({
-  name: 'get_monitored_shows',
+  name: 'list_monitored_shows',
   description: 'Get all monitored TV shows in the Sonarr library.',
   input: z.object({
     downloaded: z.boolean().optional(),
@@ -157,7 +158,7 @@ export const getMonitoredShows = defineAction({
   output: z.array(showSchema),
   http: { method: 'GET' },
   ai: { tier: 'inform' },
-  ui: { label: 'Show Library', section: 'media' },
+  ui: { type: 'data', label: 'Show Library', section: 'media' },
   async execute(input, _ctx) {
     const sonarr = getSonarrClient()
     if (!sonarr) throw new Error('Sonarr not configured')
@@ -184,7 +185,7 @@ export const getMonitoredShows = defineAction({
 })
 
 export const checkShowStatus = defineAction({
-  name: 'check_show_status',
+  name: 'get_show_status',
   description: "Check if a specific TV show is in Sonarr — whether it's monitored and episode counts.",
   input: z.object({
     title: z.string(),

@@ -70,13 +70,13 @@ export function App() {
 
   const health = useApi<{ status: string }>("/api/health", POLL_INTERVAL);
   const devicesApi = useApi<Device[]>("/api/devices", POLL_INTERVAL);
-  const nasApi = useApi<NasHealth>("/api/nas/health", POLL_INTERVAL);
-  const plexApi = useApi<PlexStatus>("/api/plex/status", POLL_INTERVAL);
+  const nasApi = useApi<NasHealth>("/api/synology/storage-health", POLL_INTERVAL);
+  const plexApi = useApi<PlexStatus>("/api/plex/plex-status", POLL_INTERVAL);
   const mediaApi = useApi<any>("/api/media/calendar", POLL_INTERVAL);
   const hdhrApi = useApi<HdhrStatus>("/api/hdhr/status", POLL_INTERVAL);
   const dakboardApi = useApi<any[]>("/api/dakboard/devices", POLL_INTERVAL);
-  const switchesApi = useApi<any[]>("/api/ha/switches", POLL_INTERVAL);
-  const bambuApi = useApi<any>("/api/bambu/status", POLL_INTERVAL);
+  const switchesApi = useApi<any[]>("/api/home-assistant/switches", POLL_INTERVAL);
+  const bambuApi = useApi<any>("/api/bambu/print-status", POLL_INTERVAL);
   // Packages API requires Google OAuth. Skip unless we know it's configured to
   // avoid a 401 on every load. Check /api/packages/configured before polling.
   const packagesConfiguredApi = useApi<{ configured: boolean }>("/api/packages/configured", 0);
@@ -84,7 +84,7 @@ export function App() {
     packagesConfiguredApi.data?.configured ? "/api/packages/active" : null,
     5 * 60_000,
   );
-  const calibreApi = useApi<CalibreStatus>("/api/calibre/status", POLL_INTERVAL);
+  const calibreApi = useApi<CalibreStatus>("/api/calibre/calibre-status", POLL_INTERVAL);
 
   const layout = useLayout("home");
 

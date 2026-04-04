@@ -67,7 +67,7 @@ describe('plugin structure', () => {
     const names = Object.values(actionDefs)
       .filter(v => typeof v === 'object' && 'name' in v)
       .map((a: any) => a.name)
-    expect(names).toContain('get_status')
+    expect(names).toContain('get_print_status')
   })
 
   test('all actions have http explicitly set', () => {

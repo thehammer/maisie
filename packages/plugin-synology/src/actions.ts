@@ -1,13 +1,13 @@
 import { z } from 'zod'
-import { defineAction } from '@maisie/shared'
+import { defineAction, field } from '@maisie/shared'
 import { getClients } from './clients'
 
 const volumeSchema = z.object({
   id: z.string(),
-  status: z.string(),
-  totalBytes: z.number(),
-  usedBytes: z.number(),
-  usedPercent: z.number(),
+  status: field(z.string(), 'status'),
+  totalBytes: field(z.number(), 'bytes'),
+  usedBytes: field(z.number(), 'bytes'),
+  usedPercent: field(z.number(), 'percentage'),
 })
 
 const diskSchema = z.object({
@@ -15,30 +15,30 @@ const diskSchema = z.object({
   name: z.string(),
   vendor: z.string(),
   model: z.string(),
-  temp: z.number(),
+  temp: field(z.number(), 'temperature'),
   smartStatus: z.string(),
-  sizeBytes: z.number(),
+  sizeBytes: field(z.number(), 'bytes'),
 })
 
 const containerSchema = z.object({
   name: z.string(),
   image: z.string(),
-  status: z.string(),
+  status: field(z.string(), 'status'),
   state: z.enum(['running', 'stopped', 'exited', 'created']),
-  uptime: z.number().optional(),
+  uptime: field(z.number().optional(), 'duration'),
 })
 
 const systemInfoSchema = z.object({
   model: z.string(),
   dsmVersion: z.string(),
-  uptime: z.number(),
-  cpuLoad: z.number(),
-  ramUsedPercent: z.number(),
-  temp: z.number(),
+  uptime: field(z.number(), 'duration'),
+  cpuLoad: field(z.number(), 'percentage'),
+  ramUsedPercent: field(z.number(), 'percentage'),
+  temp: field(z.number(), 'temperature'),
 })
 
 export const getHealth = defineAction({
-  name: 'get_health',
+  name: 'get_storage_health',
   description: 'Get NAS health: volume status, disk health, container states, system load.',
   input: z.object({}),
   output: z.object({
@@ -46,11 +46,11 @@ export const getHealth = defineAction({
     volumes: z.array(volumeSchema),
     disks: z.array(diskSchema),
     containers: z.array(containerSchema),
-    timestamp: z.string(),
+    timestamp: field(z.string(), 'timestamp'),
   }),
   http: { method: 'GET' },
   ai: { tier: 'inform' },
-  ui: { label: 'NAS Health', section: 'nas', realtimeTopic: 'home/nas/health' },
+  ui: { type: 'data', label: 'NAS Health', section: 'nas', realtimeTopic: 'home/nas/health' },
   async execute(_input, _ctx) {
     const { dsm } = getClients()
     if (!dsm) throw new Error('Synology not configured')
@@ -110,7 +110,7 @@ const fileEntrySchema = z.object({
   path: z.string(),
   isdir: z.boolean(),
   size: z.number().optional(),
-  mtime: z.number().optional(),
+  mtime: field(z.number().optional(), 'timestamp'),
 })
 
 export const listFiles = defineAction({
@@ -122,7 +122,7 @@ export const listFiles = defineAction({
   output: z.array(fileEntrySchema),
   http: { method: 'GET' },
   ai: { tier: 'inform' },
-  ui: { label: 'Files', section: 'nas' },
+  ui: { type: 'data', label: 'Files', section: 'nas' },
   async execute(input, _ctx) {
     const { dsm } = getClients()
     if (!dsm) throw new Error('Synology not configured')
@@ -138,13 +138,13 @@ export const listFiles = defineAction({
 })
 
 export const getContainerStatus = defineAction({
-  name: 'get_container_status',
+  name: 'list_containers',
   description: 'Get the status of all Docker containers running on the NAS.',
   input: z.object({}),
   output: z.array(containerSchema),
   http: { method: 'GET' },
   ai: { tier: 'inform' },
-  ui: { label: 'Containers', section: 'nas' },
+  ui: { type: 'data', label: 'Containers', section: 'nas' },
   async execute(_input, _ctx) {
     const { dsm } = getClients()
     if (!dsm) throw new Error('Synology not configured')
@@ -166,7 +166,7 @@ export const getSystemInfo = defineAction({
   output: systemInfoSchema,
   http: { method: 'GET' },
   ai: { tier: 'inform' },
-  ui: { label: 'System Info', section: 'nas' },
+  ui: { type: 'data', label: 'System Info', section: 'nas' },
   async execute(_input, _ctx) {
     const { dsm } = getClients()
     if (!dsm) throw new Error('Synology not configured')

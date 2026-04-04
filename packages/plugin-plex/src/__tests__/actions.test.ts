@@ -46,9 +46,9 @@ describe('get_plex_image action', () => {
 describe('plugin structure', () => {
   test('provides all required media-server capability actions', () => {
     const actionNames = Object.values(actionDefs).map((a) => a.name)
-    expect(actionNames).toContain('get_libraries')
+    expect(actionNames).toContain('list_libraries')
     expect(actionNames).toContain('get_now_playing')
-    expect(actionNames).toContain('get_recently_added')
+    expect(actionNames).toContain('list_recently_added')
   })
 
   test('all actions have http explicitly set', () => {

@@ -70,13 +70,13 @@ function formatSeasonEpisode(parentIndex?: number, index?: number): string | und
 }
 
 export const getLibraries = defineAction({
-  name: 'get_libraries',
+  name: 'list_libraries',
   description: 'Get all Plex media libraries (movies, TV shows, music, etc.).',
   input: z.object({}),
   output: z.array(librarySchema),
   http: { method: 'GET' },
   ai: { tier: 'inform' },
-  ui: { label: 'Libraries', section: 'media' },
+  ui: { type: 'data', label: 'Libraries', section: 'media' },
   async execute(_input, _ctx) {
     const plex = getPlexClient()
     if (!plex) throw new Error('Plex not configured')
@@ -101,7 +101,7 @@ export const getNowPlaying = defineAction({
   output: z.array(nowPlayingSchema),
   http: { method: 'GET' },
   ai: { tier: 'inform' },
-  ui: { label: 'Now Playing', section: 'media', realtimeTopic: 'home/media/plex/now_playing' },
+  ui: { type: 'data', label: 'Now Playing', section: 'media', realtimeTopic: 'home/media/plex/now_playing' },
   async execute(_input, _ctx) {
     const plex = getPlexClient()
     if (!plex) throw new Error('Plex not configured')
@@ -129,7 +129,7 @@ export const getNowPlaying = defineAction({
 })
 
 export const getRecentlyAdded = defineAction({
-  name: 'get_recently_added',
+  name: 'list_recently_added',
   description: 'Get recently added media from the Plex library.',
   input: z.object({
     limit: z.number().default(20),
@@ -139,6 +139,7 @@ export const getRecentlyAdded = defineAction({
   http: { method: 'GET' },
   ai: { tier: 'inform' },
   ui: {
+    type: 'data',
     label: 'Recently Added',
     section: 'media',
     realtimeTopic: 'home/media/plex/recently_added',
@@ -164,7 +165,7 @@ export const getRecentlyAdded = defineAction({
 })
 
 export const searchMedia = defineAction({
-  name: 'search_media',
+  name: 'list_media',
   description: 'Search the Plex library for movies, shows, or episodes by title.',
   input: z.object({
     query: z.string(),
@@ -176,7 +177,7 @@ export const searchMedia = defineAction({
     tier: 'inform',
     description: 'Search the Plex library for movies, shows, or episodes by title.',
   },
-  ui: { label: 'Search Library', section: 'media' },
+  ui: { type: 'data', label: 'Search Library', section: 'media' },
   async execute(input, _ctx) {
     const plex = getPlexClient()
     if (!plex) throw new Error('Plex not configured')
@@ -201,7 +202,7 @@ export const getPlexImage = defineAction({
 })
 
 export const getShows = defineAction({
-  name: 'get_shows',
+  name: 'list_shows',
   description: 'Get TV shows from the Plex library, optionally filtered by library section.',
   input: z.object({
     libraryId: z.string().optional(),
@@ -209,7 +210,7 @@ export const getShows = defineAction({
   output: z.array(showSchema),
   http: { method: 'GET' },
   ai: { tier: 'inform' },
-  ui: { label: 'TV Shows', section: 'media' },
+  ui: { type: 'data', label: 'TV Shows', section: 'media' },
   async execute(input, _ctx) {
     const plex = getPlexClient()
     if (!plex) throw new Error('Plex not configured')
@@ -238,7 +239,7 @@ export const getShows = defineAction({
 })
 
 export const getEpisodes = defineAction({
-  name: 'get_episodes',
+  name: 'list_episodes',
   description: 'Get episodes for a TV show, optionally filtered by season.',
   input: z.object({
     showId: z.string(),
@@ -256,5 +257,29 @@ export const getEpisodes = defineAction({
       episodes = episodes.filter((ep) => ep.parentIndex === input.season)
     }
     return episodes
+  },
+})
+
+export const getPlexStatus = defineAction({
+  name: 'get_plex_status',
+  description: 'Get combined Plex server status: server info, libraries, now playing, and recently added.',
+  input: z.object({}),
+  output: z.object({
+    name: z.string(),
+    version: z.string(),
+    online: z.boolean(),
+    libraries: z.array(z.object({ id: z.string(), name: z.string(), type: z.string(), count: z.number() })),
+    nowPlaying: z.array(z.any()),
+    recentlyAdded: z.array(z.any()),
+    timestamp: z.string(),
+  }),
+  http: { method: 'GET' },
+  ai: { tier: 'inform' },
+  ui: { type: 'data', label: 'Plex Status', section: 'media', realtimeTopic: 'home/media/plex/now_playing' },
+  async execute(_input, _ctx) {
+    const plex = getPlexClient()
+    if (!plex) throw new Error('Plex not configured')
+    const { getPlexStatus: fetchStatus } = await import('../../agent/src/skills/media/plex-status')
+    return fetchStatus(plex)
   },
 })

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { defineAction } from '@maisie/shared'
+import { defineAction, field } from '@maisie/shared'
 import type { HaClient } from './client'
 
 let _client: HaClient | null = null
@@ -21,14 +21,6 @@ const entitySchema = z.object({
   last_updated: z.string(),
 })
 
-const lightSchema = z.object({
-  entity_id: z.string(),
-  state: z.string(),
-  attributes: z.record(z.string(), z.unknown()),
-  last_changed: z.string(),
-  last_updated: z.string(),
-})
-
 const sceneSchema = z.object({
   entity_id: z.string(),
   state: z.string(),
@@ -37,16 +29,8 @@ const sceneSchema = z.object({
   last_updated: z.string(),
 })
 
-const switchSchema = z.object({
-  entity_id: z.string(),
-  state: z.string(),
-  attributes: z.record(z.string(), z.unknown()),
-  last_changed: z.string(),
-  last_updated: z.string(),
-})
-
 export const getEntities = defineAction({
-  name: 'get_entities',
+  name: 'list_entities',
   description: 'Get Home Assistant entities — lights, switches, sensors, etc. Filter by domain (light, switch, sensor) or area.',
   input: z.object({
     domain: z.string().optional(),
@@ -55,7 +39,7 @@ export const getEntities = defineAction({
   output: z.array(entitySchema),
   http: { method: 'GET' },
   ai: { tier: 'inform' },
-  ui: { label: 'Entities', section: 'smarthome', realtimeTopic: 'home/smarthome/entities/+' },
+  ui: { type: 'data', label: 'Entities', section: 'smarthome', realtimeTopic: 'home/smarthome/entities/+' },
   async execute(input, _ctx) {
     const client = getClient()
     if (input.domain) {
@@ -66,7 +50,7 @@ export const getEntities = defineAction({
 })
 
 export const callService = defineAction({
-  name: 'call_service',
+  name: 'invoke_service',
   description: 'Call a Home Assistant service to control a device. Example: turn on a light (domain: light, service: turn_on, entityId: light.kitchen).',
   input: z.object({
     domain: z.string(),
@@ -91,30 +75,40 @@ export const callService = defineAction({
 })
 
 export const getLights = defineAction({
-  name: 'get_lights',
+  name: 'list_lights',
   description: 'Get all lights and their current on/off/brightness state.',
   input: z.object({}),
-  output: z.array(lightSchema),
+  output: z.array(z.object({
+    entityId: z.string(),
+    name: z.string(),
+    state: field(z.string(), 'status'),
+    brightness: z.number().optional(),
+  })),
   http: { method: 'GET' },
   ai: { tier: 'inform', description: 'Get all lights and their current on/off/brightness state.' },
-  ui: { label: 'Lights', section: 'smarthome' },
+  ui: { type: 'data', label: 'Lights', section: 'smarthome' },
   async execute(_input, _ctx) {
-    return getClient().getLights()
+    const lights = await getClient().getLights()
+    return lights.map((l: any) => ({
+      entityId: l.entity_id,
+      name: l.attributes?.friendly_name || l.entity_id,
+      state: l.state,
+      brightness: l.attributes?.brightness,
+    }))
   },
 })
 
 export const toggleEntity = defineAction({
-  name: 'toggle_entity',
+  name: 'invoke_toggle',
   description: 'Toggle a light or switch on/off.',
   input: z.object({ entityId: z.string() }),
   output: z.object({ success: z.boolean(), newState: z.string() }),
   http: { method: 'POST' },
   ai: { tier: 'act', description: 'Toggle a light or switch on/off.' },
-  ui: { label: 'Toggle', section: 'smarthome' },
+  ui: { type: 'action', label: 'Toggle', section: 'smarthome' },
   async execute(input, _ctx) {
     const client = getClient()
     const current = await client.getState(input.entityId)
-    const domain = input.entityId.split('.')[0]
     const newState = current.state === 'on' ? 'off' : 'on'
     if (newState === 'on') {
       await client.turnOn(input.entityId)
@@ -126,26 +120,26 @@ export const toggleEntity = defineAction({
 })
 
 export const getScenes = defineAction({
-  name: 'get_scenes',
+  name: 'list_scenes',
   description: 'Get all Home Assistant scenes.',
   input: z.object({}),
   output: z.array(sceneSchema),
   http: { method: 'GET' },
   ai: { tier: 'inform' },
-  ui: { label: 'Scenes', section: 'smarthome' },
+  ui: { type: 'data', label: 'Scenes', section: 'smarthome' },
   async execute(_input, _ctx) {
     return getClient().getScenes()
   },
 })
 
 export const triggerScene = defineAction({
-  name: 'trigger_scene',
+  name: 'invoke_scene',
   description: 'Activate a Home Assistant scene.',
   input: z.object({ sceneId: z.string() }),
   output: z.object({ success: z.boolean() }),
   http: { method: 'POST' },
   ai: { tier: 'act', description: 'Activate a Home Assistant scene.' },
-  ui: { label: 'Activate Scene', section: 'smarthome' },
+  ui: { type: 'action', label: 'Activate Scene', section: 'smarthome' },
   async execute(input, _ctx) {
     await getClient().triggerScene(input.sceneId)
     return { success: true }
@@ -153,14 +147,23 @@ export const triggerScene = defineAction({
 })
 
 export const getSwitches = defineAction({
-  name: 'get_switches',
+  name: 'list_switches',
   description: 'Get all switches and their current on/off state.',
   input: z.object({}),
-  output: z.array(switchSchema),
+  output: z.array(z.object({
+    entityId: z.string(),
+    name: z.string(),
+    state: field(z.string(), 'status'),
+  })),
   http: { method: 'GET' },
   ai: { tier: 'inform' },
-  ui: { label: 'Switches', section: 'smarthome' },
+  ui: { type: 'data', label: 'Switches', section: 'smarthome' },
   async execute(_input, _ctx) {
-    return getClient().getSwitches()
+    const switches = await getClient().getSwitches()
+    return switches.map((s: any) => ({
+      entityId: s.entity_id,
+      name: s.attributes?.friendly_name || s.entity_id,
+      state: s.state,
+    }))
   },
 })
