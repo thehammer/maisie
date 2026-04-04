@@ -43,6 +43,7 @@ import type { MaisiePlugin } from "@maisie/shared";
 import corePlugin, { setPlugins as setCorePlugins } from "@maisie/plugin-core";
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const DATA_DIR = join(import.meta.dir, "../../..", "data");
 const RECONNECT_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 
 /** MQTT wildcard matching: + = single level, # = multi-level */
@@ -98,13 +99,14 @@ async function main() {
 
   // --- Initial connections ---
 
-  // UniFi — login cooldown is handled inside the client itself
-  const unifiClient = createUniFiClientFromEnv();
+  // UniFi — session persisted to data/ so restarts don't require a fresh login
+  const unifiClient = createUniFiClientFromEnv(join(DATA_DIR, "unifi-session.json"));
   if (unifiClient) {
     try {
-      await unifiClient.login();
+      const restored = await unifiClient.tryRestoreSession();
+      if (!restored) await unifiClient.login();
       services.unifi = unifiClient;
-      console.log("  ✓ UniFi connected");
+      console.log(`  ✓ UniFi connected${restored ? " (restored session)" : ""}`);
       const result = await syncDevices(db, unifiClient);
       console.log(`  ✓ Device sync: ${result.totalActive} active, ${result.newCount} new`);
     } catch (err) {
@@ -364,13 +366,14 @@ async function main() {
   }
 
   // UniFi Protect (same UDM, separate session)
-  const protectClient = createProtectClientFromEnv();
+  const protectClient = createProtectClientFromEnv(join(DATA_DIR, "protect-session.json"));
   if (protectClient) {
     try {
-      await protectClient.login();
+      const restored = await protectClient.tryRestoreSession();
+      if (!restored) await protectClient.login();
       const cameras = await protectClient.getCameras();
       services.protect = protectClient;
-      console.log(`  ✓ UniFi Protect connected (${cameras.length} cameras)`);
+      console.log(`  ✓ UniFi Protect connected (${cameras.length} cameras)${restored ? " (restored session)" : ""}`);
 
       // Auto-populate HDHR channels from cameras (only if table is empty)
       try {

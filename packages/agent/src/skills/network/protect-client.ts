@@ -2,12 +2,38 @@ interface ProtectConfig {
   host: string;
   username: string;
   password: string;
+  sessionFile?: string; // path to persist session cookies across restarts
+}
+
+interface SessionData {
+  cookies: string[];
+  csrfToken: string | null;
+  savedAt: string;
 }
 
 export function createProtectClient(config: ProtectConfig) {
   const baseUrl = `https://${config.host}`;
   let cookies: string[] = [];
   let csrfToken: string | null = null;
+
+  async function saveSession(): Promise<void> {
+    if (!config.sessionFile) return;
+    try {
+      const data: SessionData = { cookies, csrfToken, savedAt: new Date().toISOString() };
+      await Bun.write(config.sessionFile, JSON.stringify(data, null, 2));
+    } catch { /* non-fatal */ }
+  }
+
+  async function loadSession(): Promise<boolean> {
+    if (!config.sessionFile) return false;
+    try {
+      const raw = await Bun.file(config.sessionFile).text();
+      const data: SessionData = JSON.parse(raw);
+      cookies = data.cookies ?? [];
+      csrfToken = data.csrfToken ?? null;
+      return cookies.length > 0;
+    } catch { return false; }
+  }
 
   async function request(path: string, options: RequestInit = {}): Promise<any> {
     const headers: Record<string, string> = {
@@ -57,12 +83,30 @@ export function createProtectClient(config: ProtectConfig) {
             password: config.password,
           }),
         });
+        await saveSession();
       } finally {
         loginPromise = null;
       }
     })();
 
     return loginPromise;
+  }
+
+  // Try restoring a saved session before attempting a fresh login.
+  // Returns true if the session is still valid (skips login entirely).
+  async function tryRestoreSession(): Promise<boolean> {
+    const loaded = await loadSession();
+    if (!loaded) return false;
+    try {
+      await request("/proxy/protect/api/nvr");
+      return true;
+    } catch (e: any) {
+      if (e.message?.includes("401")) {
+        cookies = [];
+        csrfToken = null;
+      }
+      return false;
+    }
   }
 
   async function withReauth<T>(fn: () => Promise<T>): Promise<T> {
@@ -83,6 +127,7 @@ export function createProtectClient(config: ProtectConfig) {
 
   return {
     login,
+    tryRestoreSession,
 
     async getBootstrap(): Promise<any> {
       return api("bootstrap");
@@ -128,7 +173,7 @@ export function createProtectClient(config: ProtectConfig) {
   };
 }
 
-export function createProtectClientFromEnv() {
+export function createProtectClientFromEnv(sessionFile?: string) {
   const host = process.env.UNIFI_HOST;
   const username = process.env.UNIFI_USERNAME;
   const password = process.env.UNIFI_PASSWORD;
@@ -137,5 +182,5 @@ export function createProtectClientFromEnv() {
   if (!host || !username || !password) return null;
   if (enabled !== undefined && enabled !== "true") return null;
 
-  return createProtectClient({ host, username, password });
+  return createProtectClient({ host, username, password, sessionFile });
 }

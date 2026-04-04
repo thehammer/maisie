@@ -3,6 +3,7 @@ interface UniFiConfig {
   username: string;
   password: string;
   site: string;
+  sessionFile?: string; // path to persist session cookies across restarts
 }
 
 interface UniFiClient {
@@ -44,10 +45,35 @@ interface UniFiHealth {
   gateways?: string[];
 }
 
+interface SessionData {
+  cookies: string[];
+  csrfToken: string | null;
+  savedAt: string;
+}
+
 export function createUniFiClient(config: UniFiConfig) {
   const baseUrl = `https://${config.host}`;
   let cookies: string[] = [];
   let csrfToken: string | null = null;
+
+  async function saveSession(): Promise<void> {
+    if (!config.sessionFile) return;
+    try {
+      const data: SessionData = { cookies, csrfToken, savedAt: new Date().toISOString() };
+      await Bun.write(config.sessionFile, JSON.stringify(data, null, 2));
+    } catch { /* non-fatal */ }
+  }
+
+  async function loadSession(): Promise<boolean> {
+    if (!config.sessionFile) return false;
+    try {
+      const raw = await Bun.file(config.sessionFile).text();
+      const data: SessionData = JSON.parse(raw);
+      cookies = data.cookies ?? [];
+      csrfToken = data.csrfToken ?? null;
+      return cookies.length > 0;
+    } catch { return false; }
+  }
 
   async function request(path: string, options: RequestInit = {}): Promise<any> {
     const headers: Record<string, string> = {
@@ -100,12 +126,31 @@ export function createUniFiClient(config: UniFiConfig) {
             password: config.password,
           }),
         });
+        await saveSession();
       } finally {
         loginPromise = null;
       }
     })();
 
     return loginPromise;
+  }
+
+  // Try restoring a saved session before attempting a fresh login.
+  // Returns true if the session is still valid (skips login entirely).
+  async function tryRestoreSession(): Promise<boolean> {
+    const loaded = await loadSession();
+    if (!loaded) return false;
+    try {
+      // Probe with a lightweight endpoint — no login needed if this succeeds
+      await request("/api/self");
+      return true;
+    } catch (e: any) {
+      if (e.message?.includes("401")) {
+        cookies = [];
+        csrfToken = null;
+      }
+      return false;
+    }
   }
 
   async function withReauth<T>(fn: () => Promise<T>): Promise<T> {
@@ -137,6 +182,7 @@ export function createUniFiClient(config: UniFiConfig) {
 
   return {
     login,
+    tryRestoreSession,
 
     async uploadSslCert(certPem: string, keyPem: string): Promise<any> {
       // Try multiple known UDM certificate endpoints
@@ -260,7 +306,7 @@ export function createUniFiClient(config: UniFiConfig) {
   };
 }
 
-export function createUniFiClientFromEnv() {
+export function createUniFiClientFromEnv(sessionFile?: string) {
   const host = process.env.UNIFI_HOST;
   const username = process.env.UNIFI_USERNAME;
   const password = process.env.UNIFI_PASSWORD;
@@ -274,5 +320,6 @@ export function createUniFiClientFromEnv() {
     username,
     password,
     site: process.env.UNIFI_SITE || "default",
+    sessionFile,
   });
 }
