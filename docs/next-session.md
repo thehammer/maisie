@@ -2,7 +2,7 @@
 
 ## Priority: Re-enable UniFi/Protect
 
-The UDM Pro locked us out from too many login attempts today. Session persistence
+The UDM Pro locked us out from too many login attempts. Session persistence
 is now in place (`data/unifi-session.json`, `data/protect-session.json`).
 
 **To re-enable:**
@@ -16,14 +16,38 @@ is now in place (`data/unifi-session.json`, `data/protect-session.json`).
 
 - **Chat has no conversation history**: `runForMessage` accepts a `history` param but the chat route always passes `[]`. Each message is a fresh context. Fix: send history from ChatPage/ChatPanel and pass it through the route.
 
+## Universal Interface Project
+
+`docs/super-plan.md` is committed. The phases:
+
+- **Phase 0** — Complete. API catalog written (`docs/api-catalog/`), dashboard layout customization implemented (all three surfaces: UI drag/drop, REST, agent actions).
+
+- **Phase 1** — Next: Taxonomy & Protocol Design.
+  - Produce `docs/protocol.md` — universal resource model derived from the catalog
+  - Vocabulary: Resource, Field, Action, Entity, Capability, Tier
+  - Semantic types: `bytes`, `percentage`, `status`, `image`, `progress`, `list<T>`, `action`, `toggle`
+  - Define the three-surface contract precisely enough to build the framework
+
+- **Phase 2** — Core Framework
+  - `packages/plugin-core` gets Resource Registry, typed pipeline operators
+  - `PluginAction` gets explicit `ui` surface declaration (not just `false`)
+  - Auto-generated OpenAPI from action definitions
+
+- **Phase 3** — Fill integration gaps (per catalog gap analyses)
+- **Phase 4** — Surface layers (dashboard auto-generation, agent discovery)
+
+## Rename "widget" → "card"
+
+Discussed but not implemented. `WidgetConfig` → `CardConfig`, `widgetId` → `cardId`,
+CSS class names, layout-service, DB schema comment. Do this before Phase 2 adds more
+surface area.
+
 ## Completed This Session
 
 - Fixed CI (TypeScript error in useApi.ts — null narrowing in async closure)
 - Added exponential backoff for UniFi/Protect reconnect (2m → 4 → 8 → 16 → 30m cap)
-- Removed conflicting 30-min client-side cooldowns (backoff in index.ts is the sole governor)
-- Persisted UniFi/Protect sessions to disk (restarts no longer burn a login attempt)
-- Fixed MQTT mixed-content (Caddy `/mqtt` proxy, wss on HTTPS)
-- Fixed AgentStatus rendering, Personas page, plugin configure modal
-- Added Maison Mark favicon + header icon
-- Fixed Google OAuth redirect URI
-- Fixed chat (wrong model IDs — `claude-sonnet-4-5-20251001` doesn't exist)
+- Removed conflicting 30-min client-side cooldowns
+- Persisted UniFi/Protect sessions to disk
+- Dashboard layout customization — all three surfaces (drag/drop UI, REST API, agent actions)
+- Full API catalog: UniFi, Synology, Home Assistant, media stack, devices/tools
+- Universal interface super plan (`docs/super-plan.md`)
