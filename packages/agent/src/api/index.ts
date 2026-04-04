@@ -21,6 +21,7 @@ import { createChatRouter } from "./chat";
 import { createPluginsRouter } from "./plugins";
 import { createPersonasRouter } from "./personas";
 import { createLayoutRouter } from "./layout";
+import { createPluginActionRouter } from "./plugin-actions";
 import type { Agent } from "../agent/index";
 import type { MaisiePlugin } from "@maisie/shared";
 
@@ -50,6 +51,10 @@ export function createApi(services: Services, agent?: Agent, plugins: MaisiePlug
   app.route("/api", createPluginsRouter(plugins));
   app.route("/api", createPersonasRouter());
   app.route("/api", createLayoutRouter());
+
+  // Generic action routing — auto-registers all plugin actions as HTTP endpoints.
+  // Hand-written domain routers above take precedence; these fill in the rest.
+  app.route("/api", createPluginActionRouter(plugins, services));
 
   // Mount custom routes from plugins (OAuth flows, streaming endpoints, webhooks)
   for (const plugin of plugins) {

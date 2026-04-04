@@ -308,52 +308,49 @@ describe('get_widget_catalog', () => {
 
 describe('get_layout / update_layout', () => {
   it('round-trips a layout through SQLite', async () => {
-    const placements = [
-      {
-        widgetId: 'fake.fake_action',
-        position: { row: 0, col: 0 },
-        size: { rows: 1, cols: 2 },
-        config: { visibleFields: ['name', 'count'], refreshInterval: 30, title: 'My Widget' },
-      },
+    // WidgetConfig format: id, visible, col_span, order
+    const widgets = [
+      { id: 'NetworkCard', visible: true, col_span: 1, order: 0 },
+      { id: 'NasCard',     visible: false, col_span: 2, order: 1 },
     ]
 
-    await actionDefs.updateLayout.execute({ page: 'home', widgets: placements }, noopCtx)
+    await actionDefs.updateLayout.execute({ page: 'roundtrip-test', widgets }, noopCtx)
 
-    const result = await actionDefs.getLayout.execute({ page: 'home' }, noopCtx)
-    expect(result).toHaveLength(1)
-    expect(result[0].widgetId).toBe('fake.fake_action')
-    expect(result[0].position).toEqual({ row: 0, col: 0 })
-    expect(result[0].config.title).toBe('My Widget')
+    const result = await actionDefs.getLayout.execute({ page: 'roundtrip-test' }, noopCtx)
+    // getLayout merges stored with defaults — stored widgets come first, sorted by order
+    const networkCard = result.find((w: any) => w.id === 'NetworkCard')
+    const nasCard     = result.find((w: any) => w.id === 'NasCard')
+    expect(networkCard).toBeDefined()
+    expect(networkCard.visible).toBe(true)
+    expect(networkCard.col_span).toBe(1)
+    expect(nasCard).toBeDefined()
+    expect(nasCard.visible).toBe(false)
+    expect(nasCard.col_span).toBe(2)
   })
 
-  it('returns [] for a page with no layout', async () => {
-    const result = await actionDefs.getLayout.execute({ page: 'nonexistent' }, noopCtx)
-    expect(result).toEqual([])
+  it('returns defaults for a page with no stored layout', async () => {
+    const result = await actionDefs.getLayout.execute({ page: 'nonexistent-page-xyz' }, noopCtx)
+    // getLayout always returns defaults — never empty for a fresh page
+    expect(result.length).toBeGreaterThan(0)
+    for (const w of result) {
+      expect(w.id).toBeDefined()
+      expect(typeof w.visible).toBe('boolean')
+      expect([1, 2]).toContain(w.col_span)
+      expect(typeof w.order).toBe('number')
+    }
   })
 
   it('overwrites an existing layout on update', async () => {
-    const first = [
-      {
-        widgetId: 'fake.fake_action',
-        position: { row: 0, col: 0 },
-        size: { rows: 1, cols: 1 },
-        config: { visibleFields: ['name'] },
-      },
-    ]
-    const second = [
-      {
-        widgetId: 'fake.fake_action',
-        position: { row: 1, col: 1 },
-        size: { rows: 2, cols: 2 },
-        config: { visibleFields: ['count'] },
-      },
-    ]
+    const first  = [{ id: 'PlexCard', visible: true,  col_span: 1, order: 0 }]
+    const second = [{ id: 'PlexCard', visible: false, col_span: 2, order: 0 }]
 
-    await actionDefs.updateLayout.execute({ page: 'media', widgets: first }, noopCtx)
-    await actionDefs.updateLayout.execute({ page: 'media', widgets: second }, noopCtx)
+    await actionDefs.updateLayout.execute({ page: 'overwrite-test', widgets: first  }, noopCtx)
+    await actionDefs.updateLayout.execute({ page: 'overwrite-test', widgets: second }, noopCtx)
 
-    const result = await actionDefs.getLayout.execute({ page: 'media' }, noopCtx)
-    expect(result[0].position).toEqual({ row: 1, col: 1 })
+    const result = await actionDefs.getLayout.execute({ page: 'overwrite-test' }, noopCtx)
+    const plexCard = result.find((w: any) => w.id === 'PlexCard')
+    expect(plexCard?.visible).toBe(false)
+    expect(plexCard?.col_span).toBe(2)
   })
 })
 
@@ -362,25 +359,20 @@ describe('get_layout / update_layout', () => {
 // ----------------------------------------------------------------
 
 describe('reset_layout', () => {
-  it('removes the stored layout', async () => {
+  it('clears stored layout and returns defaults', async () => {
     await actionDefs.updateLayout.execute(
-      {
-        page: 'network',
-        widgets: [
-          {
-            widgetId: 'fake.fake_action',
-            position: { row: 0, col: 0 },
-            size: { rows: 1, cols: 1 },
-            config: { visibleFields: [] },
-          },
-        ],
-      },
+      { page: 'reset-test', widgets: [{ id: 'BambuCard', visible: false, col_span: 1, order: 0 }] },
       noopCtx,
     )
 
-    await actionDefs.resetLayout.execute({ page: 'network' }, noopCtx)
-    const result = await actionDefs.getLayout.execute({ page: 'network' }, noopCtx)
-    expect(result).toEqual([])
+    await actionDefs.resetLayout.execute({ page: 'reset-test' }, noopCtx)
+
+    // After reset, getLayout returns defaults again (all visible, default order)
+    const result = await actionDefs.getLayout.execute({ page: 'reset-test' }, noopCtx)
+    expect(result.length).toBeGreaterThan(0)
+    const bambu = result.find((w: any) => w.id === 'BambuCard')
+    // Should be back to default (visible = true)
+    expect(bambu?.visible).toBe(true)
   })
 })
 

@@ -4,8 +4,14 @@ export type HttpMethod = 'GET' | 'POST' | 'DELETE' | 'PATCH'
 export type ActionTier = 'inform' | 'advise' | 'act'
 
 export interface ActionContext {
+  // Legacy helpers — kept for backward compat
   log: (level: 'info' | 'warn' | 'error', message: string, data?: unknown) => void
   emit: (topic: string, payload: unknown) => void
+  // Protocol fields
+  plugin: string
+  requestId: string
+  persona?: string
+  db?: unknown  // typed as Database in plugins that need it
 }
 
 /**
@@ -64,6 +70,13 @@ export interface PluginAction<
    */
   ui:
     | {
+        /**
+         * What kind of surface this action produces.
+         *   data   — displays output fields (renders as a data card or table)
+         *   action — triggers something (renders as a button or form)
+         *   both   — displays current state AND provides controls to change it
+         */
+        type?: 'data' | 'action' | 'both'
         label: string
         section: string
         icon?: string
@@ -72,6 +85,11 @@ export interface PluginAction<
          * components using this action's hook will re-fetch.
          */
         realtimeTopic?: string
+        /**
+         * Suggest a specific renderer component. If omitted, the framework
+         * picks the default renderer based on the output schema's field types.
+         */
+        componentHint?: string
       }
     | false
 

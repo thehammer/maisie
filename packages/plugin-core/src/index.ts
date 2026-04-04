@@ -1,6 +1,7 @@
 import type { MaisiePlugin } from '@maisie/shared'
 import * as actionDefs from './actions'
 import { setDb, setPlugins } from './actions'
+import { registry } from './registry'
 
 const plugin: MaisiePlugin = {
   name: 'core',
@@ -43,5 +44,7 @@ const plugin: MaisiePlugin = {
   },
 }
 
-export { setPlugins }
+export { setPlugins, registry }
+export { validatePlugin, validateActionName, VERB_PREFIXES } from './validators'
+export { deriveHttpPath } from './registry'
 export default plugin

@@ -109,14 +109,14 @@ describe('CAPABILITIES', () => {
 
   test('media-server requires the three standard actions', () => {
     const cap = CAPABILITIES['media-server']
-    expect(cap.requiredActions).toContain('get_libraries')
+    expect(cap.requiredActions).toContain('list_libraries')
     expect(cap.requiredActions).toContain('get_now_playing')
-    expect(cap.requiredActions).toContain('get_recently_added')
+    expect(cap.requiredActions).toContain('list_recently_added')
   })
 
-  test('network requires get_devices and get_wan_health', () => {
+  test('network requires list_devices and get_wan_health', () => {
     const cap = CAPABILITIES['network']
-    expect(cap.requiredActions).toContain('get_devices')
+    expect(cap.requiredActions).toContain('list_devices')
     expect(cap.requiredActions).toContain('get_wan_health')
   })
 })

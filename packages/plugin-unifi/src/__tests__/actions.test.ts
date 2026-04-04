@@ -1,53 +1,77 @@
 import { describe, test, expect } from 'bun:test'
 import * as actionDefs from '../actions'
 
-describe('get_devices action', () => {
+describe('list_devices action', () => {
   test('has correct action shape', () => {
-    const action = actionDefs.getDevices
-    expect(action.name).toBe('get_devices')
+    const action = actionDefs.listDevices
+    expect(action.name).toBe('list_devices')
     expect(action.http.method).toBe('GET')
     expect(action.ai).not.toBe(false)
     expect(action.ui).not.toBe(false)
   })
 
-  test('input schema accepts onlineOnly filter', () => {
-    const action = actionDefs.getDevices
-    expect(action.input.safeParse({ onlineOnly: true }).success).toBe(true)
-    expect(action.input.safeParse({ onlineOnly: 'not-a-bool' }).success).toBe(false)
+  test('input schema accepts vlan filter', () => {
+    const action = actionDefs.listDevices
+    expect(action.input.safeParse({ vlan: 20 }).success).toBe(true)
+    expect(action.input.safeParse({ vlan: 'not-a-number' }).success).toBe(false)
   })
 
   test('input schema accepts empty object', () => {
-    expect(actionDefs.getDevices.input.safeParse({}).success).toBe(true)
+    expect(actionDefs.listDevices.input.safeParse({}).success).toBe(true)
+  })
+
+  test('ui surface has type declared', () => {
+    const action = actionDefs.listDevices
+    if (action.ui !== false) {
+      expect(action.ui.type).toBe('data')
+    }
   })
 })
 
-describe('block_device action', () => {
-  test('has act tier — unsafe operation', () => {
-    const action = actionDefs.blockDevice
+describe('invoke_block_device action', () => {
+  test('has advise tier — requires human approval before blocking', () => {
+    const action = actionDefs.invokeBlockDevice
     expect(action.ai).not.toBe(false)
     if (action.ai !== false) {
-      expect(action.ai.tier).toBe('act')
+      expect(action.ai.tier).toBe('advise')
     }
   })
 
   test('ui is false — not surfaced in dashboard directly', () => {
-    expect(actionDefs.blockDevice.ui).toBe(false)
+    expect(actionDefs.invokeBlockDevice.ui).toBe(false)
   })
 
   test('requires valid mac address', () => {
-    const action = actionDefs.blockDevice
+    const action = actionDefs.invokeBlockDevice
     expect(action.input.safeParse({ mac: 'aa:bb:cc:dd:ee:ff' }).success).toBe(true)
     expect(action.input.safeParse({ mac: 'not-a-mac' }).success).toBe(false)
     expect(action.input.safeParse({}).success).toBe(false)
   })
 })
 
-describe('get_network_audit action', () => {
+describe('invoke_network_audit action', () => {
   test('has advise tier — produces analysis for review', () => {
-    const action = actionDefs.getNetworkAudit
+    const action = actionDefs.invokeNetworkAudit
     if (action.ai !== false) {
       expect(action.ai.tier).toBe('advise')
     }
+  })
+
+  test('ui surface type is action', () => {
+    const action = actionDefs.invokeNetworkAudit
+    if (action.ui !== false) {
+      expect(action.ui.type).toBe('action')
+    }
+  })
+})
+
+describe('list_cameras action', () => {
+  test('has correct action shape', () => {
+    const action = actionDefs.listCameras
+    expect(action.name).toBe('list_cameras')
+    expect(action.http.method).toBe('GET')
+    expect(action.ai).not.toBe(false)
+    expect(action.ui).not.toBe(false)
   })
 })
 
@@ -73,13 +97,32 @@ describe('plugin structure', () => {
 
   test('plugin provides all required network capability actions', () => {
     const actionNames = Object.values(actionDefs).map(a => a.name)
-    expect(actionNames).toContain('get_devices')
+    expect(actionNames).toContain('list_devices')
     expect(actionNames).toContain('get_wan_health')
   })
 
   test('plugin provides all required camera capability actions', () => {
     const actionNames = Object.values(actionDefs).map(a => a.name)
-    expect(actionNames).toContain('get_cameras')
+    expect(actionNames).toContain('list_cameras')
     expect(actionNames).toContain('get_snapshot')
+  })
+
+  test('all action names follow verb prefix convention', () => {
+    const validPrefixes = ['list_', 'get_', 'set_', 'create_', 'delete_', 'invoke_', 'stream_', 'subscribe_']
+    for (const action of Object.values(actionDefs)) {
+      const valid = validPrefixes.some(p => action.name.startsWith(p))
+      expect(valid, `action "${action.name}" must start with a valid verb prefix`).toBe(true)
+    }
+  })
+
+  test('data actions have ui.type declared', () => {
+    for (const action of Object.values(actionDefs)) {
+      if (action.ui !== false) {
+        expect(
+          action.ui.type,
+          `action "${action.name}" should have ui.type declared`
+        ).toBeDefined()
+      }
+    }
   })
 })

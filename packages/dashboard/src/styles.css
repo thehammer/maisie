@@ -3649,3 +3649,121 @@ body {
     width: 100vw;
   }
 }
+
+/* ── ResourceCard — generic field renderer ───────────────── */
+
+.resource-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.resource-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.resource-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.resource-field:last-child {
+  border-bottom: none;
+}
+
+.resource-field-label {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.resource-field-value {
+  text-align: right;
+}
+
+/* Status badges */
+.resource-status {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: lowercase;
+}
+.resource-status-ok      { background: rgba(74, 222, 128, 0.15); color: var(--green); }
+.resource-status-warning { background: rgba(251, 191, 36, 0.15);  color: var(--yellow); }
+.resource-status-error   { background: rgba(248, 113, 113, 0.15); color: var(--red); }
+.resource-status-idle    { background: rgba(139, 143, 163, 0.15); color: var(--text-muted); }
+.resource-status-busy    { background: rgba(108, 140, 255, 0.15); color: var(--accent); }
+.resource-status-unknown { background: rgba(139, 143, 163, 0.15); color: var(--text-muted); }
+
+/* Progress bar */
+.resource-percentage {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.resource-progress-bar {
+  display: inline-block;
+  width: 60px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.resource-progress-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* Other types */
+.resource-image {
+  max-width: 48px;
+  max-height: 48px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+.resource-json {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  max-height: 120px;
+  overflow: auto;
+  background: var(--bg);
+  padding: 0.4rem;
+  border-radius: 4px;
+}
+.resource-null   { color: var(--text-muted); opacity: 0.5; }
+.resource-url    { color: var(--accent); }
+.resource-loading { color: var(--text-muted); font-size: 0.85rem; }
+.resource-error  { color: var(--red); font-size: 0.85rem; }
+
+/* ResourceList table */
+.resource-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.resource-table th {
+  text-align: left;
+  color: var(--text-muted);
+  font-weight: 500;
+  padding: 0.3rem 0.5rem 0.3rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.resource-table td {
+  padding: 0.3rem 0.5rem 0.3rem 0;
+  border-bottom: 1px solid rgba(42, 46, 58, 0.5);
+  vertical-align: middle;
+}
+.resource-table tr:last-child td {
+  border-bottom: none;
+}

@@ -31,7 +31,7 @@ export function createToolRegistry(plugins: MaisiePlugin[]) {
               try {
                 return await action.execute(
                   action.input.parse(args),
-                  { log: (level, msg) => console.log(`[${plugin}:${action.name}]`, msg), emit: () => {} }
+                  { log: (level, msg) => console.log(`[${plugin}:${action.name}]`, msg), emit: () => {}, plugin, requestId: crypto.randomUUID() }
                 )
               } catch (err) {
                 return { error: err instanceof Error ? err.message : String(err) }
