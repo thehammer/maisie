@@ -2,7 +2,9 @@ import { z } from 'zod'
 import { defineAction } from '@maisie/shared'
 import type { MaisiePlugin } from '@maisie/shared'
 import { introspectSchema } from './schema-introspector'
-import type { WidgetDescriptor, WidgetPlacement, PersonaConfig } from './types'
+import type { WidgetDescriptor, WidgetPlacement, WidgetConfig, PersonaConfig } from './types'
+import { createLayoutService } from './layout-service'
+import type { LayoutService } from './layout-service'
 
 // ----------------------------------------------------------------
 // Module-level state — injected by plugin init()
@@ -10,9 +12,11 @@ import type { WidgetDescriptor, WidgetPlacement, PersonaConfig } from './types'
 
 let _db: import('drizzle-orm/bun-sqlite').BunSQLiteDatabase<Record<string, never>> | null = null
 let _loadedPlugins: MaisiePlugin[] = []
+let _layout: LayoutService | null = null
 
 export function setDb(db: unknown) {
   _db = db as typeof _db
+  _layout = createLayoutService(_db as any)
 }
 
 export function setPlugins(plugins: MaisiePlugin[]) {
@@ -75,6 +79,13 @@ const widgetPlacementSchema = z.object({
   }),
 })
 
+const widgetConfigSchema = z.object({
+  id: z.string(),
+  visible: z.boolean(),
+  col_span: z.union([z.literal(1), z.literal(2)]),
+  order: z.number().int().min(0),
+})
+
 // ----------------------------------------------------------------
 // Helpers — DB access with lazy import to avoid circular deps
 // ----------------------------------------------------------------
@@ -89,6 +100,11 @@ async function getSchema() {
 function requireDb() {
   if (!_db) throw new Error('plugin-core: database not initialized')
   return _db
+}
+
+function requireLayout() {
+  if (!_layout) throw new Error('plugin-core: layout service not initialized')
+  return _layout
 }
 
 // ----------------------------------------------------------------
@@ -539,85 +555,110 @@ export const getWidgetCatalog = defineAction({
 
 export const getLayout = defineAction({
   name: 'get_layout',
-  description: 'Get the widget layout for a dashboard page.',
-  input: z.object({ page: z.string() }),
-  output: z.array(widgetPlacementSchema),
+  description: 'Get the ordered widget config for a dashboard page. Returns the default order if no custom layout has been saved.',
+  input: z.object({ page: z.string().default('home') }),
+  output: z.array(widgetConfigSchema),
   http: { method: 'GET', path: '/api/layout/:page' },
-  ai: { tier: 'inform' },
+  ai: { tier: 'inform', description: 'Read the current dashboard widget order and visibility' },
   ui: false,
   async execute(input, _ctx) {
-    const db = requireDb()
-    const { dashboardLayouts } = await getSchema()
-    const { eq } = await import('drizzle-orm')
-
-    const row = await db
-      .select()
-      .from(dashboardLayouts)
-      .where(eq(dashboardLayouts.page, input.page))
-      .get()
-
-    if (!row) return []
-    return JSON.parse(row.widgets) as WidgetPlacement[]
+    return requireLayout().getLayout(input.page)
   },
 })
 
 export const updateLayout = defineAction({
   name: 'update_layout',
-  description: 'Set the widget layout for a dashboard page, replacing any existing layout.',
+  description: 'Replace the full widget layout for a dashboard page. Prefer set_widget_visibility or reorder_widgets for targeted changes.',
   input: z.object({
-    page: z.string(),
-    widgets: z.array(widgetPlacementSchema),
+    page: z.string().default('home'),
+    widgets: z.array(widgetConfigSchema),
   }),
   output: z.object({ success: z.boolean() }),
   http: { method: 'POST', path: '/api/layout/:page' },
-  ai: { tier: 'act', description: 'Rearrange or configure dashboard widgets on a page' },
-  ui: { label: 'Edit Layout', section: 'dashboard' },
+  ai: { tier: 'act', description: 'Set the complete dashboard layout for a page' },
+  ui: false,
   async execute(input, _ctx) {
-    const db = requireDb()
-    const { dashboardLayouts } = await getSchema()
-    const { eq } = await import('drizzle-orm')
-    const { randomUUID } = await import('crypto')
-
-    const existing = await db
-      .select()
-      .from(dashboardLayouts)
-      .where(eq(dashboardLayouts.page, input.page))
-      .get()
-
-    const now = new Date()
-    const widgetsJson = JSON.stringify(input.widgets)
-
-    if (existing) {
-      await db
-        .update(dashboardLayouts)
-        .set({ widgets: widgetsJson, updatedAt: now })
-        .where(eq(dashboardLayouts.page, input.page))
-    } else {
-      await db.insert(dashboardLayouts).values({
-        id: randomUUID(),
-        page: input.page,
-        widgets: widgetsJson,
-        updatedAt: now,
-      })
-    }
-
+    await requireLayout().updateLayout(input.page, input.widgets)
     return { success: true }
   },
 })
 
 export const resetLayout = defineAction({
   name: 'reset_layout',
-  description: 'Delete the stored layout for a dashboard page, reverting it to the default.',
-  input: z.object({ page: z.string() }),
+  description: 'Delete the stored layout for a dashboard page, reverting it to the default order.',
+  input: z.object({ page: z.string().default('home') }),
   output: z.object({ success: z.boolean() }),
   http: { method: 'DELETE', path: '/api/layout/:page' },
-  ai: { tier: 'advise' },
+  ai: { tier: 'advise', description: 'Reset the dashboard layout to factory defaults' },
   ui: false,
   async execute(input, _ctx) {
-    const db = requireDb()
+    requireDb() // ensure initialized
     const { dashboardLayouts } = await getSchema()
     const { eq } = await import('drizzle-orm')
-    await db.delete(dashboardLayouts).where(eq(dashboardLayouts.page, input.page))
+    await requireDb().delete(dashboardLayouts).where(eq(dashboardLayouts.page, input.page))
     return { success: true }
+  },
+})
+
+export const setWidgetVisibility = defineAction({
+  name: 'set_widget_visibility',
+  description: 'Show or hide a specific dashboard widget by its ID.',
+  input: z.object({
+    page: z.string().default('home'),
+    widgetId: z.string().describe(
+      'Stable widget ID. Valid values: ServiceStatus, NetworkCard, NasCard, PlexCard, MediaCard, HdhrCard, DakboardCard, BambuCard, CalibreCard, CalibreEnrichmentCard, NightlyCard, YouTubeCleanupCard, PackagesCard, RecentlyAddedCard, SmartHomeCard',
+    ),
+    visible: z.boolean().describe('true = show, false = hide'),
+  }),
+  output: z.array(widgetConfigSchema),
+  http: { method: 'PATCH', path: '/api/layout/:page/widgets/:widgetId/visibility' },
+  ai: {
+    tier: 'act',
+    description: 'Show or hide a named dashboard card. Use this when the user says "hide the X card" or "show the Y widget".',
+  },
+  ui: false,
+  async execute(input, _ctx) {
+    return requireLayout().patchWidget(input.page, input.widgetId, { visible: input.visible })
+  },
+})
+
+export const reorderWidgets = defineAction({
+  name: 'reorder_widgets',
+  description: 'Reorder dashboard widgets by providing the desired order of widget IDs. Unlisted widgets are appended after the listed ones.',
+  input: z.object({
+    page: z.string().default('home'),
+    orderedIds: z.array(z.string()).min(1).describe('Widget IDs in the desired display order'),
+  }),
+  output: z.array(widgetConfigSchema),
+  http: { method: 'PATCH', path: '/api/layout/:page/order' },
+  ai: {
+    tier: 'act',
+    description: 'Reorder dashboard widgets. To move NetworkCard to the top, pass orderedIds: ["NetworkCard"]. You can pass a partial list — only those widgets are repositioned, the rest stay after them.',
+  },
+  ui: false,
+  async execute(input, _ctx) {
+    return requireLayout().reorderWidgets(input.page, input.orderedIds)
+  },
+})
+
+export const patchWidget = defineAction({
+  name: 'patch_widget',
+  description: 'Change a single widget\'s width (col_span) or visibility.',
+  input: z.object({
+    page: z.string().default('home'),
+    widgetId: z.string(),
+    visible: z.boolean().optional(),
+    col_span: z.union([z.literal(1), z.literal(2)]).optional().describe('1 = normal width, 2 = full-width'),
+  }),
+  output: z.array(widgetConfigSchema),
+  http: { method: 'PATCH', path: '/api/layout/:page/widgets/:widgetId' },
+  ai: {
+    tier: 'act',
+    description: 'Change a widget\'s width (col_span: 1=normal, 2=full-width) or visibility',
+  },
+  ui: false,
+  async execute(input, _ctx) {
+    const { widgetId, page, ...patch } = input
+    return requireLayout().patchWidget(page, widgetId, patch)
   },
 })

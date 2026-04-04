@@ -29,6 +29,9 @@ import { PersonasPage } from "./pages/PersonasPage";
 import { ChatPanel } from "./components/ChatPanel";
 import { NotificationsFeed } from "./components/NotificationsFeed";
 import { AgentStatus } from "./components/AgentStatus";
+import { DraggableDashboardGrid } from "./components/DraggableDashboardGrid";
+import { WidgetSlot } from "./components/WidgetSlot";
+import { useLayout } from "./hooks/useLayout";
 
 
 const POLL_INTERVAL = 30_000; // 30 seconds
@@ -82,6 +85,8 @@ export function App() {
     5 * 60_000,
   );
   const calibreApi = useApi<CalibreStatus>("/api/calibre/status", POLL_INTERVAL);
+
+  const layout = useLayout("home");
 
   // Handle live MQTT messages — refresh relevant data immediately
   const handleMqttMessage = useCallback(
@@ -267,6 +272,36 @@ export function App() {
     },
   ];
 
+  function renderCard(id: string, apis: {
+    services: typeof services;
+    devicesApi: typeof devicesApi; nasApi: typeof nasApi; plexApi: typeof plexApi;
+    mediaApi: typeof mediaApi; hdhrApi: typeof hdhrApi; dakboardApi: typeof dakboardApi;
+    bambuApi: typeof bambuApi; calibreApi: typeof calibreApi; packagesApi: typeof packagesApi;
+    switchesApi: typeof switchesApi;
+  }) {
+    switch (id) {
+      case "ServiceStatus":    return <ServiceStatus services={apis.services} />;
+      case "NetworkCard":      return apis.devicesApi.data ? <NetworkCard devices={apis.devicesApi.data} /> : null;
+      case "NasCard":          return apis.nasApi.data ? <NasCard health={apis.nasApi.data} /> : null;
+      case "PlexCard":         return apis.plexApi.data ? <PlexCard status={apis.plexApi.data} /> : null;
+      case "MediaCard":        return apis.mediaApi.data ? <MediaCard calendar={apis.mediaApi.data} /> : null;
+      case "HdhrCard":         return apis.hdhrApi.data ? <HdhrCard status={apis.hdhrApi.data} /> : null;
+      case "DakboardCard":     return <DakboardCard pollInterval={POLL_INTERVAL} />;
+      case "BambuCard":        return apis.bambuApi.data ? <BambuCard status={apis.bambuApi.data} /> : null;
+      case "CalibreCard":      return apis.calibreApi.data ? <CalibreCard status={apis.calibreApi.data} /> : null;
+      case "CalibreEnrichmentCard": return <CalibreEnrichmentCard pollInterval={POLL_INTERVAL} />;
+      case "NightlyCard":      return <NightlyCard pollInterval={POLL_INTERVAL} />;
+      case "YouTubeCleanupCard": return <YouTubeCleanupCard pollInterval={POLL_INTERVAL} />;
+      case "PackagesCard":     return apis.packagesApi.data ? <PackagesCard orders={apis.packagesApi.data.orders} /> : null;
+      case "RecentlyAddedCard":
+        return apis.plexApi.data && apis.plexApi.data.recentlyAdded.length > 0
+          ? <RecentlyAddedCard items={apis.plexApi.data.recentlyAdded} />
+          : null;
+      case "SmartHomeCard":    return <SmartHomeCard pollInterval={POLL_INTERVAL} />;
+      default:                 return null;
+    }
+  }
+
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -292,42 +327,41 @@ export function App() {
           <div className={`status-dot ${agentUp ? "" : "down"}`} />
           {agentUp ? "Agent connected" : "Agent offline"}
           {mqttConnected && <span className="mqtt-badge">LIVE</span>}
+          {layout.isEditMode ? (
+            <>
+              <button className="edit-layout-btn save" onClick={layout.saveLayout} disabled={layout.saving}>
+                {layout.saving ? "Saving…" : "Save Layout"}
+              </button>
+              <button className="edit-layout-btn cancel" onClick={layout.cancelEditMode}>Cancel</button>
+            </>
+          ) : (
+            <button className="edit-layout-btn" onClick={layout.enterEditMode}>Edit Layout</button>
+          )}
         </div>
       </div>
 
-      <div className="grid">
-        <ServiceStatus services={services} />
-
-        {devicesApi.data && <NetworkCard devices={devicesApi.data} />}
-
-        {nasApi.data && <NasCard health={nasApi.data} />}
-
-        {plexApi.data && <PlexCard status={plexApi.data} />}
-
-        {mediaApi.data && <MediaCard calendar={mediaApi.data} />}
-
-        {hdhrApi.data && <HdhrCard status={hdhrApi.data} />}
-
-        <DakboardCard pollInterval={POLL_INTERVAL} />
-
-        {bambuApi.data && <BambuCard status={bambuApi.data} />}
-
-        {calibreApi.data && <CalibreCard status={calibreApi.data} />}
-
-        <CalibreEnrichmentCard pollInterval={POLL_INTERVAL} />
-
-        <NightlyCard pollInterval={POLL_INTERVAL} />
-
-        <YouTubeCleanupCard pollInterval={POLL_INTERVAL} />
-
-        {packagesApi.data && <PackagesCard orders={packagesApi.data.orders} />}
-
-        {plexApi.data && plexApi.data.recentlyAdded.length > 0 && (
-          <RecentlyAddedCard items={plexApi.data.recentlyAdded} />
-        )}
-
-        <SmartHomeCard pollInterval={POLL_INTERVAL} />
-      </div>
+      <DraggableDashboardGrid
+        widgets={layout.widgets}
+        isEditMode={layout.isEditMode}
+        onReorder={layout.reorder}
+      >
+        {layout.widgets.map((widget) => (
+          <WidgetSlot
+            key={widget.id}
+            widget={widget}
+            isEditMode={layout.isEditMode}
+            onToggleVisible={() => layout.setVisible(widget.id, !widget.visible)}
+            onToggleColSpan={() => layout.setColSpan(widget.id, widget.col_span === 1 ? 2 : 1)}
+          >
+            {renderCard(widget.id, {
+              services,
+              devicesApi, nasApi, plexApi, mediaApi, hdhrApi,
+              dakboardApi, bambuApi, calibreApi, packagesApi,
+              switchesApi,
+            })}
+          </WidgetSlot>
+        ))}
+      </DraggableDashboardGrid>
       {chatOverlay}
     </div>
   );

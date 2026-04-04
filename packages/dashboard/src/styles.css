@@ -3548,6 +3548,87 @@ body {
   border-color: var(--accent);
 }
 
+/* ── Layout edit mode ───────────────────────────────────── */
+
+.grid.edit-mode {
+  outline: 2px dashed var(--accent);
+  outline-offset: 6px;
+  border-radius: var(--radius);
+}
+
+.widget-edit-controls {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  gap: 0.25rem;
+  z-index: 10;
+  background: rgba(15, 17, 23, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.2rem 0.3rem;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  padding: 0.1rem 0.25rem;
+  font-size: 1rem;
+  line-height: 1;
+  user-select: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.widget-edit-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.1rem 0.25rem;
+  font-size: 0.9rem;
+  line-height: 1;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.widget-edit-btn:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.widget-hidden {
+  opacity: 0.35;
+  border-style: dashed;
+}
+
+.edit-layout-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.edit-layout-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.edit-layout-btn.save {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.edit-layout-btn.cancel {
+  color: var(--text-muted);
+}
+
 /* ── Responsive additions ────────────────────────────────── */
 
 @media (max-width: 768px) {

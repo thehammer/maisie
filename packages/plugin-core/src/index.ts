@@ -23,6 +23,9 @@ const plugin: MaisiePlugin = {
     actionDefs.getLayout,
     actionDefs.updateLayout,
     actionDefs.resetLayout,
+    actionDefs.setWidgetVisibility,
+    actionDefs.reorderWidgets,
+    actionDefs.patchWidget,
   ],
   events: [],
 

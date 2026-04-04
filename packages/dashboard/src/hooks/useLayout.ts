@@ -1,29 +1,16 @@
 import { useState, useCallback, useEffect } from "react";
+import { arrayMove } from "@dnd-kit/sortable";
 
-export interface WidgetDescriptor {
+export interface WidgetConfig {
   id: string;
-  pluginName: string;
-  actionName: string;
-  label: string;
-  section: string;
-  outputFields: Array<{ key: string; type: string; label: string; optional: boolean }>;
-}
-
-export interface WidgetPlacement {
-  widgetId: string;
-  position: { row: number; col: number };
-  size: { rows: number; cols: number };
-  config: {
-    visibleFields: string[];
-    refreshInterval?: number;
-    title?: string;
-  };
+  visible: boolean;
+  col_span: 1 | 2;
+  order: number;
 }
 
 interface LayoutState {
-  widgets: WidgetPlacement[];
-  catalog: WidgetDescriptor[];
-  isCustomizing: boolean;
+  widgets: WidgetConfig[];
+  isEditMode: boolean;
   loading: boolean;
   saving: boolean;
   error: string | null;
@@ -32,42 +19,28 @@ interface LayoutState {
 export function useLayout(page: string) {
   const [state, setState] = useState<LayoutState>({
     widgets: [],
-    catalog: [],
-    isCustomizing: false,
+    isEditMode: false,
     loading: true,
     saving: false,
     error: null,
   });
-  // Keep a snapshot for cancel
-  const [savedWidgets, setSavedWidgets] = useState<WidgetPlacement[]>([]);
+  // Snapshot for cancel — captured when entering edit mode
+  const [snapshot, setSnapshot] = useState<WidgetConfig[]>([]);
 
   useEffect(() => {
     let mounted = true;
 
     async function load() {
-      setState((s) => ({ ...s, loading: true, error: null }));
       try {
-        const [layoutRes, catalogRes] = await Promise.all([
-          fetch(`/api/layout/${page}`),
-          fetch("/api/widgets/catalog"),
-        ]);
-
-        const layout = layoutRes.ok ? await layoutRes.json() : { widgets: [] };
-        const catalogData = catalogRes.ok ? await catalogRes.json() : { widgets: [] };
-
+        const res = await fetch(`/api/layout/${page}`);
+        const widgets: WidgetConfig[] = res.ok ? await res.json() : [];
         if (mounted) {
-          setState((s) => ({
-            ...s,
-            widgets: layout.widgets ?? [],
-            catalog: catalogData.widgets ?? [],
-            loading: false,
-          }));
-          setSavedWidgets(layout.widgets ?? []);
+          const sorted = [...widgets].sort((a, b) => a.order - b.order);
+          setState((s) => ({ ...s, widgets: sorted, loading: false }));
+          setSnapshot(sorted);
         }
       } catch (err) {
-        if (mounted) {
-          setState((s) => ({ ...s, loading: false, error: String(err) }));
-        }
+        if (mounted) setState((s) => ({ ...s, loading: false, error: String(err) }));
       }
     }
 
@@ -75,90 +48,72 @@ export function useLayout(page: string) {
     return () => { mounted = false; };
   }, [page]);
 
-  const saveLayout = useCallback(
-    async (widgets: WidgetPlacement[]) => {
-      setState((s) => ({ ...s, saving: true, error: null }));
-      try {
-        const res = await fetch(`/api/layout/${page}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ page, widgets }),
-        });
-        if (!res.ok) throw new Error(`${res.status}`);
-        setSavedWidgets(widgets);
-        setState((s) => ({ ...s, saving: false, isCustomizing: false }));
-      } catch (err) {
-        setState((s) => ({ ...s, saving: false, error: String(err) }));
-      }
-    },
-    [page],
-  );
-
-  const toggleCustomize = useCallback(() => {
+  const enterEditMode = useCallback(() => {
     setState((s) => {
-      if (s.isCustomizing) {
-        // Cancel — restore snapshot
-        return { ...s, isCustomizing: false, widgets: savedWidgets };
-      }
-      return { ...s, isCustomizing: true };
-    });
-  }, [savedWidgets]);
-
-  const addWidget = useCallback((descriptor: WidgetDescriptor) => {
-    setState((s) => {
-      const maxRow = s.widgets.reduce((m, w) => Math.max(m, w.position.row + w.size.rows), 0);
-      const placement: WidgetPlacement = {
-        widgetId: descriptor.id,
-        position: { row: maxRow, col: 0 },
-        size: { rows: 1, cols: 1 },
-        config: {
-          visibleFields: descriptor.outputFields.filter((f) => !f.optional).map((f) => f.key),
-        },
-      };
-      return { ...s, widgets: [...s.widgets, placement] };
+      setSnapshot(s.widgets);
+      return { ...s, isEditMode: true };
     });
   }, []);
 
-  const removeWidget = useCallback((widgetId: string) => {
-    setState((s) => ({ ...s, widgets: s.widgets.filter((w) => w.widgetId !== widgetId) }));
+  const cancelEditMode = useCallback(() => {
+    setState((s) => ({ ...s, isEditMode: false, widgets: snapshot }));
+  }, [snapshot]);
+
+  const saveLayout = useCallback(async (currentWidgets: WidgetConfig[]) => {
+    setState((s) => ({ ...s, saving: true, error: null }));
+    try {
+      const res = await fetch(`/api/layout/${page}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ widgets: currentWidgets }),
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      setSnapshot(currentWidgets);
+      setState((s) => ({ ...s, saving: false, isEditMode: false }));
+    } catch (err) {
+      setState((s) => ({ ...s, saving: false, error: String(err) }));
+    }
+  }, [page]);
+
+  const setVisible = useCallback((id: string, visible: boolean) => {
+    setState((s) => ({
+      ...s,
+      widgets: s.widgets.map((w) => (w.id === id ? { ...w, visible } : w)),
+    }));
   }, []);
 
-  const configureWidget = useCallback(
-    (widgetId: string, config: Partial<WidgetPlacement["config"]>) => {
-      setState((s) => ({
-        ...s,
-        widgets: s.widgets.map((w) =>
-          w.widgetId === widgetId ? { ...w, config: { ...w.config, ...config } } : w,
-        ),
+  const setColSpan = useCallback((id: string, col_span: 1 | 2) => {
+    setState((s) => ({
+      ...s,
+      widgets: s.widgets.map((w) => (w.id === id ? { ...w, col_span } : w)),
+    }));
+  }, []);
+
+  // Called by DraggableDashboardGrid after a drag ends
+  const reorder = useCallback((activeId: string, overId: string) => {
+    setState((s) => {
+      const oldIndex = s.widgets.findIndex((w) => w.id === activeId);
+      const newIndex = s.widgets.findIndex((w) => w.id === overId);
+      if (oldIndex === -1 || newIndex === -1) return s;
+      const moved = arrayMove(s.widgets, oldIndex, newIndex).map((w, i) => ({
+        ...w,
+        order: i,
       }));
-    },
-    [],
-  );
-
-  const moveWidget = useCallback((widgetId: string, direction: "up" | "down") => {
-    setState((s) => {
-      const idx = s.widgets.findIndex((w) => w.widgetId === widgetId);
-      if (idx === -1) return s;
-      const next = direction === "up" ? idx - 1 : idx + 1;
-      if (next < 0 || next >= s.widgets.length) return s;
-      const arr = [...s.widgets];
-      [arr[idx], arr[next]] = [arr[next], arr[idx]];
-      return { ...s, widgets: arr };
+      return { ...s, widgets: moved };
     });
   }, []);
 
   return {
     widgets: state.widgets,
-    catalog: state.catalog,
-    isCustomizing: state.isCustomizing,
+    isEditMode: state.isEditMode,
     loading: state.loading,
     saving: state.saving,
     error: state.error,
-    toggleCustomize,
+    enterEditMode,
+    cancelEditMode,
     saveLayout: () => saveLayout(state.widgets),
-    addWidget,
-    removeWidget,
-    configureWidget,
-    moveWidget,
+    setVisible,
+    setColSpan,
+    reorder,
   };
 }

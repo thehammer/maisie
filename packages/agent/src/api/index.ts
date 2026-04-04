@@ -20,6 +20,7 @@ import { createDashboardRouter } from "./dashboard";
 import { createChatRouter } from "./chat";
 import { createPluginsRouter } from "./plugins";
 import { createPersonasRouter } from "./personas";
+import { createLayoutRouter } from "./layout";
 import type { Agent } from "../agent/index";
 import type { MaisiePlugin } from "@maisie/shared";
 
@@ -48,6 +49,7 @@ export function createApi(services: Services, agent?: Agent, plugins: MaisiePlug
   app.route("/api", createBridgeRouter(services));
   app.route("/api", createPluginsRouter(plugins));
   app.route("/api", createPersonasRouter());
+  app.route("/api", createLayoutRouter());
 
   // Mount custom routes from plugins (OAuth flows, streaming endpoints, webhooks)
   for (const plugin of plugins) {
