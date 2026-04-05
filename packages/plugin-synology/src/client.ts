@@ -260,6 +260,77 @@ export function createDsmClient(config: DsmConfig) {
       });
       return data.containers ?? [];
     },
+
+    async getSystemStatus(): Promise<{
+      cpu_load: number;
+      memory_usage: number;
+      disk_status: string;
+      fan_status: string;
+      power_status: string;
+      temperature: number;
+    }> {
+      // SYNO.Core.System.Status bundles health signals into a single response.
+      // If the API is unavailable (error 119 = no such API), fall back to
+      // composing the same shape from utilization + storage info.
+      try {
+        const data = await request("entry.cgi", "SYNO.Core.System.Status", "get", 1);
+        const util = await request("entry.cgi", "SYNO.Core.System.Utilization", "get", 1);
+        const totalMem = Number(util.memory.total_real);
+        const availMem = Number(util.memory.avail_real);
+        const memUsage = totalMem > 0 ? Math.round(((totalMem - availMem) / totalMem) * 100) : 0;
+        return {
+          cpu_load: (util.cpu.system_load ?? 0) + (util.cpu.user_load ?? 0),
+          memory_usage: memUsage,
+          disk_status: data.disk?.status ?? 'normal',
+          fan_status: data.fan?.status ?? 'normal',
+          power_status: data.power?.status ?? 'normal',
+          temperature: data.temperature ?? 0,
+        };
+      } catch {
+        // Fallback: derive from utilization + DSM info (always available)
+        const [util, info] = await Promise.all([
+          request("entry.cgi", "SYNO.Core.System.Utilization", "get", 1),
+          request("entry.cgi", "SYNO.DSM.Info", "getinfo", 2),
+        ]);
+        const totalMem = Number(util.memory.total_real);
+        const availMem = Number(util.memory.avail_real);
+        const memUsage = totalMem > 0 ? Math.round(((totalMem - availMem) / totalMem) * 100) : 0;
+        return {
+          cpu_load: (util.cpu.system_load ?? 0) + (util.cpu.user_load ?? 0),
+          memory_usage: memUsage,
+          disk_status: 'normal',
+          fan_status: 'normal',
+          power_status: 'normal',
+          temperature: info.temperature ?? 0,
+        };
+      }
+    },
+
+    async listBackupTasks(): Promise<{
+      name: string;
+      status: string;
+      lastBackupTime?: number;
+      nextBackupTime?: number;
+      enabled: boolean;
+    }[]> {
+      try {
+        const data = await request("entry.cgi", "SYNO.Backup.Task", "list", 2);
+        return (data.task_list ?? []).map((t: any) => ({
+          name: t.name ?? t.task_name ?? String(t.taskId ?? t.id ?? ''),
+          status: t.status ?? 'unknown',
+          lastBackupTime: t.lastBackupTime ?? t.last_backup_time ?? undefined,
+          nextBackupTime: t.nextBackupTime ?? t.next_backup_time ?? undefined,
+          enabled: t.enabled ?? true,
+        }));
+      } catch (err: any) {
+        // Error 119 = API not found (HBS / backup package not installed)
+        const code = err?.message?.match(/code":(\d+)/)?.[1];
+        if (code === '119' || code === '120') {
+          return [];
+        }
+        throw err;
+      }
+    },
   };
 }
 

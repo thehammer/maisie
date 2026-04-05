@@ -185,3 +185,50 @@ export const getSystemInfo = defineAction({
     }
   },
 })
+
+const systemStatusSchema = z.object({
+  cpu_load: field(z.number(), 'percentage'),
+  memory_usage: field(z.number(), 'percentage'),
+  disk_status: field(z.string(), 'status'),
+  fan_status: field(z.string(), 'status'),
+  power_status: field(z.string(), 'status'),
+  temperature: field(z.number(), 'temperature'),
+})
+
+export const getSystemStatus = defineAction({
+  name: 'get_system_status',
+  description: 'Get NAS system health status including CPU, memory, temperature, and fan.',
+  input: z.object({}),
+  output: systemStatusSchema,
+  http: { method: 'GET' },
+  ai: { tier: 'inform', description: 'Get NAS system health status including CPU, memory, temperature, and fan' },
+  ui: { type: 'data', label: 'System Status', section: 'nas' },
+  async execute(_input, _ctx) {
+    const { dsm } = getClients()
+    if (!dsm) throw new Error('Synology not configured')
+    return dsm.getSystemStatus()
+  },
+})
+
+const backupTaskSchema = z.object({
+  name: z.string(),
+  status: field(z.string(), 'status'),
+  lastBackupTime: field(z.number().optional(), 'timestamp'),
+  nextBackupTime: field(z.number().optional(), 'timestamp'),
+  enabled: z.boolean(),
+})
+
+export const listBackupTasks = defineAction({
+  name: 'list_backup_tasks',
+  description: 'List backup tasks and their status.',
+  input: z.object({}),
+  output: z.array(backupTaskSchema),
+  http: { method: 'GET' },
+  ai: { tier: 'inform', description: 'List backup tasks and their status' },
+  ui: { type: 'data', label: 'Backup Tasks', section: 'nas' },
+  async execute(_input, _ctx) {
+    const { dsm } = getClients()
+    if (!dsm) throw new Error('Synology not configured')
+    return dsm.listBackupTasks()
+  },
+})

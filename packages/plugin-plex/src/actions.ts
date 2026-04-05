@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { defineAction } from '@maisie/shared'
+import { defineAction, field } from '@maisie/shared'
 import { getPlexClient } from './client'
 
 const librarySchema = z.object({
@@ -257,6 +257,71 @@ export const getEpisodes = defineAction({
       episodes = episodes.filter((ep) => ep.parentIndex === input.season)
     }
     return episodes
+  },
+})
+
+const onDeckItemSchema = z.object({
+  title: z.string(),
+  type: z.string(),
+  seriesTitle: z.string().optional(),
+  seasonEpisode: z.string().optional(),
+  progress: field(z.number(), 'percentage'),
+  thumb: field(z.string().optional(), 'image'),
+})
+
+const watchHistoryItemSchema = z.object({
+  title: z.string(),
+  type: z.string(),
+  seriesTitle: z.string().optional(),
+  viewedAt: field(z.number(), 'timestamp'),
+  accountId: z.number().optional(),
+})
+
+export const getOnDeck = defineAction({
+  name: 'list_on_deck',
+  description: 'Get on-deck content — in-progress or next to watch across all Plex libraries.',
+  input: z.object({}),
+  output: z.array(onDeckItemSchema),
+  http: { method: 'GET' },
+  ai: { tier: 'inform', description: 'Get on-deck content — in-progress or next to watch' },
+  ui: { type: 'data', label: 'On Deck', section: 'media' },
+  async execute(_input, _ctx) {
+    const plex = getPlexClient()
+    if (!plex) throw new Error('Plex not configured')
+    const raw = await plex.getOnDeck()
+    return raw.map((m) => ({
+      title: m.title,
+      type: m.type,
+      seriesTitle: m.grandparentTitle,
+      seasonEpisode: formatSeasonEpisode(m.parentIndex, m.index),
+      progress:
+        m.viewOffset != null && m.duration
+          ? Math.round((m.viewOffset / m.duration) * 100)
+          : 0,
+      thumb: m.thumb,
+    }))
+  },
+})
+
+export const getWatchHistory = defineAction({
+  name: 'list_watch_history',
+  description: 'Get recent watch history across all Plex users.',
+  input: z.object({}),
+  output: z.array(watchHistoryItemSchema),
+  http: { method: 'GET' },
+  ai: { tier: 'inform', description: 'Get recent watch history' },
+  ui: { type: 'data', label: 'Watch History', section: 'media' },
+  async execute(_input, _ctx) {
+    const plex = getPlexClient()
+    if (!plex) throw new Error('Plex not configured')
+    const raw = await plex.getWatchHistory()
+    return raw.map((m) => ({
+      title: m.title,
+      type: m.type,
+      seriesTitle: m.grandparentTitle,
+      viewedAt: m.viewedAt,
+      accountId: m.accountId,
+    }))
   },
 })
 

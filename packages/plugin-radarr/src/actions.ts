@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { defineAction } from '@maisie/shared'
+import { defineAction, field } from '@maisie/shared'
 import { getRadarrClient } from './client'
 
 const movieResultSchema = z.object({
@@ -174,6 +174,88 @@ export const getMonitoredMovies = defineAction({
       status: m.status,
       overview: m.overview?.slice(0, 200),
     }))
+  },
+})
+
+const missingMovieSchema = z.object({
+  title: z.string(),
+  year: z.number(),
+  status: field(z.string(), 'status'),
+  inCinemas: field(z.string().optional(), 'timestamp'),
+})
+
+const downloadHistoryEntrySchema = z.object({
+  title: z.string(),
+  eventType: z.string(),
+  date: field(z.string(), 'timestamp'),
+  quality: z.string(),
+})
+
+export const listMissingMovies = defineAction({
+  name: 'list_missing_movies',
+  description: 'Get monitored movies that have not been downloaded yet, sorted by cinema release date descending.',
+  input: z.object({}),
+  output: z.array(missingMovieSchema),
+  http: { method: 'GET' },
+  ai: { tier: 'inform' },
+  ui: { type: 'data', label: 'Missing Movies', section: 'media' },
+  async execute(_input, _ctx) {
+    const radarr = getRadarrClient()
+    if (!radarr) throw new Error('Radarr not configured')
+    const result = await radarr.getMissingMovies()
+    const records = result.records ?? []
+    return records.map((m: any) => ({
+      title: m.title,
+      year: m.year ?? 0,
+      status: m.monitored ? 'warning' : 'idle',
+      inCinemas: m.inCinemas || undefined,
+    }))
+  },
+})
+
+export const listDownloadHistory = defineAction({
+  name: 'list_download_history',
+  description: 'Get recent grab and import events from Radarr download history.',
+  input: z.object({}),
+  output: z.array(downloadHistoryEntrySchema),
+  http: { method: 'GET' },
+  ai: { tier: 'inform' },
+  ui: { type: 'data', label: 'Download History', section: 'media' },
+  async execute(_input, _ctx) {
+    const radarr = getRadarrClient()
+    if (!radarr) throw new Error('Radarr not configured')
+    const result = await radarr.getHistory()
+    const records = result.records ?? []
+    return records.map((h: any) => ({
+      title: h.movie?.title || 'Unknown',
+      eventType: h.eventType || '',
+      date: h.date || '',
+      quality: h.quality?.quality?.name || '',
+    }))
+  },
+})
+
+export const invokeMovieSearch = defineAction({
+  name: 'invoke_movie_search',
+  description: 'Trigger Radarr to search for a specific movie.',
+  input: z.object({
+    movieId: z.number(),
+  }),
+  output: z.object({
+    commandId: z.number(),
+    status: z.string(),
+  }),
+  http: { method: 'POST' },
+  ai: { tier: 'act' },
+  ui: false,
+  async execute(input, _ctx) {
+    const radarr = getRadarrClient()
+    if (!radarr) throw new Error('Radarr not configured')
+    const result = await radarr.sendCommand({ name: 'MoviesSearch', movieIds: [input.movieId] })
+    return {
+      commandId: result.id,
+      status: result.status || 'queued',
+    }
   },
 })
 

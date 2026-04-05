@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { defineAction } from '@maisie/shared'
+import { defineAction, field } from '@maisie/shared'
 import { getSonarrClient } from './client'
 
 const showResultSchema = z.object({
@@ -181,6 +181,92 @@ export const getMonitoredShows = defineAction({
       status: s.status,
       overview: s.overview?.slice(0, 200),
     }))
+  },
+})
+
+const missingEpisodeSchema = z.object({
+  show: z.string(),
+  title: z.string(),
+  seasonEpisode: z.string(),
+  airDate: field(z.string(), 'timestamp'),
+  status: field(z.string(), 'status'),
+})
+
+const downloadHistoryEntrySchema = z.object({
+  show: z.string(),
+  title: z.string(),
+  eventType: z.string(),
+  date: field(z.string(), 'timestamp'),
+  quality: z.string(),
+})
+
+export const listMissingEpisodes = defineAction({
+  name: 'list_missing_episodes',
+  description: 'Get monitored episodes that have not been downloaded yet, sorted by air date descending.',
+  input: z.object({}),
+  output: z.array(missingEpisodeSchema),
+  http: { method: 'GET' },
+  ai: { tier: 'inform' },
+  ui: { type: 'data', label: 'Missing Episodes', section: 'media' },
+  async execute(_input, _ctx) {
+    const sonarr = getSonarrClient()
+    if (!sonarr) throw new Error('Sonarr not configured')
+    const result = await sonarr.getMissingEpisodes()
+    const records = result.records ?? []
+    return records.map((ep: any) => ({
+      show: ep.series?.title || 'Unknown',
+      title: ep.title || 'TBA',
+      seasonEpisode: `S${padNum(ep.seasonNumber)}E${padNum(ep.episodeNumber)}`,
+      airDate: ep.airDateUtc || ep.airDate || '',
+      status: ep.monitored ? 'warning' : 'idle',
+    }))
+  },
+})
+
+export const listDownloadHistory = defineAction({
+  name: 'list_download_history',
+  description: 'Get recent grab and import events from Sonarr download history.',
+  input: z.object({}),
+  output: z.array(downloadHistoryEntrySchema),
+  http: { method: 'GET' },
+  ai: { tier: 'inform' },
+  ui: { type: 'data', label: 'Download History', section: 'media' },
+  async execute(_input, _ctx) {
+    const sonarr = getSonarrClient()
+    if (!sonarr) throw new Error('Sonarr not configured')
+    const result = await sonarr.getHistory()
+    const records = result.records ?? []
+    return records.map((h: any) => ({
+      show: h.series?.title || 'Unknown',
+      title: h.episode?.title || 'Unknown',
+      eventType: h.eventType || '',
+      date: h.date || '',
+      quality: h.quality?.quality?.name || '',
+    }))
+  },
+})
+
+export const invokeSeriesSearch = defineAction({
+  name: 'invoke_series_search',
+  description: 'Trigger Sonarr to search for missing episodes of a specific series.',
+  input: z.object({
+    seriesId: z.number(),
+  }),
+  output: z.object({
+    commandId: z.number(),
+    status: z.string(),
+  }),
+  http: { method: 'POST' },
+  ai: { tier: 'act' },
+  ui: false,
+  async execute(input, _ctx) {
+    const sonarr = getSonarrClient()
+    if (!sonarr) throw new Error('Sonarr not configured')
+    const result = await sonarr.sendCommand({ name: 'SeriesSearch', seriesId: input.seriesId })
+    return {
+      commandId: result.id,
+      status: result.status || 'queued',
+    }
   },
 })
 

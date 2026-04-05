@@ -79,6 +79,21 @@ export function createRadarrClient(config: RadarrConfig) {
         }),
       })
     },
+
+    async getMissingMovies(): Promise<{ records: any[]; totalRecords: number }> {
+      return request('/wanted/missing?sortKey=inCinemas&sortDirection=desc&pageSize=50')
+    },
+
+    async getHistory(): Promise<{ records: any[] }> {
+      return request('/history?sortKey=date&sortDirection=desc&pageSize=25&includeMovie=true')
+    },
+
+    async sendCommand(body: Record<string, unknown>): Promise<any> {
+      return request('/command', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+    },
   }
 }
 

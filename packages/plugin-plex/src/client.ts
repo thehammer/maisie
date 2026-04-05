@@ -196,6 +196,37 @@ export function createPlexClient(config: PlexConfig) {
       return data.MediaContainer.Metadata ?? []
     },
 
+    async getOnDeck(): Promise<
+      {
+        title: string
+        type: string
+        grandparentTitle?: string
+        parentIndex?: number
+        index?: number
+        viewOffset?: number
+        duration?: number
+        thumb?: string
+      }[]
+    > {
+      const data = await request('/library/onDeck')
+      return data.MediaContainer.Metadata ?? []
+    },
+
+    async getWatchHistory(limit = 25): Promise<
+      {
+        title: string
+        type: string
+        grandparentTitle?: string
+        viewedAt: number
+        accountId?: number
+      }[]
+    > {
+      const data = await request(
+        `/status/sessions/history/all?sort=viewedAt:desc&X-Plex-Container-Size=${limit}`,
+      )
+      return data.MediaContainer.Metadata ?? []
+    },
+
     async search(query: string, limit = 10): Promise<any[]> {
       const data = await request(`/hubs/search?query=${encodeURIComponent(query)}&limit=${limit}`)
       const hubs = data.MediaContainer?.Hub ?? []

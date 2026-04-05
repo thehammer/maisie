@@ -83,6 +83,21 @@ export function createSonarrClient(config: SonarrConfig) {
         }),
       })
     },
+
+    async getMissingEpisodes(): Promise<{ records: any[]; totalRecords: number }> {
+      return request('/wanted/missing?sortKey=airDateUtc&sortDirection=desc&pageSize=50&includeSeries=true')
+    },
+
+    async getHistory(): Promise<{ records: any[] }> {
+      return request('/history?sortKey=date&sortDirection=desc&pageSize=25&includeSeries=true&includeEpisode=true')
+    },
+
+    async sendCommand(body: Record<string, unknown>): Promise<any> {
+      return request('/command', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+    },
   }
 }
 
