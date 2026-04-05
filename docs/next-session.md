@@ -1,70 +1,84 @@
 # Next Session
 
-## Overnight Progress (2026-04-04 → 05)
+## State as of 2026-04-05
 
-### Completed
+### What's Running
 
-**Quick fixes (committed)**
-- `fix: dedup personas by name in createPersonaRouter` — Natalie was showing twice (plugin-unifi + plugin-synology both declare her). First occurrence wins.
-- `fix: propagate conversation history to chat API` — Chat was always sending [] as history. Now snapshots settled turns and includes them in every POST.
-
-**Refactor + Phase 2 (committed as one)**
-- `refactor: rename widget → card throughout + Phase 2 semantic types`
-  - WidgetConfig → CardConfig, WidgetDescriptor → CardDescriptor, WidgetField → CardField
-  - getWidgetCatalog → getCardCatalog, /api/widgets/catalog → /api/cards/catalog
-  - addWidget/removeWidget → addCard/removeCard, WidgetSlot → CardSlot
-  - CSS: widget-edit-* → card-edit-*, widget-hidden → card-hidden
-  - **Phase 2**: CardField now has `maisieType: MaisieFieldType | null`; schema-introspector reads field() annotations via getMaisieType(); DynamicCard prefers maisieType over raw Zod fallback. Plugin fields annotated with field(z.number(), 'bytes') now render as "1.2 GB" automatically.
-
-**Phase 1 (committed)**
-- `docs: Phase 1 universal interface protocol spec` — docs/protocol.md written
-
-**Phase 3 (in flight at time of writing)**
-- Sonarr: list_missing_episodes, list_download_history, invoke_series_search
-- Radarr: list_missing_movies, list_download_history, invoke_movie_search
-- Plex: list_on_deck, list_watch_history
-- Synology: get_system_status, list_backup_tasks
+- **Tokyo** (192.168.1.10): all services up, latest code deployed
+- **Webster**: ✅ Chrome working, ✅ Safari working (got it working this morning)
+  - MCP server registered in `~/.claude.json`
+  - Agent definition at `~/.claude/agents/webster.md`
+  - If `mcp__webster__*` tools don't appear, orphan process on port 3000:
+    ```bash
+    kill $(lsof -ti :3000) && claude
+    ```
 
 ---
 
-## UniFi — Still Locked Out
+## Overnight Commits (all deployed)
 
-Rate limit (429) still active at end of session. Try again tomorrow:
+| Commit | What |
+|--------|------|
+| `25b84c5` | fix: dedup Natalie persona (plugin-unifi + plugin-synology both declared her) |
+| `795e856` | fix: chat history — each message now carries prior turns to the agent |
+| `b33872e` | refactor: widget→card rename + Phase 2 semantic type propagation |
+| `69e8748` | feat: Phase 3 gaps — Sonarr/Radarr missing+history+search, Plex on-deck+history, Synology system status+backups |
+| `7e58705` | docs: next-session update |
+
+### Phase 2 detail (in b33872e)
+- `CardField.maisieType: MaisieFieldType | null` — field() annotations now flow through schema introspector → catalog API → DynamicCard renderer
+- Full widget→card vocabulary rename (CardConfig, CardDescriptor, CardField, /api/cards/catalog, addCard/removeCard, CardSlot, AddCardPanel)
+
+---
+
+## What to Test This Session
+
+### Dashboard (http://maisie.1368bayoupathcourt.net or http://192.168.1.10:3001)
+1. **Add Card panel** — Edit Layout → "+ Add Card" — catalog drawer should slide in
+2. **DynamicCard rendering** — add `synology.get_system_status`, `plex.list_on_deck`, `sonarr.list_missing_episodes` — verify they render with correct semantic types (percentages as bars, timestamps as "2h ago", status as colored badge)
+3. **Chat memory** — start a conversation, ask a follow-up that requires context ("what about the second one?") — should work now
+4. **Personas** — agent log should show "3 personas active: Channing, Alexandria, Natalie" (not 4)
+
+### Webster (with Safari now working)
+- Use the webster agent (`.claude/agents/webster.md`) or `mcp__webster__*` tools directly
+- Navigate, read pages, interact with dashboard via browser automation
+
+---
+
+## Pending Items
+
+### UniFi — still rate-limited (try first thing)
 ```bash
 ssh tokyo 'PASS=$(grep UNIFI_PASSWORD ~/maisie/.env | cut -d= -f2-); curl -sk -X POST https://192.168.1.1/api/auth/login -H "Content-Type: application/json" -d "{\"username\":\"Maisie\",\"password\":\"$PASS\"}" -w "\nHTTP %{http_code}"'
 ```
-If 200: set `UNIFI_PROTECT_ENABLED=true` in Tokyo .env and deploy.
+If 200 → set `UNIFI_PROTECT_ENABLED=true` in Tokyo `.env` and deploy.
 
----
-
-## What's Left
-
-### Phase 3 remaining gaps (lower priority)
-- UniFi: RTSP stream URLs from protect bootstrap (cameras already have the data, just needs mapping)
-- Plex: webhook receiver for play/stop events without polling
-- Sonarr/Radarr: webhook receivers for grab/import events
+### Remaining Phase 3 gaps (lower priority)
+- UniFi: expose RTSP stream URLs from Protect bootstrap (data's already there)
+- Plex/Sonarr/Radarr: webhook receivers to eliminate polling
 - Synology: network interface info, package status
 
-### Phase 4 (surface layers — mostly done)
-- Dashboard auto-generation: ✅ complete
-- Add Widget catalog panel: ✅ complete
-- Semantic type propagation: ✅ complete (Phase 2)
-- OpenAPI auto-generation: not yet implemented (lower priority)
+### Housekeeping
+- File renames: `WidgetSlot.tsx` → `CardSlot.tsx`, `AddWidgetPanel.tsx` → `AddCardPanel.tsx` (exports already renamed, imports still work)
 
-### Rename follow-up
-- File names WidgetSlot.tsx and AddWidgetPanel.tsx not renamed (exports renamed, imports still work)
-- Can do as housekeeping
-
-### Webster
-- Chrome: ✅ working
-- Safari: popup still unconfirmed — see steps in previous notes
-- Firefox: temporary add-on load from build/extension/firefox/
+### OpenAPI auto-generation (Phase 2 remainder — low priority)
+- Auto-generate OpenAPI spec from PluginAction definitions
 
 ---
 
-## Deploy
+## Webster Project State
 
-Run when Phase 3 agents complete and typecheck is green:
-```bash
-LAN_IP=192.168.1.10 ./scripts/deploy-tokyo.sh maisie
-```
+Repo: `~/Software Development/Open Source/webster`
+
+- MCP server: `src/server.ts` + `src/index.ts` (Bun, stdio transport)
+- Extension: `extension/` (MV3, Chrome/Safari/Firefox)
+- Build: `./scripts/build-extension.sh [--safari|--firefox]`
+- Tests: `bun test` in the webster repo
+
+**Safari build notes:**
+- `Allow Unsigned Extensions` resets on Safari restart — re-enable each time
+- Build + install: `./scripts/build-extension.sh --safari --xcode` → Cmd+R in Xcode
+- Grant website access on first toolbar click
+
+**Firefox:**
+- `about:debugging` → "Load Temporary Add-on" → `build/extension/firefox/manifest.json`
