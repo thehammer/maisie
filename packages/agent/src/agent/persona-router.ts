@@ -2,9 +2,15 @@ import type { MaisiePlugin, AgentPersona } from '@maisie/shared'
 import { topicMatches } from './event-router'
 
 export function createPersonaRouter(plugins: MaisiePlugin[]) {
+  const seen = new Set<string>()
   const personas = plugins
     .filter(p => p.persona != null)
     .map(p => ({ plugin: p.name, persona: p.persona! }))
+    .filter(({ persona }) => {
+      if (seen.has(persona.name)) return false
+      seen.add(persona.name)
+      return true
+    })
 
   function routeEvent(topic: string): AgentPersona | null {
     for (const { persona } of personas) {
