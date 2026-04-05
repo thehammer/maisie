@@ -84,6 +84,11 @@ export function ChatPanel({ notificationCount, onOpenNotifications }: Props) {
       streaming: true,
     };
 
+    // Snapshot completed turns before appending the new pair
+    const history = messages
+      .filter((m) => !m.streaming)
+      .map(({ role, content: c }) => ({ role, content: c }));
+
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setInput("");
     setSending(true);
@@ -96,7 +101,7 @@ export function ChatPanel({ notificationCount, onOpenNotifications }: Props) {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, persona }),
+        body: JSON.stringify({ message: text, persona, history }),
         signal: controller.signal,
       });
 
@@ -148,7 +153,7 @@ export function ChatPanel({ notificationCount, onOpenNotifications }: Props) {
         prev.map((m) => (m.id === assistantId ? { ...m, streaming: false } : m))
       );
     }
-  }, [input, sending, statusApi.data]);
+  }, [input, sending, statusApi.data, messages]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {

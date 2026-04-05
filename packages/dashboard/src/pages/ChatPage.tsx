@@ -88,6 +88,11 @@ export function ChatPage({ onBack }: Props) {
         streaming: true,
       };
 
+      // Snapshot completed turns before appending the new pair
+      const history = messages
+        .filter((m) => !m.streaming)
+        .map(({ role, content: c }) => ({ role, content: c }));
+
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
       setInput("");
       setSending(true);
@@ -100,7 +105,7 @@ export function ChatPage({ onBack }: Props) {
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: content, persona }),
+          body: JSON.stringify({ message: content, persona, history }),
           signal: controller.signal,
         });
 
@@ -153,7 +158,7 @@ export function ChatPage({ onBack }: Props) {
         );
       }
     },
-    [input, sending, statusApi.data],
+    [input, sending, statusApi.data, messages],
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
