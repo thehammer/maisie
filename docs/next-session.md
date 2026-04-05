@@ -1,82 +1,70 @@
 # Next Session
 
-## What Was Completed Today (Phase 4)
+## Overnight Progress (2026-04-04 → 05)
 
-Dashboard auto-generation is live:
-- `DynamicCard` — fetches its own data, renders with ResourceCard/ResourceList, derives HTTP path using same logic as plugin-core's `deriveHttpPath`
-- `AddWidgetPanel` — right-side catalog drawer in edit mode, grouped by section, one-click add
-- `useLayout.addWidget` / `removeWidget` — catalog-sourced widgets (dot in ID) get a remove button
-- **Bug fixed**: DynamicCard was using raw action name as URL path (`/list_lights`) instead of derived path (`/lights`)
+### Completed
 
-## Ready to Test Tomorrow
+**Quick fixes (committed)**
+- `fix: dedup personas by name in createPersonaRouter` — Natalie was showing twice (plugin-unifi + plugin-synology both declare her). First occurrence wins.
+- `fix: propagate conversation history to chat API` — Chat was always sending [] as history. Now snapshots settled turns and includes them in every POST.
 
-- Open dashboard, click Edit Layout → "+ Add Widget"
-- Try: `synology.get_system_info`, `unifi.get_wan_health`, `plex.get_now_playing`, `plex.list_libraries`
-- Catalog widgets have a red ✕ to remove (not just hide)
+**Refactor + Phase 2 (committed as one)**
+- `refactor: rename widget → card throughout + Phase 2 semantic types`
+  - WidgetConfig → CardConfig, WidgetDescriptor → CardDescriptor, WidgetField → CardField
+  - getWidgetCatalog → getCardCatalog, /api/widgets/catalog → /api/cards/catalog
+  - addWidget/removeWidget → addCard/removeCard, WidgetSlot → CardSlot
+  - CSS: widget-edit-* → card-edit-*, widget-hidden → card-hidden
+  - **Phase 2**: CardField now has `maisieType: MaisieFieldType | null`; schema-introspector reads field() annotations via getMaisieType(); DynamicCard prefers maisieType over raw Zod fallback. Plugin fields annotated with field(z.number(), 'bytes') now render as "1.2 GB" automatically.
 
----
+**Phase 1 (committed)**
+- `docs: Phase 1 universal interface protocol spec` — docs/protocol.md written
 
-## Known Issues (Quick Fixes)
-
-- **Double Natalie in agent log**: `[agent] 4 personas active: Channing, Alexandria, Natalie, Natalie`
-  - plugin-unifi and plugin-synology both declare her
-  - Fix: dedup in `createPersonaRouter` or `createAgent`
-
-- **Chat has no conversation history**: `runForMessage` always passes `[]`
-  - Fix: propagate history from ChatPage/ChatPanel through the route
-
-- **UniFi re-enable** (rate limit should have cleared long ago):
-  ```bash
-  ssh tokyo 'PASS=$(grep UNIFI_PASSWORD ~/maisie/.env | cut -d= -f2-); curl -sk -X POST https://192.168.1.1/api/auth/login -H "Content-Type: application/json" -d "{\"username\":\"Maisie\",\"password\":\"$PASS\"}" -w "\nHTTP %{http_code}"'
-  ```
-  If 200: set `UNIFI_PROTECT_ENABLED=true` in Tokyo .env and deploy.
+**Phase 3 (in flight at time of writing)**
+- Sonarr: list_missing_episodes, list_download_history, invoke_series_search
+- Radarr: list_missing_movies, list_download_history, invoke_movie_search
+- Plex: list_on_deck, list_watch_history
+- Synology: get_system_status, list_backup_tasks
 
 ---
 
-## Universal Interface Plan — Current Position
+## UniFi — Still Locked Out
 
-See `docs/super-plan.md` for full detail.
-
-- **Phase 0** ✅ API catalog, dashboard layout customization, three-surface framework running
-- **Phase 3/4 (session phases)** ✅ Plugin migration complete, dashboard auto-generation complete
-
-**Next up — Phase 1: Taxonomy & Protocol Design**
-- Produce `docs/protocol.md` — universal resource model derived from the catalog
-- Vocabulary: Resource, Field, Action, Entity, Capability, Tier
-- Semantic types: `bytes`, `percentage`, `status`, `image`, `progress`, `list<T>`, `action`, `toggle`
-- This is design work — no code yet. Output is a protocol doc tight enough to build the Phase 2 framework from.
-
-**Then Phase 2: Core Framework**
-- Resource Registry in `packages/plugin-core`
-- `PluginAction` gets explicit `ui` surface declaration (type: data | action | list)
-- Auto-generated OpenAPI from action definitions
-- MaisieFieldType semantic annotations propagated through to widget catalog (currently lost at introspection)
-
----
-
-## Rename "widget" → "card"
-
-Still deferred. Do before Phase 2 adds more surface area:
-- `WidgetConfig` → `CardConfig`, `widgetId` → `cardId`
-- CSS class names, layout service, DB schema
-
----
-
-## Webster Browser Automation
-
-Webster (`~/Software Development/Open Source/webster`) — Chrome working, Safari popup unresolved.
-
-**MCP tools registration:** If `mcp__webster__*` tools don't appear, orphan process on port 3000:
+Rate limit (429) still active at end of session. Try again tomorrow:
 ```bash
-kill $(lsof -ti :3000)
-claude   # fresh session — tools register
+ssh tokyo 'PASS=$(grep UNIFI_PASSWORD ~/maisie/.env | cut -d= -f2-); curl -sk -X POST https://192.168.1.1/api/auth/login -H "Content-Type: application/json" -d "{\"username\":\"Maisie\",\"password\":\"$PASS\"}" -w "\nHTTP %{http_code}"'
 ```
+If 200: set `UNIFI_PROTECT_ENABLED=true` in Tokyo .env and deploy.
 
-**Safari popup** — still not confirmed working. To rebuild:
+---
+
+## What's Left
+
+### Phase 3 remaining gaps (lower priority)
+- UniFi: RTSP stream URLs from protect bootstrap (cameras already have the data, just needs mapping)
+- Plex: webhook receiver for play/stop events without polling
+- Sonarr/Radarr: webhook receivers for grab/import events
+- Synology: network interface info, package status
+
+### Phase 4 (surface layers — mostly done)
+- Dashboard auto-generation: ✅ complete
+- Add Widget catalog panel: ✅ complete
+- Semantic type propagation: ✅ complete (Phase 2)
+- OpenAPI auto-generation: not yet implemented (lower priority)
+
+### Rename follow-up
+- File names WidgetSlot.tsx and AddWidgetPanel.tsx not renamed (exports renamed, imports still work)
+- Can do as housekeeping
+
+### Webster
+- Chrome: ✅ working
+- Safari: popup still unconfirmed — see steps in previous notes
+- Firefox: temporary add-on load from build/extension/firefox/
+
+---
+
+## Deploy
+
+Run when Phase 3 agents complete and typecheck is green:
 ```bash
-cd ~/Software\ Development/Open\ Source/webster && ./scripts/build-extension.sh --safari --xcode
+LAN_IP=192.168.1.10 ./scripts/deploy-tokyo.sh maisie
 ```
-Cmd+R in Xcode. Then: Safari → Develop → Allow Unsigned Extensions ✓ (resets on restart!), grant website access on first click.
-
-**Firefox** — MV3 background script bundled, manifest uses `background.scripts`. Load from `build/extension/firefox/`:
-1. `about:debugging` → "This Firefox" → "Load Temporary Add-on..." → select `manifest.json`
