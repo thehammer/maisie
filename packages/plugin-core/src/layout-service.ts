@@ -1,7 +1,7 @@
-import type { WidgetConfig } from './types'
+import type { CardConfig } from './types'
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 
-export const DEFAULT_WIDGET_ORDER: WidgetConfig[] = [
+export const DEFAULT_WIDGET_ORDER: CardConfig[] = [
   { id: 'ServiceStatus',         visible: true,  col_span: 1, order: 0  },
   { id: 'NetworkCard',           visible: true,  col_span: 1, order: 1  },
   { id: 'NasCard',               visible: true,  col_span: 1, order: 2  },
@@ -20,7 +20,7 @@ export const DEFAULT_WIDGET_ORDER: WidgetConfig[] = [
 ]
 
 export function createLayoutService(db: BunSQLiteDatabase<any>) {
-  async function getLayout(page: string): Promise<WidgetConfig[]> {
+  async function getLayout(page: string): Promise<CardConfig[]> {
     const { dashboardLayouts } = await import('../../agent/src/services/schema')
     const { eq } = await import('drizzle-orm')
 
@@ -32,7 +32,7 @@ export function createLayoutService(db: BunSQLiteDatabase<any>) {
 
     if (!row) return [...DEFAULT_WIDGET_ORDER]
 
-    const parsed = JSON.parse(row.widgets) as WidgetConfig[]
+    const parsed = JSON.parse(row.widgets) as CardConfig[]
     // Ensure any widgets added since the layout was saved are appended
     const knownIds = new Set(parsed.map((w) => w.id))
     const missing = DEFAULT_WIDGET_ORDER
@@ -42,7 +42,7 @@ export function createLayoutService(db: BunSQLiteDatabase<any>) {
     return [...parsed, ...missing].sort((a, b) => a.order - b.order)
   }
 
-  async function updateLayout(page: string, widgets: WidgetConfig[]): Promise<void> {
+  async function updateLayout(page: string, widgets: CardConfig[]): Promise<void> {
     const { dashboardLayouts } = await import('../../agent/src/services/schema')
     const { eq } = await import('drizzle-orm')
     const { randomUUID } = await import('crypto')
@@ -75,15 +75,15 @@ export function createLayoutService(db: BunSQLiteDatabase<any>) {
   async function patchWidget(
     page: string,
     id: string,
-    patch: Partial<Pick<WidgetConfig, 'visible' | 'col_span'>>,
-  ): Promise<WidgetConfig[]> {
+    patch: Partial<Pick<CardConfig, 'visible' | 'col_span'>>,
+  ): Promise<CardConfig[]> {
     const current = await getLayout(page)
     const updated = current.map((w) => (w.id === id ? { ...w, ...patch } : w))
     await updateLayout(page, updated)
     return updated
   }
 
-  async function reorderWidgets(page: string, orderedIds: string[]): Promise<WidgetConfig[]> {
+  async function reorderWidgets(page: string, orderedIds: string[]): Promise<CardConfig[]> {
     const current = await getLayout(page)
     const idSet = new Set(orderedIds)
 
@@ -93,7 +93,7 @@ export function createLayoutService(db: BunSQLiteDatabase<any>) {
         const w = current.find((c) => c.id === id)
         return w ? { ...w, order: i } : null
       })
-      .filter((w): w is WidgetConfig => w !== null)
+      .filter((w): w is CardConfig => w !== null)
 
     const trailing = current
       .filter((w) => !idSet.has(w.id))

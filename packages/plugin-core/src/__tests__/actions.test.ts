@@ -274,12 +274,12 @@ describe('delete_persona', () => {
 })
 
 // ----------------------------------------------------------------
-// get_widget_catalog
+// get_card_catalog
 // ----------------------------------------------------------------
 
-describe('get_widget_catalog', () => {
+describe('get_card_catalog', () => {
   it('returns a descriptor for the fake action (ui !== false)', async () => {
-    const catalog = await actionDefs.getWidgetCatalog.execute({}, noopCtx)
+    const catalog = await actionDefs.getCardCatalog.execute({}, noopCtx)
     expect(Array.isArray(catalog)).toBe(true)
     const desc = catalog.find((d) => d.id === 'fake.fake_action')
     expect(desc).toBeDefined()
@@ -289,7 +289,7 @@ describe('get_widget_catalog', () => {
   })
 
   it('introspects output fields correctly from the fake action schema', async () => {
-    const catalog = await actionDefs.getWidgetCatalog.execute({}, noopCtx)
+    const catalog = await actionDefs.getCardCatalog.execute({}, noopCtx)
     const desc = catalog.find((d) => d.id === 'fake.fake_action')!
     const nameField = desc.outputFields.find((f) => f.key === 'name')
     const countField = desc.outputFields.find((f) => f.key === 'count')
@@ -308,7 +308,7 @@ describe('get_widget_catalog', () => {
 
 describe('get_layout / update_layout', () => {
   it('round-trips a layout through SQLite', async () => {
-    // WidgetConfig format: id, visible, col_span, order
+    // CardConfig format: id, visible, col_span, order
     const widgets = [
       { id: 'NetworkCard', visible: true, col_span: 1, order: 0 },
       { id: 'NasCard',     visible: false, col_span: 2, order: 1 },

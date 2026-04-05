@@ -1,253 +1,185 @@
-# Maisie Protocol — Universal Resource Model v0.1
+# Maisie Universal Interface Protocol
 
-> **Status:** Working draft. Decisions marked `[provisional]` are open to revision
-> after initial implementation. Everything else is locked for Phase 2.
-
----
-
-## Purpose
-
-This document specifies the universal resource model that Maisie uses to describe
-every capability exposed by every plugin. It is the source of truth for Phase 2
-implementation.
-
-The model has one core rule:
-
-> **One definition. Three surfaces.**  
-> Every plugin capability is defined once as a `PluginAction`. The framework
-> derives the HTTP endpoint, AI tool, and dashboard component from that single
-> definition. Nothing is hand-wired.
+*Phase 1 specification — last updated 2026-04-04*
 
 ---
 
-## Resource Model
+## Overview
 
-A **Resource** is any addressable thing a plugin knows about — a network device,
-a storage volume, a media item, a sensor, a camera, a print job.
+The Universal Interface Protocol is the contract that governs how plugins describe their capabilities and how the framework materializes those descriptions into usable surfaces. A capability defined once becomes an HTTP endpoint, an AI agent tool, and a dashboard card simultaneously. The protocol specifies the vocabulary, the contract, and the derivation rules that make this work.
 
-### Address Scheme
+The intermediate layers — resource model, semantic type vocabulary, capability model — make zero domain assumptions. They are equally applicable to home automation, healthcare portals, factory floor dashboards, or any system composed of heterogeneous subsystems. Maisie-specific knowledge lives only in plugins.
 
-Every resource instance has a globally unique address:
+---
+
+## Core Vocabulary
+
+**Resource** — A named, typed data structure returned by a plugin action. Examples: a `Device` returned by `plugin-unifi`, a `PrintJob` from `plugin-bambu`, a `NasVolume` from `plugin-synology`. Resources have a type, an identifier, and a set of entities.
+
+**Field** — A typed property of a resource, optionally annotated with a semantic `MaisieFieldType`. The annotation is what allows the framework to render and reason about fields without plugin-specific knowledge.
+
+**Action** — The atomic unit of plugin capability. A single `PluginAction` definition from which the framework generates three surfaces: an HTTP endpoint, an AI tool, and a dashboard card. Actions have a name, input schema, output schema, and explicit declarations for each surface.
+
+**Entity** — A specific addressable instance of a resource — a particular camera, a particular storage volume, a particular network device. Entities are referenced by address:
 
 ```
-{plugin}.{resource-type}.{id}
+{plugin}.{resource-type}.{id}              # the resource
+{plugin}.{resource-type}.{id}.{field}      # a specific field on the resource
 ```
 
-Every field or command on a resource has an entity address:
-
-```
-{plugin}.{resource-type}.{id}.{field}
-```
-
-**Examples:**
-
+Examples:
 ```
 unifi.network-device.aa:bb:cc:dd:ee:ff
 unifi.network-device.aa:bb:cc:dd:ee:ff.blocked
 synology.volume.volume1.used_percent
 home-assistant.sensor.kitchen_temperature.state
 plex.media-item.12345.title
-calibre.book.4421.tags
 bambu.print-job.current.progress
 ```
 
-**Rules:**
-- Plugin names use `kebab-case`, matching the plugin package name
-- Resource type names use `kebab-case` (plural in list contexts, singular in get contexts)
-- IDs are plugin-local. The framework scopes them globally by prepending `{plugin}.{type}.`
-- IDs must be stable — MAC addresses, volume names, entity IDs, Plex rating keys.
-  Avoid positional indices. `[provisional: whether to require a `stable_id` declaration]`
+**Capability** — A named group of required action names that a plugin must implement to claim the capability. A plugin declaring `capabilities: ['network']` must expose actions named `list_devices` and `get_wan_health`. The framework validates this contract at boot and refuses to start a plugin that does not satisfy its declared capabilities.
 
-### Identity
+**Tier** — The autonomy level for AI-accessible actions. Controls whether the agent calls the action freely, surfaces the result for human review, or acts and moves on. See Autonomy Tiers.
 
-Plugins declare resource types in their manifest. Each resource type declaration
-includes which field is the stable ID:
+---
 
-```typescript
-interface ResourceTypeDecl {
-  type: string                 // "network-device"
-  idField: string              // "mac" — which output field is the stable ID
-  label: string                // "Network Device"
-  labelField?: string          // "hostname" — human-readable name field
-}
-```
+## The Three-Surface Rule
 
-`[provisional: exact manifest schema — resolved in Phase 2 plugin-sdk work]`
+Every `PluginAction` MUST explicitly declare `http`, `ai`, AND `ui`. Setting a surface to `false` is a valid opt-out. Leaving any surface undefined is a boot error — the registry rejects the plugin.
+
+The framework materializes each declared surface:
+
+**HTTP** — A REST endpoint registered with the Hono server. The request body (POST/PATCH/DELETE) or query string (GET) is validated against the action's `input` schema. The response is the serialized output. The full path is `/api/{plugin-name}/{derived-path}`, where the derived path follows the URL Derivation rules below.
+
+**AI** — The action is registered in the agent's tool registry under its `name`. The declared `tier` governs how the agent may call it. The `description` (or the optional `ai.description` override) is passed to the LLM as the tool description. The agent runtime enforces tier constraints before every call.
+
+**UI** — The action is included in the card catalog with its `ui.label`, `ui.section`, and output field descriptors. The dashboard auto-renders it as a card. If `ui.type` is `'action'`, it renders as a button or form. If `'data'`, it renders as a data card or table. If `'both'`, it shows current state with controls to change it.
+
+`false` on a surface is an explicit opt-out and must be used sparingly. If the data or action is meaningful to a human operator, it belongs in the UI. Setting `ui: false` for convenience — because a card hasn't been designed yet — is a protocol violation, not a valid opt-out.
 
 ---
 
 ## Semantic Field Types
 
-Fields carry semantic types that let the framework render and reason about values
-without plugin-specific knowledge.
+The `MaisieFieldType` vocabulary is layered on top of Zod primitives. A field annotated with a semantic type tells the renderer how to display it and tells the agent how to reason about it, without either needing plugin-specific logic.
 
-| Type | Base | Meaning | Default Render |
-|------|------|---------|----------------|
-| `string` | string | Plain text | `<span>` |
-| `number` | number | Generic number | formatted integer |
-| `boolean` | boolean | True/false | ✓ / ✗ |
-| `bytes` | number | Size in bytes | `1.2 GB`, `340 MB` |
-| `percentage` | number | 0–100 | progress bar |
-| `status` | string | Named state | colored badge |
-| `image` | string | URL to image | `<img>` thumbnail |
-| `timestamp` | string | ISO 8601 date | relative: "2h ago" |
-| `duration` | number | Seconds | `2h 34m` |
-| `progress` | object | `{ current, total, label? }` | progress bar + fraction |
-| `temperature` | number | Celsius | `72°C` with threshold color |
-| `signal` | number | dBm | signal bars indicator |
-| `toggle` | boolean | Binary writable state | toggle switch |
-| `action` | void | Triggerable command | button |
-| `stream` | string | URL to media stream | player / channel tile |
-| `list<T>` | array | Typed collection | table or card list |
-| `url` | string | Clickable link | `<a>` |
-| `json` | object | Untyped structured data | collapsed JSON viewer |
-
-**Status values** use a shared vocabulary. Plugins must map their state strings to one of:
-
-| Value | Color | Meaning |
-|-------|-------|---------|
-| `ok` | green | Healthy, connected, running |
-| `warning` | yellow | Degraded, near limit, attention needed |
-| `error` | red | Failed, disconnected, offline |
-| `idle` | gray | Online but inactive |
-| `busy` | blue | Active, in progress |
-| `unknown` | gray | State not determinable |
-
-Custom status values are allowed but won't get color treatment from the generic renderer.
-
-### Type Annotation in Zod
-
-Field types are declared as Zod metadata attached to schema fields:
+Annotations are attached using the `field()` helper from `packages/shared/src/field.ts`:
 
 ```typescript
-import { z } from 'zod'
-import { field } from '@maisie/shared'  // or packages/shared — same thing for now
+import { field } from '@maisie/shared'
 
 const VolumeSchema = z.object({
-  id:          z.string(),
-  name:        z.string(),
   usedBytes:   field(z.number(), 'bytes'),
   usedPercent: field(z.number(), 'percentage'),
   status:      field(z.string(), 'status'),
-  totalBytes:  field(z.number(), 'bytes'),
+  lastChecked: field(z.string(), 'timestamp'),
 })
 ```
 
-`field(schema, type)` attaches `._def.maisieType = type` to the Zod schema.
-The framework reads this at action registration time to build the field catalog.
+`field(schema, type)` encodes the annotation as a Zod schema description in the form `maisie:{type}`. It is read back with `getMaisieType()` from the same module.
 
-`[provisional: exact Zod metadata mechanism — could use `.brand()`, `.describe()`,
-or a wrapper. Resolve in Phase 2 shared package work.]`
+Full type catalog:
+
+| Type | Base type | Renders as | Typical source |
+|------|-----------|------------|----------------|
+| `string` | `string` | Plain text | Names, IDs, labels |
+| `number` | `number` | Raw number | Counts, indices |
+| `boolean` | `boolean` | Yes / No | Flags |
+| `bytes` | `number` | `"1.2 GB"` with unit suffix | Storage and transfer sizes |
+| `percentage` | `number` | Progress bar or gauge | Disk usage, CPU load, job progress |
+| `status` | `string` | Colored badge | Health states: `ok`, `warning`, `error`, `idle`, `busy`, `unknown` |
+| `image` | `string` | `<img>` thumbnail | Album art, avatars, camera snapshots |
+| `timestamp` | `string` | Relative time: `"2h ago"` | Event times, last-seen |
+| `duration` | `number` | `"2h 34m"` | Seconds elapsed, ETAs, remaining time |
+| `progress` | `object` | Progress bar with fraction | `{ current, total, label? }` |
+| `temperature` | `number` | `"72°C"` with threshold color | CPU, NVMe, printer chamber temps |
+| `signal` | `number` | Signal-strength indicator | dBm from access points or printers |
+| `toggle` | `boolean` | Toggle switch (read and write) | Blocked state, enabled flags |
+| `action` | `void` | Button | Pause, resume, cancel commands |
+| `stream` | `string` | Inline player or channel tile | HLS, RTSP, WebRTC URLs |
+| `url` | `string` | Clickable `<a>` | External links |
+| `json` | `any` | Collapsed viewer | Untyped structured data |
+
+Status values are standardized. Plugins must map their state strings to the shared `MaisieStatus` vocabulary — `ok`, `warning`, `error`, `idle`, `busy`, or `unknown` — for the generic badge renderer to apply color treatment. Custom values are allowed but will not receive color treatment.
+
+The vocabulary is finite and stable. New types require an explicit addition to this spec and to `packages/shared/src/field.ts`. This constraint is the price of generic rendering — and it is worth paying.
 
 ---
 
-## PluginAction — The Three-Surface Definition
-
-Every capability is a `PluginAction`. This is the complete type:
+## The PluginAction Contract
 
 ```typescript
-interface PluginAction<TInput = unknown, TOutput = unknown> {
-  // Identity
-  name: string              // snake_case verb — used as endpoint + AI tool name
-  description: string       // shared across all three surfaces
+interface PluginAction<TInput, TOutput> {
+  /** snake_case. Must start with a valid verb prefix. Used as HTTP path segment and AI tool name. */
+  name: string
 
-  // Schema
-  input:  z.ZodSchema<TInput>    // HTTP request body + AI tool parameters
-  output: z.ZodSchema<TOutput>   // HTTP response + AI tool return
+  /** Written for both humans and LLMs. Used in API docs, AI tool registry, and dashboard tooltips. */
+  description: string
 
-  // Surface declarations (all three are required — no undefined)
-  http: HttpSurface
-  ai:   AiSurface | false
-  ui:   UiSurface | false
+  /** Zod schema for the request. Validated on HTTP ingress; provided as tool parameters to the agent. */
+  input: z.ZodType<TInput>
 
-  // Implementation
+  /** Zod schema for the response. Fields should be annotated with MaisieFieldType via field(). */
+  output: z.ZodType<TOutput>
+
+  /** HTTP surface. All actions must be HTTP-accessible — this field has no false opt-out. */
+  http: {
+    method: 'GET' | 'POST' | 'DELETE' | 'PATCH'
+    /** Override the derived path. Use only when deriveHttpPath produces a collision or incorrect result. */
+    path?: string
+  }
+
+  /** AI surface. false = not available to agents. Explicit false required — undefined is a boot error. */
+  ai: {
+    tier: 'inform' | 'advise' | 'act'
+    /** Override description for AI context only. Rarely needed. */
+    description?: string
+  } | false
+
+  /** Dashboard surface. false = not shown. Explicit false required — undefined is a boot error. */
+  ui: {
+    /** Data card, action control, or both. */
+    type?: 'data' | 'action' | 'both'
+    label: string
+    section: string
+    icon?: string
+    /** MQTT topic pattern. Matching messages trigger re-fetch in dashboard components. */
+    realtimeTopic?: string
+    /** Suggest a specific renderer component. If omitted, the framework picks based on output field types. */
+    componentHint?: string
+  } | false
+
   execute(input: TInput, context: ActionContext): Promise<TOutput>
 }
 ```
 
-### `false` Policy
-
-`false` on a surface is an explicit opt-out. It should be used sparingly:
-
-- `ai: false` — the action has no meaningful agent use (e.g., raw binary proxy, OAuth redirect)
-- `ui: false` — the action has no meaningful dashboard use (e.g., internal webhook receiver, raw stream bytes)
-
-**If the data or action is meaningful to a human operator, it gets a UI declaration.**
-Setting `ui: false` out of convenience is a code smell — it means the three-surface
-contract is being avoided, not respected.
-
-### HTTP Surface
+All action definitions should use `defineAction()` from `@maisie/shared` for full TypeScript inference:
 
 ```typescript
-interface HttpSurface {
-  method: 'GET' | 'POST' | 'DELETE' | 'PATCH'
-  path?: string    // override default path; default is derived from action name
-}
+export const listDevices = defineAction({
+  name: 'list_devices',
+  description: 'List all active devices on the home network.',
+  input: z.object({ vlan: z.number().optional() }),
+  output: z.array(z.object({
+    mac:       field(z.string(), 'string'),
+    hostname:  field(z.string(), 'string').optional(),
+    last_seen: field(z.number(), 'timestamp'),
+  })),
+  http: { method: 'GET' },
+  ai: { tier: 'inform' },
+  ui: { type: 'data', label: 'Network Devices', section: 'network', realtimeTopic: 'home/network/devices/+' },
+  async execute(input, _ctx) { /* ... */ },
+})
 ```
-
-Default path derivation from `name`:
-
-| Action name | Default path |
-|-------------|-------------|
-| `list_devices` | `GET /devices` |
-| `get_device` | `GET /devices/:id` |
-| `set_device_blocked` | `PATCH /devices/:id/blocked` |
-| `invoke_speedtest` | `POST /speedtest` |
-| `delete_device` | `DELETE /devices/:id` |
-
-`[provisional: exact path derivation rules — resolve in Phase 2 HTTP routing work]`
-
-### AI Surface
-
-```typescript
-interface AiSurface {
-  tier: 'inform' | 'advise' | 'act'
-  description?: string    // override action description for AI context
-}
-```
-
-| Tier | Agent behavior |
-|------|---------------|
-| `inform` | Call freely; log result to memory |
-| `advise` | Call; surface result for human review before downstream actions |
-| `act` | Call autonomously; logged but not held for review |
-
-Destructive or irreversible operations must be `advise` unless the user has elevated
-them for a specific persona. The agent runtime enforces this.
-
-### UI Surface
-
-```typescript
-interface UiSurface {
-  type: 'data' | 'action' | 'both'
-  label: string           // human-readable name for this action
-  section: string         // which card/section this belongs to
-  icon?: string           // optional icon name
-  realtimeTopic?: string  // MQTT topic for live refresh
-  componentHint?: ComponentType  // suggest specific renderer
-}
-```
-
-`type` tells the renderer what kind of surface to build:
-
-| Value | Meaning |
-|-------|---------|
-| `data` | Displays output fields — renders as a data card or table |
-| `action` | Triggers something — renders as a button or form |
-| `both` | Displays current state AND provides controls to change it |
-
-`componentHint` is optional. If omitted, the framework picks the default renderer
-for the output schema's field types. Use it only when the default is wrong.
 
 ---
 
 ## Verb Conventions
 
-Action names must start with one of these prefixes. The framework rejects any
-action whose name doesn't match.
+Action names must start with one of these prefixes. The registry rejects any action name that does not match.
 
-| Prefix | HTTP default | Meaning |
-|--------|-------------|---------|
+| Prefix | Default HTTP method | Meaning |
+|--------|--------------------|---------| 
 | `list_` | `GET` | Return a typed collection |
 | `get_` | `GET` | Return a single resource or entity |
 | `set_` | `PATCH` | Write a field value |
@@ -257,149 +189,126 @@ action whose name doesn't match.
 | `stream_` | `GET` | Return a stream URL or handle |
 | `subscribe_` | `GET` (SSE) | Open a live subscription |
 
+Convention: use `set_` when the primary effect is a field value changing. Use `invoke_` when there are meaningful side effects beyond the value change (a device command, a print job operation, a network scan).
+
 ---
 
-## Capability Model
+## URL Derivation
 
-A **Capability** is a named group of action names that a plugin contracts to implement.
-Plugins declare which capabilities they provide in their manifest. The framework
-validates the contract at boot and refuses to start a plugin that doesn't implement
-every action in each declared capability.
+The framework derives each action's HTTP path from its name using `deriveHttpPath()` in `packages/plugin-core/src/registry.ts`.
+
+Algorithm:
+1. If `action.http.path` is explicitly set, use it as-is.
+2. Strip the verb prefix (`list_`, `get_`, `set_`, `create_`, `delete_`, `invoke_`, `stream_`, `subscribe_`).
+3. Replace remaining underscores with hyphens.
+4. Prepend `/`.
+
+The full endpoint URL is `/api/{plugin-name}/{derived-path}`.
+
+| Action name | Derived path | Full URL (`plugin = unifi`) |
+|-------------|-------------|------------------------------|
+| `list_devices` | `/devices` | `GET /api/unifi/devices` |
+| `get_wan_health` | `/wan-health` | `GET /api/unifi/wan-health` |
+| `invoke_block_device` | `/block-device` | `POST /api/unifi/block-device` |
+| `stream_camera` | `/camera` | `GET /api/unifi/camera` |
+| `subscribe_device_presence` | `/device-presence` | `GET /api/unifi/device-presence` |
+
+Use `http.path` to override when the default derivation produces a collision or an incorrect path.
+
+---
+
+## Card Catalog
+
+The card catalog is the dashboard's index of all renderable actions. At runtime, `getCardCatalog()` in `packages/plugin-core/src/actions.ts` queries the plugin registry for all actions where `ui !== false`. Each entry is a `WidgetDescriptor`:
 
 ```typescript
-// In plugin manifest:
-{
-  capabilities: ['network', 'presence']
+interface WidgetDescriptor {
+  id: string           // "{pluginName}.{actionName}" — stable, unique
+  pluginName: string
+  actionName: string
+  label: string        // from ui.label
+  section: string      // from ui.section
+  outputFields: WidgetField[]
 }
 
-// The 'network' capability requires these action names:
-capability('network', ['list_devices', 'get_wan_health'])
-capability('presence', ['list_devices', 'get_device'])
+interface WidgetField {
+  key: string
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object' | 'unknown'
+  label: string        // prettified key: "usedBytes" -> "Used Bytes"
+  optional: boolean
+}
 ```
 
-Capabilities are defined in `packages/shared` so any plugin or runtime code can
-import them. Adding a new action to a capability is a breaking change for all plugins
-that declare it — do so carefully.
-
-**Known capabilities (current):**
-
-| Name | Required actions |
-|------|-----------------|
-| `network` | `list_devices`, `get_wan_health` |
-| `storage` | `list_volumes`, `get_storage_health` |
-| `media` | `list_media`, `get_media_item` |
-| `presence` | `list_devices`, `get_device` |
-| `camera` | `list_cameras`, `stream_camera` |
-| `printing` | `get_print_status` |
-| `library` | `list_books`, `get_book` |
-
-`[provisional: full capability list — grows as plugins are built out]`
+`outputFields` is produced by `introspectSchema()` in `packages/plugin-core/src/schema-introspector.ts`, which walks the output Zod schema and maps each top-level field to a primitive type. For array outputs, it introspects the element type.
 
 ---
 
-## Pipeline Expressions (Phase 1b)
+## Autonomy Tiers
 
-Pipeline expressions are deferred to Phase 1b — after the first working plugin
-using the new `PluginAction` schema. The basic shape is committed here as guidance;
-the parser and execution engine are Phase 2 work.
+Every AI-accessible action declares a tier. The agent runtime enforces it before every call.
 
-```
-{plugin}.{resource-type}.list
-  | filter: { field: value }
-  | sort: field [asc|desc]
-  | limit: N
-  | select: [field, ...]
-```
+| Tier | Agent behavior | Appropriate for |
+|------|---------------|-----------------|
+| `inform` | Call freely; result logged to agent memory | Read-only queries: device lists, health checks, status |
+| `advise` | Call; surface result to human for approval before downstream action | Anything with side effects or that affects physical systems |
+| `act` | Call and act autonomously; logged but not held for review | Well-understood automations with no destructive risk |
 
-**Phase 2 implementation note:** For the initial build, expose pipeline parameters
-as query params on list endpoints:
+Destructive or irreversible operations — blocking a device, canceling a print job, removing media — must use `advise`. The tier is enforced by the agent runtime, not by convention. A persona can have its effective tier cap adjusted per-action, but cannot bypass the tier enforcement mechanism.
 
-```
-GET /devices?filter[status]=ok&sort=lastSeen&sort_dir=desc&limit=10
-```
+---
 
-The pipeline engine will be a first-class abstraction later. Start with query params.
+## Known Gaps and Phase 2 Targets
+
+These are the current gaps between the implemented state and the full protocol specification.
+
+**Semantic type annotations lost at introspection.** `field()` encodes annotations as Zod schema descriptions (`maisie:{type}`). The `introspectSchema()` function does not read them — `WidgetField.type` is always a raw Zod primitive. Fix: add `maisieType: MaisieFieldType | null` to `WidgetField` and call `getMaisieType()` in `introspectObject()` in `packages/plugin-core/src/schema-introspector.ts`.
+
+**`ui.type` not enforced.** The `type` field on `ui` (`'data' | 'action' | 'both'`) is defined on the interface but the dashboard currently infers card type at runtime by checking whether the response is an array. Fix: require `ui.type` at registration and use it to drive renderer selection.
+
+**No auto-generated OpenAPI spec.** The registry has all the information needed — action names, input/output schemas, HTTP methods, descriptions. No OpenAPI generation is wired. Fix: add an exporter to `plugin-core` that walks the registry and emits a spec at `GET /api/openapi.json`.
+
+**No resource registry or entity addressing.** The entity address scheme (`unifi.network-device.aa:bb:cc:dd:ee:ff.blocked`) is specified but has no runtime implementation. There is no resolver that maps an address to a live value. Fix: implement `packages/protocol/` with the resource registry and address resolver.
+
+**No pipeline engine.** Pipeline expressions are fully specified in `docs/super-plan.md` but not implemented. Fix: build the pipeline parser and execution engine in `packages/pipeline/`. Start with `filter`, `sort`, `limit` as pure functions; the parser and composition layer follow.
+
+**`WidgetField.maisieType` missing.** The `WidgetField` type needs a `maisieType` property so the dashboard renderer can pick the right component. Until this is added, the renderer falls back to primitive type heuristics.
+
+---
+
+## Design Principles
+
+**Write it once, get it three ways.** The `PluginAction` is the single source of truth for a capability. The framework derives every surface from it. No capability should exist only as a hand-written HTTP route, only in an agent's system prompt, or only as a hand-coded React component.
+
+**Domain-agnostic intermediate layers.** The protocol, resource model, pipeline engine, and component spec contain no references to home automation, network devices, cameras, or media. They are generic. Maisie-specific knowledge lives only in plugins.
+
+**The framework is a superset of Matter.** Matter is a device protocol. This is a capability protocol. It covers smart home devices but also arbitrary APIs, media servers, NAS systems, 3D printers, tuners, and anything else with a programmatic interface.
+
+**Simple solutions that work over clever solutions that impress.** The pipeline is powerful, but most dashboard use cases are simple reads and lists. Implement what the actual use cases require, then stop. The protocol spec should be a working draft that ships to implementation even if some decisions are marked provisional.
+
+**The vocabulary is finite.** The `MaisieFieldType` set must be stable. Adding a new type is a deliberate protocol change — it requires updating this spec, `packages/shared/src/field.ts`, and the renderer. This constraint is the price of generic rendering.
 
 ---
 
 ## Package Boundaries
 
-Code is organized into two zones: domain-agnostic (publishable) and Maisie-specific.
+Code is organized into two zones: domain-agnostic (extractable as open-source) and Maisie-specific.
 
-### Domain-Agnostic (publishable as `@universal-interface/*`)
-
-These packages contain zero knowledge of home automation, network devices, cameras,
-or media. They define the protocol, not the content.
+**Domain-agnostic (publishable as `@universal-interface/*`):**
 
 | Package | Contents |
 |---------|----------|
-| `@universal-interface/protocol` | Resource model types, semantic type vocabulary, capability model, verb conventions |
-| `@universal-interface/plugin-sdk` | `PluginAction`, `PluginEvent`, `defineAction()`, `defineEvent()`, Zod helpers |
+| `@universal-interface/protocol` | Resource model, semantic type vocabulary, capability model, address scheme |
+| `@universal-interface/plugin-sdk` | `PluginAction`, `PluginEvent`, `defineAction()`, `field()`, `getMaisieType()` |
 | `@universal-interface/pipeline` | Pipeline expression parser and execution engine |
 | `@universal-interface/agent-core` | Agent runtime, tool registry, safety tier enforcement |
 | `@universal-interface/components` | Component spec (JSON schema), type-to-component mapping |
 
-### Maisie-Specific (stays in this repo)
+**Maisie-specific (stays in this repo):**
 
 ```
 packages/plugin-*/     — all integrations
-packages/dashboard/    — React app, Maisie branding, home-specific pages
-packages/agent/        — Maisie personas, nightly routines, household memory
-packages/shared/       — current home for shared types (will be split into protocol + maisie-types)
-packages/core/         — HTTP server, MQTT, SQLite chassis (will absorb agent-core)
+packages/dashboard/    — React SPA, Maisie branding, household-specific pages
+packages/agent/        — personas, nightly routines, household memory
 ```
 
-**Current state:** All code lives in the monorepo. The extraction into
-`@universal-interface/*` packages happens after the shape is proven — probably
-after Phase 3 when at least 4 plugins are implemented against the protocol.
-
----
-
-## ActionContext
-
-The execution context passed to every `execute()` call:
-
-```typescript
-interface ActionContext {
-  db: Database              // bun:sqlite instance
-  mqtt: MqttClient          // publish/subscribe
-  log: Logger               // structured logging
-  plugin: string            // calling plugin name
-  persona?: string          // if called by an AI persona
-  requestId: string         // for tracing
-}
-```
-
----
-
-## Implementation Order (Phase 2)
-
-1. **`packages/shared`**: Add `field()` helper, semantic types enum, verb prefix validator
-2. **`packages/plugin-core`**: Add `ResourceRegistry`, update `PluginAction` type with new `ui` surface, boot-time validation (verb prefixes, three-surface requirement, capability contracts)
-3. **`packages/agent/src/api`**: Add generic list/get routing from ResourceRegistry
-4. **Pick one plugin to rewrite against the spec** — `plugin-unifi` is the right first target (most complex, best test of the model)
-5. **Dashboard auto-rendering**: A generic `ResourceCard` component that renders any action's output using field type metadata
-6. Repeat for remaining plugins (Phase 3)
-
----
-
-## Open Questions
-
-These are documented here, not in someone's head.
-
-1. **Resource relationships** — how does a `network-device` reference the `access-point`
-   it's connected to? Options: (a) field of type `ref<unifi.access-point>`, (b) conventions
-   only, (c) explicit join in pipeline. `[resolve before plugin-unifi rewrite]`
-
-2. **Event lifecycle** — resources come and go. When a device disappears from the network,
-   does the resource type emit a lifecycle event or does the caller poll? Lean toward
-   lifecycle events via MQTT for presence-sensitive resources.
-
-3. **Writable fields** — `set_*` actions work for simple fields. For complex mutations
-   (block + notify + log), is `set_` enough or do we need `invoke_`? Convention: use
-   `set_` when the primary effect is the field value changing. Use `invoke_` when
-   there are significant side effects beyond the value change.
-
-4. **Schema versioning** — how do we handle an action's output schema changing without
-   breaking the UI? `[defer to Phase 2 — not needed until we have plugins with real
-   version histories]`
+Extraction into `@universal-interface/*` packages happens after the shape is proven by at least four plugins implemented against the protocol. The domain-agnostic packages must contain zero references to home automation, network devices, cameras, or media before they ship.

@@ -6,7 +6,7 @@ import {
   setWidgetVisibility,
   reorderWidgets,
   patchWidget,
-  getWidgetCatalog,
+  getCardCatalog,
 } from '../../../plugin-core/src/actions'
 
 const noopCtx = {} as never
@@ -56,13 +56,13 @@ export function createLayoutRouter() {
     }
   })
 
-  // PATCH /api/layout/:page/widgets/:widgetId/visibility — show/hide
-  router.patch('/layout/:page/widgets/:widgetId/visibility', async (c) => {
+  // PATCH /api/layout/:page/cards/:cardId/visibility — show/hide
+  router.patch('/layout/:page/cards/:cardId/visibility', async (c) => {
     try {
       const body = await c.req.json()
       const result = await setWidgetVisibility.execute({
         page: c.req.param('page'),
-        widgetId: c.req.param('widgetId'),
+        cardId: c.req.param('cardId'),
         visible: body.visible,
       }, noopCtx)
       return c.json(result)
@@ -71,13 +71,13 @@ export function createLayoutRouter() {
     }
   })
 
-  // PATCH /api/layout/:page/widgets/:widgetId — patch col_span or visibility
-  router.patch('/layout/:page/widgets/:widgetId', async (c) => {
+  // PATCH /api/layout/:page/cards/:cardId — patch col_span or visibility
+  router.patch('/layout/:page/cards/:cardId', async (c) => {
     try {
       const body = await c.req.json()
       const result = await patchWidget.execute({
         page: c.req.param('page'),
-        widgetId: c.req.param('widgetId'),
+        cardId: c.req.param('cardId'),
         ...body,
       }, noopCtx)
       return c.json(result)
@@ -86,10 +86,10 @@ export function createLayoutRouter() {
     }
   })
 
-  // GET /api/widgets/catalog — all available widgets
-  router.get('/widgets/catalog', async (c) => {
+  // GET /api/cards/catalog — all available cards
+  router.get('/cards/catalog', async (c) => {
     try {
-      const catalog = await getWidgetCatalog.execute({}, noopCtx)
+      const catalog = await getCardCatalog.execute({}, noopCtx)
       return c.json(catalog)
     } catch (err) {
       return c.json({ error: String(err) }, 500)

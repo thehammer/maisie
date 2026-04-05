@@ -2,7 +2,7 @@ import { describe, test, expect, mock, beforeEach, afterEach } from "bun:test";
 
 // ── Pure logic extracted from useLayout for unit testing ─────────────────────
 
-interface WidgetDescriptor {
+interface CardDescriptor {
   id: string;
   pluginName: string;
   actionName: string;
@@ -11,8 +11,8 @@ interface WidgetDescriptor {
   outputFields: Array<{ key: string; type: string; label: string; optional: boolean }>;
 }
 
-interface WidgetPlacement {
-  widgetId: string;
+interface CardPlacement {
+  cardId: string;
   position: { row: number; col: number };
   size: { rows: number; cols: number };
   config: {
@@ -22,15 +22,15 @@ interface WidgetPlacement {
   };
 }
 
-function addWidget(
-  widgets: WidgetPlacement[],
-  descriptor: WidgetDescriptor,
-): WidgetPlacement[] {
+function addCard(
+  widgets: CardPlacement[],
+  descriptor: CardDescriptor,
+): CardPlacement[] {
   const maxRow = widgets.reduce((m, w) => Math.max(m, w.position.row + w.size.rows), 0);
   return [
     ...widgets,
     {
-      widgetId: descriptor.id,
+      cardId: descriptor.id,
       position: { row: maxRow, col: 0 },
       size: { rows: 1, cols: 1 },
       config: {
@@ -42,23 +42,23 @@ function addWidget(
   ];
 }
 
-function removeWidget(widgets: WidgetPlacement[], widgetId: string): WidgetPlacement[] {
-  return widgets.filter((w) => w.widgetId !== widgetId);
+function removeCard(widgets: CardPlacement[], cardId: string): CardPlacement[] {
+  return widgets.filter((w) => w.cardId !== cardId);
 }
 
-function configureWidget(
-  widgets: WidgetPlacement[],
-  widgetId: string,
-  config: Partial<WidgetPlacement["config"]>,
-): WidgetPlacement[] {
+function configureCard(
+  widgets: CardPlacement[],
+  cardId: string,
+  config: Partial<CardPlacement["config"]>,
+): CardPlacement[] {
   return widgets.map((w) =>
-    w.widgetId === widgetId ? { ...w, config: { ...w.config, ...config } } : w,
+    w.cardId === cardId ? { ...w, config: { ...w.config, ...config } } : w,
   );
 }
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
-function makeDescriptor(id: string): WidgetDescriptor {
+function makeDescriptor(id: string): CardDescriptor {
   return {
     id,
     pluginName: "test-plugin",
@@ -72,9 +72,9 @@ function makeDescriptor(id: string): WidgetDescriptor {
   };
 }
 
-function makePlacement(widgetId: string, row = 0): WidgetPlacement {
+function makePlacement(cardId: string, row = 0): CardPlacement {
   return {
-    widgetId,
+    cardId,
     position: { row, col: 0 },
     size: { rows: 1, cols: 1 },
     config: { visibleFields: ["status"] },
@@ -83,99 +83,99 @@ function makePlacement(widgetId: string, row = 0): WidgetPlacement {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe("useLayout — addWidget", () => {
-  test("appends widget to empty list", () => {
-    const result = addWidget([], makeDescriptor("widget-a"));
+describe("useLayout — addCard", () => {
+  test("appends card to empty list", () => {
+    const result = addCard([], makeDescriptor("widget-a"));
     expect(result).toHaveLength(1);
-    expect(result[0].widgetId).toBe("widget-a");
+    expect(result[0].cardId).toBe("widget-a");
   });
 
-  test("appends below existing widgets", () => {
+  test("appends below existing cards", () => {
     const existing = [makePlacement("widget-a", 0)];
-    const result = addWidget(existing, makeDescriptor("widget-b"));
+    const result = addCard(existing, makeDescriptor("widget-b"));
     expect(result).toHaveLength(2);
     // widget-b should be placed at row >= 1 (after existing row 0, size 1)
     expect(result[1].position.row).toBeGreaterThanOrEqual(1);
   });
 
   test("includes only required fields in visibleFields", () => {
-    const result = addWidget([], makeDescriptor("widget-a"));
+    const result = addCard([], makeDescriptor("widget-a"));
     // only "status" is non-optional
     expect(result[0].config.visibleFields).toEqual(["status"]);
     expect(result[0].config.visibleFields).not.toContain("details");
   });
 
   test("sets default position col to 0", () => {
-    const result = addWidget([], makeDescriptor("widget-a"));
+    const result = addCard([], makeDescriptor("widget-a"));
     expect(result[0].position.col).toBe(0);
   });
 
   test("does not mutate original array", () => {
-    const original: WidgetPlacement[] = [];
-    addWidget(original, makeDescriptor("widget-a"));
+    const original: CardPlacement[] = [];
+    addCard(original, makeDescriptor("widget-a"));
     expect(original).toHaveLength(0);
   });
 });
 
-describe("useLayout — removeWidget", () => {
-  test("removes widget by id", () => {
+describe("useLayout — removeCard", () => {
+  test("removes card by id", () => {
     const widgets = [makePlacement("a"), makePlacement("b")];
-    const result = removeWidget(widgets, "a");
+    const result = removeCard(widgets, "a");
     expect(result).toHaveLength(1);
-    expect(result[0].widgetId).toBe("b");
+    expect(result[0].cardId).toBe("b");
   });
 
   test("no-op when id not found", () => {
     const widgets = [makePlacement("a")];
-    const result = removeWidget(widgets, "z");
+    const result = removeCard(widgets, "z");
     expect(result).toHaveLength(1);
   });
 
   test("handles empty array", () => {
-    expect(removeWidget([], "a")).toHaveLength(0);
+    expect(removeCard([], "a")).toHaveLength(0);
   });
 
   test("does not mutate original array", () => {
     const original = [makePlacement("a")];
-    removeWidget(original, "a");
+    removeCard(original, "a");
     expect(original).toHaveLength(1);
   });
 });
 
-describe("useLayout — configureWidget", () => {
-  test("updates config for matching widgetId", () => {
+describe("useLayout — configureCard", () => {
+  test("updates config for matching cardId", () => {
     const widgets = [makePlacement("a"), makePlacement("b")];
-    const result = configureWidget(widgets, "a", { title: "My Widget" });
-    const updated = result.find((w) => w.widgetId === "a")!;
-    expect(updated.config.title).toBe("My Widget");
+    const result = configureCard(widgets, "a", { title: "My Card" });
+    const updated = result.find((w) => w.cardId === "a")!;
+    expect(updated.config.title).toBe("My Card");
   });
 
   test("merges config — does not overwrite unspecified fields", () => {
     const widgets = [
       { ...makePlacement("a"), config: { visibleFields: ["status"], refreshInterval: 30 } },
     ];
-    const result = configureWidget(widgets, "a", { title: "New Title" });
-    const updated = result.find((w) => w.widgetId === "a")!;
+    const result = configureCard(widgets, "a", { title: "New Title" });
+    const updated = result.find((w) => w.cardId === "a")!;
     expect(updated.config.refreshInterval).toBe(30);
     expect(updated.config.title).toBe("New Title");
   });
 
-  test("does not affect other widgets", () => {
+  test("does not affect other cards", () => {
     const widgets = [makePlacement("a"), makePlacement("b")];
-    const result = configureWidget(widgets, "a", { title: "Title A" });
-    const b = result.find((w) => w.widgetId === "b")!;
+    const result = configureCard(widgets, "a", { title: "Title A" });
+    const b = result.find((w) => w.cardId === "b")!;
     expect(b.config.title).toBeUndefined();
   });
 
-  test("no-op when widgetId not found", () => {
+  test("no-op when cardId not found", () => {
     const widgets = [makePlacement("a")];
-    const result = configureWidget(widgets, "z", { title: "Ghost" });
+    const result = configureCard(widgets, "z", { title: "Ghost" });
     expect(result[0].config.title).toBeUndefined();
   });
 
   test("can update visibleFields", () => {
     const widgets = [makePlacement("a")];
-    const result = configureWidget(widgets, "a", { visibleFields: ["status", "details"] });
+    const result = configureCard(widgets, "a", { visibleFields: ["status", "details"] });
     expect(result[0].config.visibleFields).toEqual(["status", "details"]);
   });
 });
@@ -191,7 +191,7 @@ describe("useLayout — fetch behavior", () => {
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
       }
-      if (url === "/api/widgets/catalog") {
+      if (url === "/api/cards/catalog") {
         return new Response(
           JSON.stringify({ widgets: [makeDescriptor("widget-a"), makeDescriptor("widget-b")] }),
           { status: 200, headers: { "Content-Type": "application/json" } },

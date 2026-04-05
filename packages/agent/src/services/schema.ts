@@ -160,7 +160,7 @@ export const personaConfigs = sqliteTable('persona_configs', {
 export const dashboardLayouts = sqliteTable('dashboard_layouts', {
   id: text('id').primaryKey(),
   page: text('page').notNull().unique(), // 'home', 'media', 'network', etc.
-  widgets: text('widgets').notNull().default('[]'), // JSON: WidgetPlacement[]
+  widgets: text('widgets').notNull().default('[]'), // JSON: CardConfig[]
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 })
 

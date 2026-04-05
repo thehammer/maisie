@@ -3556,7 +3556,7 @@ body {
   border-radius: var(--radius);
 }
 
-.widget-edit-controls {
+.card-edit-controls {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
@@ -3582,7 +3582,7 @@ body {
   cursor: grabbing;
 }
 
-.widget-edit-btn {
+.card-edit-btn {
   background: none;
   border: none;
   color: var(--text-muted);
@@ -3594,12 +3594,12 @@ body {
   transition: color 0.15s, background 0.15s;
 }
 
-.widget-edit-btn:hover {
+.card-edit-btn:hover {
   color: var(--text);
   background: var(--surface-hover);
 }
 
-.widget-hidden {
+.card-hidden {
   opacity: 0.35;
   border-style: dashed;
 }

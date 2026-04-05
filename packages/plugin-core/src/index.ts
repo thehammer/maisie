@@ -20,7 +20,7 @@ const plugin: MaisiePlugin = {
     actionDefs.createPersona,
     actionDefs.updatePersona,
     actionDefs.deletePersona,
-    actionDefs.getWidgetCatalog,
+    actionDefs.getCardCatalog,
     actionDefs.getLayout,
     actionDefs.updateLayout,
     actionDefs.resetLayout,

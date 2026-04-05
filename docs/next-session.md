@@ -1,53 +1,82 @@
 # Next Session
 
-## Priority: Re-enable UniFi/Protect
+## What Was Completed Today (Phase 4)
 
-The UDM Pro locked us out from too many login attempts. Session persistence
-is now in place (`data/unifi-session.json`, `data/protect-session.json`).
+Dashboard auto-generation is live:
+- `DynamicCard` — fetches its own data, renders with ResourceCard/ResourceList, derives HTTP path using same logic as plugin-core's `deriveHttpPath`
+- `AddWidgetPanel` — right-side catalog drawer in edit mode, grouped by section, one-click add
+- `useLayout.addWidget` / `removeWidget` — catalog-sourced widgets (dot in ID) get a remove button
+- **Bug fixed**: DynamicCard was using raw action name as URL path (`/list_lights`) instead of derived path (`/lights`)
 
-**To re-enable:**
-1. Make one test login: `ssh tokyo 'PASS=$(grep UNIFI_PASSWORD ~/maisie/.env | cut -d= -f2-); curl -sk -X POST https://192.168.1.1/api/auth/login -H "Content-Type: application/json" -d "{\"username\":\"Maisie\",\"password\":\"$PASS\"}" -w "\nHTTP %{http_code}"'`
-2. If 200: set `UNIFI_PROTECT_ENABLED=true` in Tokyo .env and deploy
-3. On first successful connect, session files are written — subsequent restarts won't login
+## Ready to Test Tomorrow
 
-## Known Issues
+- Open dashboard, click Edit Layout → "+ Add Widget"
+- Try: `synology.get_system_info`, `unifi.get_wan_health`, `plex.get_now_playing`, `plex.list_libraries`
+- Catalog widgets have a red ✕ to remove (not just hide)
 
-- **Double Natalie in agent log**: `[agent] 4 personas active: Channing, Alexandria, Natalie, Natalie` — dedup in `builtInPersonas()` fixed the API response but `personaRouter` still sees duplicates from `loadedPlugins` (plugin-unifi and plugin-synology both declare her). Fix: dedup in `createPersonaRouter` or `createAgent`.
+---
 
-- **Chat has no conversation history**: `runForMessage` accepts a `history` param but the chat route always passes `[]`. Each message is a fresh context. Fix: send history from ChatPage/ChatPanel and pass it through the route.
+## Known Issues (Quick Fixes)
 
-## Universal Interface Project
+- **Double Natalie in agent log**: `[agent] 4 personas active: Channing, Alexandria, Natalie, Natalie`
+  - plugin-unifi and plugin-synology both declare her
+  - Fix: dedup in `createPersonaRouter` or `createAgent`
 
-`docs/super-plan.md` is committed. The phases:
+- **Chat has no conversation history**: `runForMessage` always passes `[]`
+  - Fix: propagate history from ChatPage/ChatPanel through the route
 
-- **Phase 0** — Complete. API catalog written (`docs/api-catalog/`), dashboard layout customization implemented (all three surfaces: UI drag/drop, REST, agent actions).
+- **UniFi re-enable** (rate limit should have cleared long ago):
+  ```bash
+  ssh tokyo 'PASS=$(grep UNIFI_PASSWORD ~/maisie/.env | cut -d= -f2-); curl -sk -X POST https://192.168.1.1/api/auth/login -H "Content-Type: application/json" -d "{\"username\":\"Maisie\",\"password\":\"$PASS\"}" -w "\nHTTP %{http_code}"'
+  ```
+  If 200: set `UNIFI_PROTECT_ENABLED=true` in Tokyo .env and deploy.
 
-- **Phase 1** — Next: Taxonomy & Protocol Design.
-  - Produce `docs/protocol.md` — universal resource model derived from the catalog
-  - Vocabulary: Resource, Field, Action, Entity, Capability, Tier
-  - Semantic types: `bytes`, `percentage`, `status`, `image`, `progress`, `list<T>`, `action`, `toggle`
-  - Define the three-surface contract precisely enough to build the framework
+---
 
-- **Phase 2** — Core Framework
-  - `packages/plugin-core` gets Resource Registry, typed pipeline operators
-  - `PluginAction` gets explicit `ui` surface declaration (not just `false`)
-  - Auto-generated OpenAPI from action definitions
+## Universal Interface Plan — Current Position
 
-- **Phase 3** — Fill integration gaps (per catalog gap analyses)
-- **Phase 4** — Surface layers (dashboard auto-generation, agent discovery)
+See `docs/super-plan.md` for full detail.
+
+- **Phase 0** ✅ API catalog, dashboard layout customization, three-surface framework running
+- **Phase 3/4 (session phases)** ✅ Plugin migration complete, dashboard auto-generation complete
+
+**Next up — Phase 1: Taxonomy & Protocol Design**
+- Produce `docs/protocol.md` — universal resource model derived from the catalog
+- Vocabulary: Resource, Field, Action, Entity, Capability, Tier
+- Semantic types: `bytes`, `percentage`, `status`, `image`, `progress`, `list<T>`, `action`, `toggle`
+- This is design work — no code yet. Output is a protocol doc tight enough to build the Phase 2 framework from.
+
+**Then Phase 2: Core Framework**
+- Resource Registry in `packages/plugin-core`
+- `PluginAction` gets explicit `ui` surface declaration (type: data | action | list)
+- Auto-generated OpenAPI from action definitions
+- MaisieFieldType semantic annotations propagated through to widget catalog (currently lost at introspection)
+
+---
 
 ## Rename "widget" → "card"
 
-Discussed but not implemented. `WidgetConfig` → `CardConfig`, `widgetId` → `cardId`,
-CSS class names, layout-service, DB schema comment. Do this before Phase 2 adds more
-surface area.
+Still deferred. Do before Phase 2 adds more surface area:
+- `WidgetConfig` → `CardConfig`, `widgetId` → `cardId`
+- CSS class names, layout service, DB schema
 
-## Completed This Session
+---
 
-- Fixed CI (TypeScript error in useApi.ts — null narrowing in async closure)
-- Added exponential backoff for UniFi/Protect reconnect (2m → 4 → 8 → 16 → 30m cap)
-- Removed conflicting 30-min client-side cooldowns
-- Persisted UniFi/Protect sessions to disk
-- Dashboard layout customization — all three surfaces (drag/drop UI, REST API, agent actions)
-- Full API catalog: UniFi, Synology, Home Assistant, media stack, devices/tools
-- Universal interface super plan (`docs/super-plan.md`)
+## Webster Browser Automation
+
+Webster (`~/Software Development/Open Source/webster`) — Chrome working, Safari popup unresolved.
+
+**MCP tools registration:** If `mcp__webster__*` tools don't appear, orphan process on port 3000:
+```bash
+kill $(lsof -ti :3000)
+claude   # fresh session — tools register
+```
+
+**Safari popup** — still not confirmed working. To rebuild:
+```bash
+cd ~/Software\ Development/Open\ Source/webster && ./scripts/build-extension.sh --safari --xcode
+```
+Cmd+R in Xcode. Then: Safari → Develop → Allow Unsigned Extensions ✓ (resets on restart!), grant website access on first click.
+
+**Firefox** — MV3 background script bundled, manifest uses `background.scripts`. Load from `build/extension/firefox/`:
+1. `about:debugging` → "This Firefox" → "Load Temporary Add-on..." → select `manifest.json`

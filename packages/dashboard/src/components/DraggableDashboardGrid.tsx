@@ -12,10 +12,10 @@ import {
   sortableKeyboardCoordinates,
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
-import type { WidgetConfig } from "../hooks/useLayout";
+import type { CardConfig } from "../hooks/useLayout";
 
 interface Props {
-  widgets: WidgetConfig[];
+  widgets: CardConfig[];
   isEditMode: boolean;
   onReorder: (activeId: string, overId: string) => void;
   children: React.ReactNode;

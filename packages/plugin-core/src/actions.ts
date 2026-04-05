@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { defineAction } from '@maisie/shared'
 import type { MaisiePlugin } from '@maisie/shared'
 import { introspectSchema } from './schema-introspector'
-import type { WidgetDescriptor, WidgetPlacement, WidgetConfig, PersonaConfig } from './types'
+import type { CardDescriptor, CardPlacement, CardConfig, PersonaConfig } from './types'
 import { createLayoutService } from './layout-service'
 import type { LayoutService } from './layout-service'
 
@@ -52,24 +52,24 @@ const personaConfigSchema = z.object({
   isCustom: z.boolean(),
 })
 
-const widgetFieldSchema = z.object({
+const cardFieldSchema = z.object({
   key: z.string(),
   type: z.enum(['string', 'number', 'boolean', 'array', 'object', 'unknown']),
   label: z.string(),
   optional: z.boolean(),
 })
 
-const widgetDescriptorSchema = z.object({
+const cardDescriptorSchema = z.object({
   id: z.string(),
   pluginName: z.string(),
   actionName: z.string(),
   label: z.string(),
   section: z.string(),
-  outputFields: z.array(widgetFieldSchema),
+  outputFields: z.array(cardFieldSchema),
 })
 
-const widgetPlacementSchema = z.object({
-  widgetId: z.string(),
+const cardPlacementSchema = z.object({
+  cardId: z.string(),
   position: z.object({ row: z.number(), col: z.number() }),
   size: z.object({ rows: z.number(), cols: z.number() }),
   config: z.object({
@@ -79,7 +79,7 @@ const widgetPlacementSchema = z.object({
   }),
 })
 
-const widgetConfigSchema = z.object({
+const cardConfigSchema = z.object({
   id: z.string(),
   visible: z.boolean(),
   col_span: z.union([z.literal(1), z.literal(2)]),
@@ -522,16 +522,16 @@ export const deletePersona = defineAction({
 // Layout Management
 // ----------------------------------------------------------------
 
-export const getWidgetCatalog = defineAction({
-  name: 'get_widget_catalog',
-  description: 'List all available dashboard widgets — one per plugin action where ui is enabled — with their configurable output fields.',
+export const getCardCatalog = defineAction({
+  name: 'get_card_catalog',
+  description: 'List all available dashboard cards — one per plugin action where ui is enabled — with their configurable output fields.',
   input: z.object({}),
-  output: z.array(widgetDescriptorSchema),
-  http: { method: 'GET', path: '/api/widgets/catalog' },
-  ai: { tier: 'inform', description: 'List all available dashboard widgets and their configurable fields' },
-  ui: { label: 'Widget Catalog', section: 'dashboard' },
+  output: z.array(cardDescriptorSchema),
+  http: { method: 'GET', path: '/api/cards/catalog' },
+  ai: { tier: 'inform', description: 'List all available dashboard cards and their configurable fields' },
+  ui: { label: 'Card Catalog', section: 'dashboard' },
   async execute(_input, _ctx) {
-    const descriptors: WidgetDescriptor[] = []
+    const descriptors: CardDescriptor[] = []
 
     for (const plugin of _loadedPlugins) {
       for (const action of plugin.actions) {
@@ -555,9 +555,9 @@ export const getWidgetCatalog = defineAction({
 
 export const getLayout = defineAction({
   name: 'get_layout',
-  description: 'Get the ordered widget config for a dashboard page. Returns the default order if no custom layout has been saved.',
+  description: 'Get the ordered card config for a dashboard page. Returns the default order if no custom layout has been saved.',
   input: z.object({ page: z.string().default('home') }),
-  output: z.array(widgetConfigSchema),
+  output: z.array(cardConfigSchema),
   http: { method: 'GET', path: '/api/layout/:page' },
   ai: { tier: 'inform', description: 'Read the current dashboard widget order and visibility' },
   ui: false,
@@ -568,10 +568,10 @@ export const getLayout = defineAction({
 
 export const updateLayout = defineAction({
   name: 'update_layout',
-  description: 'Replace the full widget layout for a dashboard page. Prefer set_widget_visibility or reorder_widgets for targeted changes.',
+  description: 'Replace the full card layout for a dashboard page. Prefer set_widget_visibility or reorder_widgets for targeted changes.',
   input: z.object({
     page: z.string().default('home'),
-    widgets: z.array(widgetConfigSchema),
+    widgets: z.array(cardConfigSchema),
   }),
   output: z.object({ success: z.boolean() }),
   http: { method: 'POST', path: '/api/layout/:page' },
@@ -602,34 +602,34 @@ export const resetLayout = defineAction({
 
 export const setWidgetVisibility = defineAction({
   name: 'set_widget_visibility',
-  description: 'Show or hide a specific dashboard widget by its ID.',
+  description: 'Show or hide a specific dashboard card by its ID.',
   input: z.object({
     page: z.string().default('home'),
-    widgetId: z.string().describe(
-      'Stable widget ID. Valid values: ServiceStatus, NetworkCard, NasCard, PlexCard, MediaCard, HdhrCard, DakboardCard, BambuCard, CalibreCard, CalibreEnrichmentCard, NightlyCard, YouTubeCleanupCard, PackagesCard, RecentlyAddedCard, SmartHomeCard',
+    cardId: z.string().describe(
+      'Stable card ID. Valid values: ServiceStatus, NetworkCard, NasCard, PlexCard, MediaCard, HdhrCard, DakboardCard, BambuCard, CalibreCard, CalibreEnrichmentCard, NightlyCard, YouTubeCleanupCard, PackagesCard, RecentlyAddedCard, SmartHomeCard',
     ),
     visible: z.boolean().describe('true = show, false = hide'),
   }),
-  output: z.array(widgetConfigSchema),
-  http: { method: 'PATCH', path: '/api/layout/:page/widgets/:widgetId/visibility' },
+  output: z.array(cardConfigSchema),
+  http: { method: 'PATCH', path: '/api/layout/:page/cards/:cardId/visibility' },
   ai: {
     tier: 'act',
-    description: 'Show or hide a named dashboard card. Use this when the user says "hide the X card" or "show the Y widget".',
+    description: 'Show or hide a named dashboard card. Use this when the user says "hide the X card" or "show the Y card".',
   },
   ui: false,
   async execute(input, _ctx) {
-    return requireLayout().patchWidget(input.page, input.widgetId, { visible: input.visible })
+    return requireLayout().patchWidget(input.page, input.cardId, { visible: input.visible })
   },
 })
 
 export const reorderWidgets = defineAction({
   name: 'reorder_widgets',
-  description: 'Reorder dashboard widgets by providing the desired order of widget IDs. Unlisted widgets are appended after the listed ones.',
+  description: 'Reorder dashboard cards by providing the desired order of card IDs. Unlisted cards are appended after the listed ones.',
   input: z.object({
     page: z.string().default('home'),
-    orderedIds: z.array(z.string()).min(1).describe('Widget IDs in the desired display order'),
+    orderedIds: z.array(z.string()).min(1).describe('Card IDs in the desired display order'),
   }),
-  output: z.array(widgetConfigSchema),
+  output: z.array(cardConfigSchema),
   http: { method: 'PATCH', path: '/api/layout/:page/order' },
   ai: {
     tier: 'act',
@@ -643,22 +643,22 @@ export const reorderWidgets = defineAction({
 
 export const patchWidget = defineAction({
   name: 'patch_widget',
-  description: 'Change a single widget\'s width (col_span) or visibility.',
+  description: 'Change a single card\'s width (col_span) or visibility.',
   input: z.object({
     page: z.string().default('home'),
-    widgetId: z.string(),
+    cardId: z.string(),
     visible: z.boolean().optional(),
     col_span: z.union([z.literal(1), z.literal(2)]).optional().describe('1 = normal width, 2 = full-width'),
   }),
-  output: z.array(widgetConfigSchema),
-  http: { method: 'PATCH', path: '/api/layout/:page/widgets/:widgetId' },
+  output: z.array(cardConfigSchema),
+  http: { method: 'PATCH', path: '/api/layout/:page/cards/:cardId' },
   ai: {
     tier: 'act',
-    description: 'Change a widget\'s width (col_span: 1=normal, 2=full-width) or visibility',
+    description: 'Change a card\'s width (col_span: 1=normal, 2=full-width) or visibility',
   },
   ui: false,
   async execute(input, _ctx) {
-    const { widgetId, page, ...patch } = input
-    return requireLayout().patchWidget(page, widgetId, patch)
+    const { cardId, page, ...patch } = input
+    return requireLayout().patchWidget(page, cardId, patch)
   },
 })

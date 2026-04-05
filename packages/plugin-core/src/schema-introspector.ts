@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import type { WidgetField } from './types'
+import { getMaisieType } from '@maisie/shared'
+import type { CardField } from './types'
 
 /**
  * Prettifies a camelCase or snake_case key into a human-readable label.
@@ -44,9 +45,9 @@ function isOptionalSchema(schema: z.ZodTypeAny): boolean {
 }
 
 /**
- * Maps a Zod type to our simple WidgetField type enum.
+ * Maps a Zod type to our simple CardField type enum.
  */
-function zodTypeToFieldType(schema: z.ZodTypeAny): WidgetField['type'] {
+function zodTypeToFieldType(schema: z.ZodTypeAny): CardField['type'] {
   const inner = unwrapSchema(schema)
 
   if (inner instanceof z.ZodString) return 'string'
@@ -69,13 +70,13 @@ function zodTypeToFieldType(schema: z.ZodTypeAny): WidgetField['type'] {
 }
 
 /**
- * Inspects a Zod schema and returns WidgetField[] — one entry per top-level
+ * Inspects a Zod schema and returns CardField[] — one entry per top-level
  * key for ZodObject schemas. Non-object top-level schemas return [].
  *
  * Nested objects are typed as 'object' (not recursively flattened),
  * and arrays are typed as 'array'.
  */
-export function introspectSchema(schema: z.ZodTypeAny): WidgetField[] {
+export function introspectSchema(schema: z.ZodTypeAny): CardField[] {
   const inner = unwrapSchema(schema)
 
   // ZodAny / ZodUnknown — can't introspect
@@ -101,16 +102,21 @@ export function introspectSchema(schema: z.ZodTypeAny): WidgetField[] {
   return []
 }
 
-function introspectObject(schema: z.ZodObject<z.ZodRawShape>): WidgetField[] {
-  const fields: WidgetField[] = []
+function introspectObject(schema: z.ZodObject<z.ZodRawShape>): CardField[] {
+  const fields: CardField[] = []
   const shape = schema.shape
 
   for (const [key, fieldSchema] of Object.entries(shape)) {
-    const optional = isOptionalSchema(fieldSchema as z.ZodTypeAny)
-    const type = zodTypeToFieldType(fieldSchema as z.ZodTypeAny)
+    const fs = fieldSchema as z.ZodTypeAny
+    const optional = isOptionalSchema(fs)
+    const type = zodTypeToFieldType(fs)
+    // Check for maisie:* annotation on the outer schema first (field() is applied
+    // before optional/nullable wrapping), then fall back to the unwrapped inner.
+    const maisieType = getMaisieType(fs) ?? getMaisieType(unwrapSchema(fs))
     fields.push({
       key,
       type,
+      maisieType,
       label: prettifyKey(key),
       optional,
     })

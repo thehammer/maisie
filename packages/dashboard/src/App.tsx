@@ -30,8 +30,10 @@ import { ChatPanel } from "./components/ChatPanel";
 import { NotificationsFeed } from "./components/NotificationsFeed";
 import { AgentStatus } from "./components/AgentStatus";
 import { DraggableDashboardGrid } from "./components/DraggableDashboardGrid";
-import { WidgetSlot } from "./components/WidgetSlot";
+import { CardSlot } from "./components/WidgetSlot";
 import { useLayout } from "./hooks/useLayout";
+import { DynamicCard, type CardDescriptor } from "./components/DynamicCard";
+import { AddCardPanel } from "./components/AddWidgetPanel";
 
 
 const POLL_INTERVAL = 30_000; // 30 seconds
@@ -67,6 +69,7 @@ export function App() {
   const { page, navigate } = useHashRoute();
   const [notifCount, setNotifCount] = useState(0);
   const [notifsOpen, setNotifsOpen] = useState(false);
+  const [addCardOpen, setAddCardOpen] = useState(false);
 
   const health = useApi<{ status: string }>("/api/health", POLL_INTERVAL);
   const devicesApi = useApi<Device[]>("/api/devices", POLL_INTERVAL);
@@ -85,6 +88,7 @@ export function App() {
     5 * 60_000,
   );
   const calibreApi = useApi<CalibreStatus>("/api/calibre/calibre-status", POLL_INTERVAL);
+  const catalogApi = useApi<CardDescriptor[]>("/api/cards/catalog", 0);
 
   const layout = useLayout("home");
 
@@ -298,7 +302,12 @@ export function App() {
           ? <RecentlyAddedCard items={apis.plexApi.data.recentlyAdded} />
           : null;
       case "SmartHomeCard":    return <SmartHomeCard pollInterval={POLL_INTERVAL} />;
-      default:                 return null;
+      default: {
+        // Fall back to auto-rendered card from the widget catalog
+        const descriptor = (catalogApi.data ?? []).find((w) => w.id === id);
+        if (descriptor) return <DynamicCard descriptor={descriptor} pollInterval={POLL_INTERVAL} />;
+        return null;
+      }
     }
   }
 
@@ -329,10 +338,13 @@ export function App() {
           {mqttConnected && <span className="mqtt-badge">LIVE</span>}
           {layout.isEditMode ? (
             <>
-              <button className="edit-layout-btn save" onClick={layout.saveLayout} disabled={layout.saving}>
+              <button className="edit-layout-btn" onClick={() => setAddCardOpen((o) => !o)}>
+                {addCardOpen ? "Hide Catalog" : "+ Add Card"}
+              </button>
+              <button className="edit-layout-btn save" onClick={() => { layout.saveLayout(); setAddCardOpen(false); }} disabled={layout.saving}>
                 {layout.saving ? "Saving…" : "Save Layout"}
               </button>
-              <button className="edit-layout-btn cancel" onClick={layout.cancelEditMode}>Cancel</button>
+              <button className="edit-layout-btn cancel" onClick={() => { layout.cancelEditMode(); setAddCardOpen(false); }}>Cancel</button>
             </>
           ) : (
             <button className="edit-layout-btn" onClick={layout.enterEditMode}>Edit Layout</button>
@@ -346,12 +358,13 @@ export function App() {
         onReorder={layout.reorder}
       >
         {layout.widgets.map((widget) => (
-          <WidgetSlot
+          <CardSlot
             key={widget.id}
             widget={widget}
             isEditMode={layout.isEditMode}
             onToggleVisible={() => layout.setVisible(widget.id, !widget.visible)}
             onToggleColSpan={() => layout.setColSpan(widget.id, widget.col_span === 1 ? 2 : 1)}
+            onRemove={widget.id.includes(".") ? () => layout.removeCard(widget.id) : undefined}
           >
             {renderCard(widget.id, {
               services,
@@ -359,9 +372,18 @@ export function App() {
               dakboardApi, bambuApi, calibreApi, packagesApi,
               switchesApi,
             })}
-          </WidgetSlot>
+          </CardSlot>
         ))}
       </DraggableDashboardGrid>
+
+      <AddCardPanel
+        open={addCardOpen}
+        onClose={() => setAddCardOpen(false)}
+        catalog={catalogApi.data ?? []}
+        existingIds={new Set(layout.widgets.map((w) => w.id))}
+        onAdd={(id) => layout.addCard(id)}
+      />
+
       {chatOverlay}
     </div>
   );

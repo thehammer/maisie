@@ -1,16 +1,18 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { WidgetConfig } from "../hooks/useLayout";
+import type { CardConfig } from "../hooks/useLayout";
 
 interface Props {
-  widget: WidgetConfig;
+  widget: CardConfig;
   isEditMode: boolean;
   onToggleVisible: () => void;
   onToggleColSpan: () => void;
+  /** If provided, a remove button is shown — used for catalog-sourced widgets */
+  onRemove?: () => void;
   children: React.ReactNode;
 }
 
-export function WidgetSlot({ widget, isEditMode, onToggleVisible, onToggleColSpan, children }: Props) {
+export function CardSlot({ widget, isEditMode, onToggleVisible, onToggleColSpan, onRemove, children }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: widget.id,
     disabled: !isEditMode,
@@ -31,27 +33,37 @@ export function WidgetSlot({ widget, isEditMode, onToggleVisible, onToggleColSpa
     <div
       ref={setNodeRef}
       style={style}
-      className={["card", !widget.visible ? "widget-hidden" : ""].filter(Boolean).join(" ")}
+      className={["card", !widget.visible ? "card-hidden" : ""].filter(Boolean).join(" ")}
     >
       {isEditMode && (
-        <div className="widget-edit-controls">
+        <div className="card-edit-controls">
           <span className="drag-handle" {...attributes} {...listeners} title="Drag to reorder">
             ⠿
           </span>
           <button
-            className="widget-edit-btn"
+            className="card-edit-btn"
             onClick={onToggleVisible}
-            title={widget.visible ? "Hide widget" : "Show widget"}
+            title={widget.visible ? "Hide card" : "Show card"}
           >
             {widget.visible ? "●" : "○"}
           </button>
           <button
-            className="widget-edit-btn"
+            className="card-edit-btn"
             onClick={onToggleColSpan}
             title={widget.col_span === 2 ? "Make narrow" : "Make wide"}
           >
             {widget.col_span === 2 ? "⇥" : "⇔"}
           </button>
+          {onRemove && (
+            <button
+              className="card-edit-btn"
+              onClick={onRemove}
+              title="Remove card"
+              style={{ color: "var(--red, #f87171)" }}
+            >
+              ✕
+            </button>
+          )}
         </div>
       )}
       {children}

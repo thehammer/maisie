@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
 
-export interface WidgetConfig {
+export interface CardConfig {
   id: string;
   visible: boolean;
   col_span: 1 | 2;
@@ -9,7 +9,7 @@ export interface WidgetConfig {
 }
 
 interface LayoutState {
-  widgets: WidgetConfig[];
+  widgets: CardConfig[];
   isEditMode: boolean;
   loading: boolean;
   saving: boolean;
@@ -25,7 +25,7 @@ export function useLayout(page: string) {
     error: null,
   });
   // Snapshot for cancel — captured when entering edit mode
-  const [snapshot, setSnapshot] = useState<WidgetConfig[]>([]);
+  const [snapshot, setSnapshot] = useState<CardConfig[]>([]);
 
   useEffect(() => {
     let mounted = true;
@@ -33,7 +33,7 @@ export function useLayout(page: string) {
     async function load() {
       try {
         const res = await fetch(`/api/layout/${page}`);
-        const widgets: WidgetConfig[] = res.ok ? await res.json() : [];
+        const widgets: CardConfig[] = res.ok ? await res.json() : [];
         if (mounted) {
           const sorted = [...widgets].sort((a, b) => a.order - b.order);
           setState((s) => ({ ...s, widgets: sorted, loading: false }));
@@ -59,7 +59,7 @@ export function useLayout(page: string) {
     setState((s) => ({ ...s, isEditMode: false, widgets: snapshot }));
   }, [snapshot]);
 
-  const saveLayout = useCallback(async (currentWidgets: WidgetConfig[]) => {
+  const saveLayout = useCallback(async (currentWidgets: CardConfig[]) => {
     setState((s) => ({ ...s, saving: true, error: null }));
     try {
       const res = await fetch(`/api/layout/${page}`, {
@@ -89,6 +89,24 @@ export function useLayout(page: string) {
     }));
   }, []);
 
+  const addCard = useCallback((id: string) => {
+    setState((s) => {
+      if (s.widgets.find((w) => w.id === id)) return s;
+      const maxOrder = s.widgets.reduce((m, w) => Math.max(m, w.order), -1);
+      return {
+        ...s,
+        widgets: [...s.widgets, { id, visible: true, col_span: 1 as const, order: maxOrder + 1 }],
+      };
+    });
+  }, []);
+
+  const removeCard = useCallback((id: string) => {
+    setState((s) => ({
+      ...s,
+      widgets: s.widgets.filter((w) => w.id !== id).map((w, i) => ({ ...w, order: i })),
+    }));
+  }, []);
+
   // Called by DraggableDashboardGrid after a drag ends
   const reorder = useCallback((activeId: string, overId: string) => {
     setState((s) => {
@@ -115,5 +133,7 @@ export function useLayout(page: string) {
     setVisible,
     setColSpan,
     reorder,
+    addCard,
+    removeCard,
   };
 }
