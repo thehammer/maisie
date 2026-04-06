@@ -23,6 +23,7 @@ const plugin: MaisiePlugin = {
       required: true,
       description: 'HP printer IP address or hostname',
       example: '192.168.1.50',
+      discoverAction: 'discover_printer',
     },
   ],
   actions: Object.values(actionDefs).filter(v => typeof v === 'object' && 'name' in v) as any,

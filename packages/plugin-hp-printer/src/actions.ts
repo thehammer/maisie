@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { defineAction } from '@maisie/shared'
 import type { HpPrinterClient } from './client'
+import { looksLikeHp, probeForEws } from './client'
 
 let _client: HpPrinterClient | null = null
 
@@ -87,5 +88,48 @@ export const getUsage = defineAction({
   },
   async execute(_input, _ctx) {
     return getClient().getUsage()
+  },
+})
+
+export const discoverPrinter = defineAction({
+  name: 'discover_printer',
+  description: 'Scan the network for HP printers using the UniFi device list and EWS probe. Returns the IP of the first printer found.',
+  input: z.object({}),
+  output: z.object({
+    value: z.string(),  // HP_PRINTER_HOST value — empty string if none found
+    candidates: z.array(z.object({ ip: z.string(), name: z.string().optional() })),
+  }),
+  http: { method: 'POST' },
+  ai: false,
+  ui: false,
+  async execute(_input, _ctx) {
+    // Pull UniFi device list from the local Maisie API
+    const apiBase = process.env.MAISIE_INTERNAL_URL ?? 'http://localhost:3001'
+    let devices: Array<{ ip?: string; mac?: string; name?: string; manufacturer?: string }> = []
+    try {
+      const res = await fetch(`${apiBase}/api/devices`, { signal: AbortSignal.timeout(5_000) })
+      if (res.ok) {
+        const data = await res.json() as { devices?: typeof devices }
+        devices = data.devices ?? []
+      }
+    } catch {
+      // UniFi unavailable — fall through with empty list
+    }
+
+    // Filter to likely HP devices
+    const candidates = devices.filter(d => looksLikeHp(d.manufacturer, d.mac ?? null))
+
+    // Probe each candidate for EWS
+    const found: Array<{ ip: string; name?: string }> = []
+    for (const device of candidates) {
+      if (!device.ip) continue
+      const isEws = await probeForEws(device.ip)
+      if (isEws) found.push({ ip: device.ip, name: device.name })
+    }
+
+    return {
+      value: found[0]?.ip ?? '',
+      candidates: found,
+    }
   },
 })

@@ -1,12 +1,15 @@
 import { useState, useCallback } from "react";
 import { useApi } from "../hooks/useApi";
 
+const API = import.meta.env.VITE_API_URL || "";
+
 interface EnvVarSpec {
   name: string;
   required: boolean;
   description: string;
   example?: string;
   currentValue?: string | null;
+  discoverAction?: string;
 }
 
 interface PluginInfo {
@@ -30,6 +33,7 @@ const CAPABILITY_COLORS: Record<string, { bg: string; color: string }> = {
   "smart-home": { bg: "rgba(45, 212, 191, 0.12)", color: "#2dd4bf" },
   printer: { bg: "rgba(139, 143, 163, 0.15)", color: "#8b8fa3" },
   "book-library": { bg: "rgba(251, 191, 36, 0.12)", color: "#fbbf24" },
+  "inkjet-printer": { bg: "rgba(139, 143, 163, 0.15)", color: "#8b8fa3" },
 };
 
 function capabilityStyle(cap: string) {
@@ -98,6 +102,28 @@ function ConfigureModal({
 
   const [pairs, setPairs] = useState<Array<{ key: string; value: string; spec?: EnvVarSpec }>>(seedPairs);
   const [saving, setSaving] = useState(false);
+  const [discovering, setDiscovering] = useState<string | null>(null); // key of the field being discovered
+  const [discoverMsg, setDiscoverMsg] = useState<{ key: string; text: string; ok: boolean } | null>(null);
+
+  const handleDiscover = async (pairIndex: number, actionName: string, varKey: string) => {
+    setDiscovering(varKey);
+    setDiscoverMsg(null);
+    try {
+      const res = await fetch(`${API}/api/${plugin.name}/${actionName}`, { method: "POST" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json() as { value?: string; candidates?: { ip: string; name?: string }[] };
+      if (data.value) {
+        setPairs(p => p.map((pair, i) => i === pairIndex ? { ...pair, value: data.value! } : pair));
+        setDiscoverMsg({ key: varKey, text: `Found: ${data.value}`, ok: true });
+      } else {
+        setDiscoverMsg({ key: varKey, text: "No HP printers found on the network.", ok: false });
+      }
+    } catch (err) {
+      setDiscoverMsg({ key: varKey, text: `Discovery failed: ${err instanceof Error ? err.message : err}`, ok: false });
+    } finally {
+      setDiscovering(null);
+    }
+  };
 
   const addPair = () => setPairs((p) => [...p, { key: "", value: "" }]);
   const removePair = (i: number) => setPairs((p) => p.filter((_, idx) => idx !== i));
@@ -152,6 +178,17 @@ function ConfigureModal({
                   onChange={(e) => updatePair(i, "value", e.target.value)}
                   style={{ flex: 2, fontFamily: "monospace", fontSize: "0.82rem" }}
                 />
+                {pair.spec?.discoverAction && (
+                  <button
+                    className="card-btn"
+                    onClick={() => handleDiscover(i, pair.spec!.discoverAction!, pair.key)}
+                    disabled={discovering === pair.key}
+                    title="Auto-discover this value on the network"
+                    style={{ whiteSpace: "nowrap" }}
+                  >
+                    {discovering === pair.key ? "Scanning…" : "Discover"}
+                  </button>
+                )}
                 {!pair.spec && (
                   <button
                     className="tv-manager-delete"
@@ -162,6 +199,11 @@ function ConfigureModal({
                   </button>
                 )}
               </div>
+              {discoverMsg?.key === pair.key && (
+                <div style={{ fontSize: "0.72rem", marginTop: "0.25rem", color: discoverMsg.ok ? "#4ade80" : "#f87171" }}>
+                  {discoverMsg.text}
+                </div>
+              )}
             </div>
           ))}
           <button className="card-btn" onClick={addPair} style={{ alignSelf: "flex-start", marginTop: "0.25rem" }}>

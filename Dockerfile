@@ -20,6 +20,7 @@ COPY packages/plugin-calibre/package.json packages/plugin-calibre/
 COPY packages/plugin-home-assistant/package.json packages/plugin-home-assistant/
 COPY packages/plugin-bambu/package.json packages/plugin-bambu/
 COPY packages/plugin-google/package.json packages/plugin-google/
+COPY packages/plugin-hp-printer/package.json packages/plugin-hp-printer/
 COPY packages/synthetic-hdhr/package.json packages/synthetic-hdhr/
 COPY packages/tokyo-streamer/package.json packages/tokyo-streamer/
 COPY packages/ssdp-advertiser/package.json packages/ssdp-advertiser/
@@ -51,6 +52,7 @@ COPY packages/plugin-calibre/package.json packages/plugin-calibre/
 COPY packages/plugin-home-assistant/package.json packages/plugin-home-assistant/
 COPY packages/plugin-bambu/package.json packages/plugin-bambu/
 COPY packages/plugin-google/package.json packages/plugin-google/
+COPY packages/plugin-hp-printer/package.json packages/plugin-hp-printer/
 COPY packages/synthetic-hdhr/package.json packages/synthetic-hdhr/
 COPY packages/tokyo-streamer/package.json packages/tokyo-streamer/
 COPY packages/ssdp-advertiser/package.json packages/ssdp-advertiser/
@@ -74,6 +76,7 @@ COPY packages/plugin-calibre/ packages/plugin-calibre/
 COPY packages/plugin-home-assistant/ packages/plugin-home-assistant/
 COPY packages/plugin-bambu/ packages/plugin-bambu/
 COPY packages/plugin-google/ packages/plugin-google/
+COPY packages/plugin-hp-printer/ packages/plugin-hp-printer/
 
 # Copy built dashboard from build stage
 COPY --from=build /app/packages/dashboard/dist packages/dashboard/dist

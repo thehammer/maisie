@@ -8,6 +8,8 @@ export interface EnvVarSpec {
   required: boolean
   description: string
   example?: string
+  /** Action name to call to auto-discover this value. The action must return { value: string }. */
+  discoverAction?: string
 }
 
 export interface PluginHealth {
