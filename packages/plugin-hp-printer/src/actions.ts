@@ -109,23 +109,30 @@ export const discoverPrinter = defineAction({
     try {
       const res = await fetch(`${apiBase}/api/devices`, { signal: AbortSignal.timeout(5_000) })
       if (res.ok) {
-        const data = await res.json() as { devices?: typeof devices }
-        devices = data.devices ?? []
+        const data = await res.json() as { devices?: typeof devices } | typeof devices
+        devices = Array.isArray(data) ? data : (data as any).devices ?? []
       }
     } catch {
       // UniFi unavailable — fall through with empty list
     }
 
-    // Filter to likely HP devices
-    const candidates = devices.filter(d => looksLikeHp(d.manufacturer, d.mac ?? null))
+    const withIp = devices.filter(d => !!d.ip)
 
-    // Probe each candidate for EWS
-    const found: Array<{ ip: string; name?: string }> = []
-    for (const device of candidates) {
-      if (!device.ip) continue
-      const isEws = await probeForEws(device.ip)
-      if (isEws) found.push({ ip: device.ip, name: device.name })
-    }
+    // First pass: HP OUI/manufacturer match (fast path when data is available)
+    const hpCandidates = withIp.filter(d => looksLikeHp(d.manufacturer, d.mac ?? null))
+
+    // Second pass: if OUI matching found nothing (manufacturer data absent/broken),
+    // probe everything in parallel — on LAN this takes ~1s regardless of count
+    const toProbe = hpCandidates.length > 0 ? hpCandidates : withIp
+
+    const results = await Promise.all(
+      toProbe.map(async (device) => {
+        const isEws = await probeForEws(device.ip!)
+        return isEws ? { ip: device.ip!, name: device.name } : null
+      })
+    )
+
+    const found = results.filter((r): r is { ip: string; name?: string } => r !== null)
 
     return {
       value: found[0]?.ip ?? '',
