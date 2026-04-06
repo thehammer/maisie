@@ -152,8 +152,9 @@ export function createHpPrinterClient(host: string): HpPrinterClient {
 
     async ping(): Promise<boolean> {
       try {
-        await fetchXml('/DevMgmt/ProductStatusDyn.xml')
-        return true
+        const xml = await fetchXml('/DevMgmt/ProductStatusDyn.xml')
+        // Verify it's actually HP EWS — must contain HP schema namespace or ProductStatus tag
+        return xml.includes('hp.com/schemas') || xml.includes('ProductStatus')
       } catch {
         return false
       }
