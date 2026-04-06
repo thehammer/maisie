@@ -41,7 +41,7 @@ import { initEpgService } from "./services/epg";
 import { createAgent } from "./agent/index";
 import { discoverPlugins } from "./services/plugin-registry";
 import type { MaisiePlugin } from "@maisie/shared";
-import corePlugin, { setPlugins as setCorePlugins } from "@maisie/plugin-core";
+import corePlugin, { setPlugins as setCorePlugins, setCore as setCoreInstance } from "@maisie/plugin-core";
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const DATA_DIR = join(import.meta.dir, "../../..", "data");
@@ -632,6 +632,7 @@ async function main() {
     },
   };
   await corePlugin.init(coreCore);
+  setCoreInstance(coreCore);
 
   // Channing's persona lives in synthetic-hdhr (a separate service, not a discoverable plugin).
   // Inject it as a persona-only stub so it appears in /api/personas and the agent's router.
@@ -669,9 +670,24 @@ async function main() {
 
   // Initialize all discovered plugins — calls each plugin's init() so their
   // internal clients (getClients()) are populated before the API starts.
+  // Before each init, apply any env overrides stored in the DB so plugins
+  // that read process.env in their init() pick up user-configured values.
+  const { pluginConfigs: pluginConfigsTable } = await import('./services/schema')
+  const { eq } = await import('drizzle-orm')
   for (const plugin of loadedPlugins) {
     if (plugin.name === 'core' || plugin.name === 'synthetic-hdhr') continue;
     try {
+      const stored = await db
+        .select()
+        .from(pluginConfigsTable)
+        .where(eq(pluginConfigsTable.packageName, plugin.name))
+        .get()
+      if (stored?.envOverrides) {
+        const overrides = JSON.parse(stored.envOverrides) as Record<string, string>
+        for (const [k, v] of Object.entries(overrides)) {
+          if (v) process.env[k] = v
+        }
+      }
       await plugin.init(coreCore);
     } catch (err) {
       console.warn(`  ⚠ Plugin ${plugin.name} init() failed:`, err);

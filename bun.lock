@@ -108,6 +108,14 @@
         "zod": "^4.3.6",
       },
     },
+    "packages/plugin-hp-printer": {
+      "name": "@maisie/plugin-hp-printer",
+      "version": "0.1.0",
+      "dependencies": {
+        "@maisie/shared": "workspace:*",
+        "zod": "^4.3.6",
+      },
+    },
     "packages/plugin-plex": {
       "name": "@maisie/plugin-plex",
       "version": "0.1.0",
@@ -383,6 +391,8 @@
     "@maisie/plugin-google": ["@maisie/plugin-google@workspace:packages/plugin-google"],
 
     "@maisie/plugin-home-assistant": ["@maisie/plugin-home-assistant@workspace:packages/plugin-home-assistant"],
+
+    "@maisie/plugin-hp-printer": ["@maisie/plugin-hp-printer@workspace:packages/plugin-hp-printer"],
 
     "@maisie/plugin-plex": ["@maisie/plugin-plex@workspace:packages/plugin-plex"],
 

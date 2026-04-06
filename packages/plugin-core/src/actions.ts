@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { defineAction } from '@maisie/shared'
-import type { MaisiePlugin } from '@maisie/shared'
+import type { MaisiePlugin, MaisieCore } from '@maisie/shared'
 import { introspectSchema } from './schema-introspector'
 import type { CardDescriptor, CardPlacement, CardConfig, PersonaConfig } from './types'
 import { createLayoutService } from './layout-service'
@@ -13,6 +13,7 @@ import type { LayoutService } from './layout-service'
 let _db: import('drizzle-orm/bun-sqlite').BunSQLiteDatabase<Record<string, never>> | null = null
 let _loadedPlugins: MaisiePlugin[] = []
 let _layout: LayoutService | null = null
+let _core: MaisieCore | null = null
 
 export function setDb(db: unknown) {
   _db = db as typeof _db
@@ -21,6 +22,10 @@ export function setDb(db: unknown) {
 
 export function setPlugins(plugins: MaisiePlugin[]) {
   _loadedPlugins = plugins
+}
+
+export function setCore(core: MaisieCore) {
+  _core = core
 }
 
 // ----------------------------------------------------------------
@@ -223,6 +228,26 @@ export const configurePlugin = defineAction({
         envOverrides: JSON.stringify(input.envOverrides ?? {}),
         updatedAt: new Date(),
       })
+    }
+
+    // Apply env overrides immediately and reinit the plugin live so no restart required.
+    if (input.envOverrides && _core) {
+      const plugin = _loadedPlugins.find((p) => p.name === input.name)
+      if (plugin) {
+        for (const [k, v] of Object.entries(input.envOverrides)) {
+          if (v) process.env[k] = v
+        }
+        try {
+          if (plugin.shutdown) await plugin.shutdown()
+        } catch {
+          // ignore shutdown errors during reinit
+        }
+        try {
+          await plugin.init(_core)
+        } catch (err) {
+          _core.log(input.name, 'warn', `Reinit after configure failed: ${err instanceof Error ? err.message : err}`)
+        }
+      }
     }
 
     return { success: true }

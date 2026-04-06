@@ -58,7 +58,7 @@ const plugin: MaisiePlugin = {
             cartridge.levelPercent !== null &&
             cartridge.levelPercent < LOW_INK_THRESHOLD
           ) {
-            core.emit('home/hp-printer/supply_low', {
+            core.mqtt.publish('home/hp-printer/supply_low', {
               cartridge: cartridge.name,
               levelPercent: cartridge.levelPercent,
             })
@@ -67,14 +67,14 @@ const plugin: MaisiePlugin = {
 
         // Emit error event if printer moves into error state
         if (status.state === 'error') {
-          core.emit('home/hp-printer/error', {
+          core.mqtt.publish('home/hp-printer/error', {
             state: status.state,
             raw: status.raw,
           })
         }
 
         // Broadcast current status for dashboard realtime updates
-        core.emit('home/hp-printer/status', { supplies, status })
+        core.mqtt.publish('home/hp-printer/status', { supplies, status })
       } catch (err) {
         core.log('hp-printer', 'warn', `Poll failed: ${err instanceof Error ? err.message : err}`)
       }

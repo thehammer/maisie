@@ -34,19 +34,30 @@ export interface HpPrinterClient {
 
 // ── XML helpers ────────────────────────────────────────────────────────────
 
-/** Extract all occurrences of a repeating XML block. */
+/** Extract all occurrences of a repeating XML block (namespace-prefix aware). */
 function extractBlocks(xml: string, tag: string): string[] {
   const results: string[] = []
-  const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'g')
+  const re = new RegExp(`<(?:[\\w]+:)?${tag}[^>]*>([\\s\\S]*?)</(?:[\\w]+:)?${tag}>`, 'g')
   let m: RegExpExecArray | null
   while ((m = re.exec(xml)) !== null) results.push(m[1])
   return results
 }
 
-/** Extract a single text value from within an XML snippet. */
+/** Extract a single text value from within an XML snippet (namespace-prefix aware). */
 function extractValue(block: string, tag: string): string | null {
-  const m = block.match(new RegExp(`<${tag}[^>]*>([^<]*)<\\/${tag}>`))
+  const m = block.match(new RegExp(`<(?:[\\w]+:)?${tag}[^>]*>([^<]*)</(?:[\\w]+:)?${tag}>`))
   return m ? m[1].trim() : null
+}
+
+/** Map short HP label codes to color names. */
+function normalizeColorLabel(raw: string): string {
+  switch (raw.toUpperCase()) {
+    case 'K': return 'black'
+    case 'C': return 'cyan'
+    case 'M': return 'magenta'
+    case 'Y': return 'yellow'
+    default: return raw.toLowerCase()
+  }
 }
 
 function parseCartridgeState(raw: string | null): Cartridge['state'] {
@@ -67,7 +78,7 @@ function normalizePrinterState(raw: string): PrinterStatus['state'] {
   if (lower.includes('ready')) return 'ready'
   if (lower.includes('print')) return 'printing'
   if (lower.includes('error') || lower.includes('jam') || lower.includes('fail')) return 'error'
-  if (lower.includes('warn') || lower.includes('attention')) return 'warning'
+  if (lower.includes('warn') || lower.includes('attention') || lower.includes('trayempty') || lower.includes('tray')) return 'warning'
   if (lower.includes('off') || lower.includes('sleep') || lower.includes('power')) return 'offline'
   return 'unknown'
 }
@@ -99,27 +110,30 @@ export function createHpPrinterClient(host: string): HpPrinterClient {
 
       if (blocks.length === 0) {
         // Fallback: some older models put everything at the root level
-        const name = extractValue(xml, 'ConsumableLabelCode')
+        const labelRaw = extractValue(xml, 'ConsumableLabelCode')
           ?? extractValue(xml, 'ConsumableColorEnum')
           ?? 'unknown'
         const levelRaw = extractValue(xml, 'ConsumablePercentageLevelRemaining')
         const stateRaw = extractValue(xml, 'ConsumableStateEnum')
+          ?? extractValue(xml, 'MeasuredQuantityState')
         return [{
-          name: name.toLowerCase(),
+          name: normalizeColorLabel(labelRaw),
           levelPercent: levelRaw ? parseInt(levelRaw, 10) : null,
           state: parseCartridgeState(stateRaw),
         }]
       }
 
       return blocks.map((block) => {
-        const name = (
+        const labelRaw =
           extractValue(block, 'ConsumableLabelCode') ??
           extractValue(block, 'ConsumableColorEnum') ??
           'unknown'
-        ).toLowerCase()
+        const name = normalizeColorLabel(labelRaw)
 
         const levelRaw = extractValue(block, 'ConsumablePercentageLevelRemaining')
-        const stateRaw = extractValue(block, 'ConsumableStateEnum')
+        const stateRaw =
+          extractValue(block, 'ConsumableStateEnum') ??
+          extractValue(block, 'MeasuredQuantityState')
 
         return {
           name,
