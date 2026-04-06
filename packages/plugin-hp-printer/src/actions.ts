@@ -118,17 +118,14 @@ export const discoverPrinter = defineAction({
 
     const withIp = devices.filter(d => !!d.ip)
 
-    // First pass: HP OUI/manufacturer match (fast path when data is available)
-    const hpCandidates = withIp.filter(d => looksLikeHp(d.manufacturer, d.mac ?? null))
-
-    // Second pass: if OUI matching found nothing (manufacturer data absent/broken),
-    // probe everything in parallel — on LAN this takes ~1s regardless of count
-    const toProbe = hpCandidates.length > 0 ? hpCandidates : withIp
-
+    // Probe all devices in parallel — EWS response is distinctive enough that
+    // false positives won't occur, and parallel LAN probes complete in ~1s.
+    // (OUI-based pre-filtering was unreliable: field name varies across API
+    // versions and HP server OUIs match non-printer HP hardware.)
     const results = await Promise.all(
-      toProbe.map(async (device) => {
+      withIp.map(async (device) => {
         const isEws = await probeForEws(device.ip!)
-        return isEws ? { ip: device.ip!, name: device.name } : null
+        return isEws ? { ip: device.ip!, name: (device as any).name } : null
       })
     )
 
