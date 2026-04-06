@@ -99,7 +99,7 @@ export const discoverPrinter = defineAction({
     value: z.string(),  // HP_PRINTER_HOST value — empty string if none found
     candidates: z.array(z.object({ ip: z.string(), name: z.string().optional() })),
   }),
-  http: { method: 'POST' },
+  http: { method: 'POST', path: '/discover' },
   ai: false,
   ui: false,
   async execute(_input, _ctx) {
