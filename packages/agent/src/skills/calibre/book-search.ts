@@ -24,6 +24,33 @@ export interface AASearchResult {
   score: number;
 }
 
+// One logical book, potentially backed by many file copies (editions/formats/mirrors)
+export interface AABookGroup {
+  // Display data taken from the best-scored candidate
+  title: string;
+  author: string;
+  publisher: string;
+  year: string;
+  language: string;
+  coverUrl: string;
+  // Best candidate info (convenience fields)
+  bestMd5: string;
+  bestFileType: string;
+  bestFileSize: string;
+  // All candidates ranked best-first — download attempts work through this list
+  candidates: Array<{
+    md5: string;
+    fileType: string;
+    fileSize: string;
+    fileSizeBytes: number;
+    score: number;
+  }>;
+  editionCount: number;
+  topScore: number;
+  // Set by cross-referencing against the local Calibre library
+  inLibrary?: boolean;
+}
+
 export interface AADownloadResult {
   success: boolean;
   filePath?: string;
@@ -215,6 +242,108 @@ function parseSearchResults(html: string): AASearchResult[] {
   return results;
 }
 
+// --- Grouping: collapse many file-copies into one logical book ---
+
+// Reduce a title to a bare grouping key: lowercase, no subtitles, no parentheticals, no articles
+function normalizeTitleForGrouping(title: string): string {
+  return title
+    .replace(/\s*\(.*?\)/g, "")     // strip parentheticals: "(Dune Chronicles, #1)"
+    .replace(/\s*\[.*?\]/g, "")     // strip brackets
+    .replace(/:.*$/, "")            // strip subtitle after colon
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // strip accents
+    .replace(/[^\w\s]/g, "")        // strip punctuation
+    .replace(/\b(the|a|an)\b\s*/g, "") // strip articles
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Handle "Last, First" inversion, lowercase, no accents/punctuation
+// Also strips bracketed aliases like "Dan Abnett [Abnett, Dan]" before processing
+function normalizeAuthorForGrouping(author: string): string {
+  if (!author) return "";
+  // Strip bracketed aliases first: "Dan Abnett [Abnett, Dan]" → "Dan Abnett"
+  const stripped = author.replace(/\s*\[.*?\]/g, "").trim();
+  const parts = stripped.split(",").map((s) => s.trim());
+  const natural = parts.length === 2 ? `${parts[1]} ${parts[0]}` : stripped;
+  return natural
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function groupSearchResults(results: AASearchResult[]): AABookGroup[] {
+  const groups = new Map<string, AASearchResult[]>();
+
+  for (const r of results) {
+    const key = `${normalizeTitleForGrouping(r.title)}||${normalizeAuthorForGrouping(r.author)}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(r);
+  }
+
+  const bookGroups: AABookGroup[] = [];
+
+  for (const members of groups.values()) {
+    // Best candidate first
+    members.sort((a, b) => b.score - a.score);
+    const best = members[0];
+
+    // Prefer a candidate that has a cover for display, even if not top-scored
+    const withCover = members.find((r) => r.coverUrl);
+
+    bookGroups.push({
+      title: best.title,
+      author: best.author,
+      publisher: best.publisher || withCover?.publisher || "",
+      year: best.year || withCover?.year || "",
+      language: best.language,
+      coverUrl: withCover?.coverUrl || "",
+      bestMd5: best.md5,
+      bestFileType: best.fileType,
+      bestFileSize: best.fileSize,
+      candidates: members.map((r) => ({
+        md5: r.md5,
+        fileType: r.fileType,
+        fileSize: r.fileSize,
+        fileSizeBytes: r.fileSizeBytes,
+        score: r.score,
+      })),
+      editionCount: members.length,
+      topScore: best.score,
+    });
+  }
+
+  // Sort groups by their best candidate's score
+  bookGroups.sort((a, b) => b.topScore - a.topScore);
+
+  return bookGroups;
+}
+
+// Cross-reference AA groups against a Calibre library result set.
+// Any group whose normalized title+author matches a Calibre book is marked inLibrary.
+export function markInLibrary(
+  groups: AABookGroup[],
+  calibreBooks: Array<{ title?: string; authors?: string[] }>,
+): AABookGroup[] {
+  // Build a set of "titleKey||authorKey" for every Calibre book
+  const libraryKeys = new Set<string>();
+  for (const book of calibreBooks) {
+    const titleKey = normalizeTitleForGrouping(book.title || "");
+    for (const author of book.authors || [""]) {
+      libraryKeys.add(`${titleKey}||${normalizeAuthorForGrouping(author)}`);
+    }
+  }
+
+  return groups.map((g) => {
+    const key = `${normalizeTitleForGrouping(g.title)}||${normalizeAuthorForGrouping(g.author)}`;
+    return libraryKeys.has(key) ? { ...g, inLibrary: true } : g;
+  });
+}
+
 // Download a book file to a temp directory via Anna's Archive fast_download API
 export async function downloadBook(
   md5: string,
@@ -227,37 +356,65 @@ export async function downloadBook(
   const tmpDir = "/tmp/maisie-books";
   await Bun.spawn(["mkdir", "-p", tmpDir]).exited;
 
-  // Try each AA mirror's fast_download API
+  // Try each AA mirror's fast_download API, with multiple domain_index values per mirror
   for (const mirror of AA_MIRRORS) {
-    try {
-      const res = await fetch(
-        `${mirror}/dyn/api/fast_download.json?md5=${md5}&key=${apiKey}`,
-        { headers: { "User-Agent": USER_AGENT } },
-      );
-      if (!res.ok) continue;
+    // Try up to 4 domain_index values (0–3) to get different download servers
+    for (let domainIndex = 0; domainIndex <= 3; domainIndex++) {
+      try {
+        const apiUrl = `${mirror}/dyn/api/fast_download.json?md5=${md5}&key=${apiKey}&domain_index=${domainIndex}`;
+        console.log(`[book-search] Trying mirror ${mirror} domain_index=${domainIndex} for md5=${md5}`);
+        const res = await fetch(apiUrl, {
+          headers: { "User-Agent": USER_AGENT },
+          signal: AbortSignal.timeout(30_000),
+        });
 
-      const data = await res.json() as {
-        download_url?: string | null;
-        error?: string;
-        account_fast_download_info?: { downloads_left: number };
-      };
+        // Always try to parse the JSON body — AA returns error details even on non-2xx
+        let data: { download_url?: string | null; error?: string; account_fast_download_info?: { downloads_left: number } } = {};
+        try {
+          data = await res.json();
+        } catch {
+          if (!res.ok) {
+            console.warn(`[book-search] ${mirror} domain=${domainIndex} HTTP ${res.status} (no JSON body)`);
+            break; // No point trying more domain_index if mirror itself is broken
+          }
+        }
 
-      if (data.error) {
-        console.error(`[book-search] AA API error: ${data.error}`);
-        return { success: false, error: `AA API: ${data.error}` };
-      }
-
-      if (!data.download_url) continue;
-
-      const result = await downloadFile(data.download_url, tmpDir, md5);
-      if (result) {
         const left = data.account_fast_download_info?.downloads_left;
-        if (left !== undefined) console.log(`[book-search] Download OK, ${left} downloads remaining today`);
-        return result;
+        console.log(`[book-search] ${mirror} domain=${domainIndex} HTTP ${res.status}, download_url=${data.download_url ? "yes" : "null"}, error=${data.error ?? "none"}, downloads_left=${left ?? "unknown"}`);
+
+        if (data.error) {
+          console.error(`[book-search] AA API error from ${mirror} domain=${domainIndex}: ${data.error}`);
+          // "Record not found" / "Invalid domain_index" — stop trying this mirror
+          if (
+            data.error.toLowerCase().includes("not found") ||
+            data.error.toLowerCase().includes("record") ||
+            data.error.toLowerCase().includes("invalid domain")
+          ) {
+            if (domainIndex === 0) {
+              // Not in catalog at all — no point trying other mirrors either
+              return { success: false, error: "Book not available for direct download (not in AA fast-download catalog)" };
+            }
+            break; // Ran out of domain_index values for this mirror
+          }
+          // Other errors — try next domain_index
+          continue;
+        }
+
+        if (!data.download_url) {
+          break; // No URL and no error — stop trying this mirror
+        }
+
+        const result = await downloadFile(data.download_url, tmpDir, md5);
+        if (result) {
+          if (left !== undefined) console.log(`[book-search] Download OK, ${left} downloads remaining today`);
+          return result;
+        }
+        console.warn(`[book-search] downloadFile returned null for ${mirror} domain=${domainIndex} — trying next server`);
+        // Continue to next domain_index
+      } catch (err) {
+        console.error(`[book-search] Mirror ${mirror} domain=${domainIndex} failed:`, err);
+        break; // Network error — skip this mirror entirely
       }
-    } catch (err) {
-      console.error(`[book-search] Mirror ${mirror} failed:`, err);
-      continue;
     }
   }
 
@@ -270,14 +427,18 @@ async function downloadFile(
   md5: string,
 ): Promise<AADownloadResult | null> {
   try {
+    console.log(`[book-search] Fetching download URL: ${url.slice(0, 80)}...`);
     const res = await fetch(url, {
       headers: { "User-Agent": USER_AGENT },
       redirect: "follow",
+      signal: AbortSignal.timeout(60_000),
     });
+
+    const contentType = res.headers.get("content-type") || "";
+    console.log(`[book-search] Download response: HTTP ${res.status}, content-type=${contentType}, content-length=${res.headers.get("content-length") ?? "unknown"}`);
 
     if (!res.ok) return null;
 
-    const contentType = res.headers.get("content-type") || "";
     if (contentType.includes("text/html")) return null;
 
     const contentDisp = res.headers.get("content-disposition") || "";

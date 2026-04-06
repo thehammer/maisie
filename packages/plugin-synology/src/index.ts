@@ -24,7 +24,16 @@ const plugin: MaisiePlugin = {
 
   async init(core) {
     const { dsm } = initClients()
-    if (!dsm) core.log('synology', 'warn', 'Synology not configured — storage actions unavailable')
+    if (!dsm) {
+      core.log('synology', 'warn', 'Synology not configured — storage actions unavailable')
+      return
+    }
+    try {
+      await dsm.login()
+      core.log('synology', 'info', 'Synology DSM connected')
+    } catch (err) {
+      core.log('synology', 'warn', `Synology DSM login failed: ${err instanceof Error ? err.message : err}`)
+    }
   },
 
   async shutdown() {

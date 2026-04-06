@@ -35,6 +35,7 @@ import { createProtectClientFromEnv } from "./skills/network/protect-client";
 import { createProwlarrClientFromEnv } from "./skills/media/prowlarr-client";
 import { createReadarrClientFromEnv } from "./skills/media/readarr-client";
 import { createTransmissionClientFromEnv } from "./skills/media/transmission-client";
+import { createAudiobookshelfClientFromEnv } from "./skills/media/audiobookshelf-client";
 import { autoPopulateChannels, pushLineup } from "./skills/network/synthetic-hdhr";
 import { initEpgService } from "./services/epg";
 import { createAgent } from "./agent/index";
@@ -95,6 +96,7 @@ async function main() {
     prowlarr: null,
     transmission: null,
     readarr: null,
+    audiobookshelf: null,
   };
 
   // --- Initial connections ---
@@ -336,6 +338,21 @@ async function main() {
     }
   } else {
     console.log("  ⚠ Readarr not configured (set READARR_HOST in .env)");
+  }
+
+  // Audiobookshelf (audiobook library)
+  const absClient = createAudiobookshelfClientFromEnv();
+  if (absClient) {
+    try {
+      const status = await absClient.getSystemStatus();
+      services.audiobookshelf = absClient;
+      console.log(`  ✓ Audiobookshelf connected (v${status.serverVersion})`);
+    } catch (err) {
+      services.audiobookshelf = absClient;
+      console.error("  ✗ Audiobookshelf configured but failed to connect:", err);
+    }
+  } else {
+    console.log("  ⚠ Audiobookshelf not configured (set ABS_HOST, ABS_TOKEN in .env)");
   }
 
   // Prowlarr (indexer search)
@@ -649,6 +666,17 @@ async function main() {
   setCorePlugins(allPlugins);
   loadedPlugins = allPlugins;
   console.log("  ✓ Core plugin initialized");
+
+  // Initialize all discovered plugins — calls each plugin's init() so their
+  // internal clients (getClients()) are populated before the API starts.
+  for (const plugin of loadedPlugins) {
+    if (plugin.name === 'core' || plugin.name === 'synthetic-hdhr') continue;
+    try {
+      await plugin.init(coreCore);
+    } catch (err) {
+      console.warn(`  ⚠ Plugin ${plugin.name} init() failed:`, err);
+    }
+  }
 
   // Agent runtime — wires MQTT events to the agent loop
   let agent: ReturnType<typeof createAgent> | undefined

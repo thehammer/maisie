@@ -16,6 +16,7 @@ import type { createProtectClient } from "../skills/network/protect-client";
 import type { ProwlarrClient } from "../skills/media/prowlarr-client";
 import type { ReadarrClient } from "../skills/media/readarr-client";
 import type { TransmissionClient } from "../skills/media/transmission-client";
+import type { AudiobookshelfClient } from "../skills/media/audiobookshelf-client";
 
 type Db = ReturnType<typeof import("../services/db").initDb>;
 type UniFi = ReturnType<typeof createUniFiClient>;
@@ -50,4 +51,5 @@ export interface Services {
   prowlarr: ProwlarrClient | null;
   transmission: TransmissionClient | null;
   readarr: ReadarrClient | null;
+  audiobookshelf: AudiobookshelfClient | null;
 }

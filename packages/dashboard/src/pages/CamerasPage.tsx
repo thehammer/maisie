@@ -10,10 +10,14 @@ interface CameraInfo {
   group: string;
 }
 
-// Map camera name to go2rtc stream name (must match config/go2rtc.yaml keys)
+// Map camera name to go2rtc stream name (must match config/go2rtc.yaml keys).
+// Normalize both straight (') and curly (') apostrophes before slugifying.
 function toStreamName(name: string): string {
-  return name.toLowerCase().replace(/'/g, "").replace(/[^a-z0-9]+/g, "_").replace(/(^_|_$)/g, "");
+  return name.toLowerCase().replace(/[\u2018\u2019']/g, "").replace(/[^a-z0-9]+/g, "_").replace(/(^_|_$)/g, "");
 }
+
+// Safari (including iOS) has unreliable MediaSource support — use native HLS instead.
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
 function CameraFeed({ camera }: { camera: CameraInfo }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -23,10 +27,6 @@ function CameraFeed({ camera }: { camera: CameraInfo }) {
     const container = containerRef.current;
     if (!container) return;
 
-    // Use go2rtc's WebSocket API with MSE (works in Safari)
-    const go2rtcHost = window.location.hostname;
-    const wsUrl = `ws://${go2rtcHost}:1984/api/ws?src=${camera.streamName}`;
-
     const video = document.createElement("video");
     video.autoplay = true;
     video.playsInline = true;
@@ -34,8 +34,22 @@ function CameraFeed({ camera }: { camera: CameraInfo }) {
     video.className = "cam-video";
     container.prepend(video);
 
+    // Safari: use native HLS — no MSE/WebSocket needed, lower latency on iOS.
+    // go2rtc's HLS endpoint is proxied through Caddy at /go2rtc/*.
+    if (isSafari) {
+      const hlsUrl = `/go2rtc/api/stream.m3u8?src=${camera.streamName}`;
+      video.src = hlsUrl;
+      video.oncanplay = () => setStatus("live");
+      video.onerror = () => setStatus("error");
+      return () => { video.src = ""; video.remove(); };
+    }
+
+    // All other browsers: WebSocket + MSE for lower latency.
+    // Proxied through Caddy at /go2rtc/* so wss:// works on HTTPS pages.
+    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${wsProtocol}//${window.location.host}/go2rtc/api/ws?src=${camera.streamName}`;
+
     let ws: WebSocket | null = null;
-    let pc: RTCPeerConnection | null = null as RTCPeerConnection | null;
     let mseSourceBuffer: SourceBuffer | null = null;
     let mse: MediaSource | null = null;
     let mseQueue: ArrayBuffer[] = [];
@@ -53,7 +67,6 @@ function CameraFeed({ camera }: { camera: CameraInfo }) {
         const codecs = msg.value;
         console.log(`[cam:${camera.streamName}] MSE codecs: ${codecs}`);
         if (mse && mse.readyState === "open") {
-          // Safari may not support all codecs — try with reported codecs, fall back to basic H.264
           const mimeTypes = [
             `video/mp4; codecs="${codecs}"`,
             'video/mp4; codecs="avc1.42E01E,mp4a.40.2"',
@@ -86,17 +99,12 @@ function CameraFeed({ camera }: { camera: CameraInfo }) {
     ws = new WebSocket(wsUrl);
     ws.binaryType = "arraybuffer";
 
-    ws.onopen = () => {
-      // Start with MSE — more reliable in Safari than WebRTC
-      startMSE();
-    };
+    ws.onopen = () => { startMSE(); };
 
     ws.onmessage = (ev) => {
       if (typeof ev.data === "string") {
-        const msg = JSON.parse(ev.data);
-        onMseMessage(msg);
+        onMseMessage(JSON.parse(ev.data));
       } else if (ev.data instanceof ArrayBuffer) {
-        // Binary MSE data
         if (mseSourceBuffer && !mseSourceBuffer.updating) {
           mseSourceBuffer.appendBuffer(ev.data);
         } else {
@@ -106,13 +114,10 @@ function CameraFeed({ camera }: { camera: CameraInfo }) {
     };
 
     ws.onerror = () => setStatus("error");
-    ws.onclose = () => {
-      if (status !== "error") setStatus("error");
-    };
+    ws.onclose = () => setStatus("error");
 
     return () => {
       ws?.close();
-      pc?.close();
       if (mse && mse.readyState === "open") {
         try { mse.endOfStream(); } catch {}
       }

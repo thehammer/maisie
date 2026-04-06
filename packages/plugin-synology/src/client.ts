@@ -39,8 +39,8 @@ export function createDsmClient(config: DsmConfig) {
 
     const json = await res.json();
     if (!json.success) {
-      // Error code 105 = invalid session — re-auth
-      if (json.error?.code === 105) {
+      // 105 = invalid session, 119 = SID not found — re-auth
+      if (json.error?.code === 105 || json.error?.code === 119) {
         sid = null;
         await login();
         return request(cgi, api, method, version, params);

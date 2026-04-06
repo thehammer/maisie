@@ -10,7 +10,24 @@ import {
 } from "../skills/media/media-cleaner";
 import type { Services } from "./types";
 
-export function createMediaRouter(services: Pick<Services, "db" | "plex" | "radarr" | "sonarr" | "hdhr" | "prowlarr" | "transmission" | "readarr">) {
+// Normalize a title for fuzzy audiobook library matching
+// Strips author prefixes like "Andy Weir - Project Hail Mary", punctuation, articles
+function normalizeTitleForAudiobook(title: string): string {
+  return title
+    .replace(/^[^-]+-\s*/, "")  // strip "Author - " prefix common in torrent filenames
+    .replace(/\s*\(.*?\)/g, "") // strip parentheticals
+    .replace(/\s*\[.*?\]/g, "") // strip brackets
+    .replace(/:.*$/, "")        // strip subtitle
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\s]/g, "")
+    .replace(/\b(the|a|an)\b\s*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function createMediaRouter(services: Pick<Services, "db" | "plex" | "radarr" | "sonarr" | "hdhr" | "prowlarr" | "transmission" | "readarr" | "audiobookshelf">) {
   const router = new Hono();
 
   router.get("/plex/status", async (c) => {
@@ -289,10 +306,20 @@ export function createMediaRouter(services: Pick<Services, "db" | "plex" | "rada
     if (!q) return c.json({ error: "q parameter required" }, 400);
 
     try {
-      const results = await services.prowlarr!.searchAudiobooks(q);
+      // Run Prowlarr search and full ABS library fetch in parallel
+      const [prowlarrResults, absItems] = await Promise.all([
+        services.prowlarr!.searchAudiobooks(q),
+        services.audiobookshelf ? services.audiobookshelf.getAllItems().catch(() => []) : Promise.resolve([]),
+      ]);
+
+      // Build a set of normalized titles from the ABS library
+      const absLibraryTitles = new Set(
+        absItems.map((item) => normalizeTitleForAudiobook(item.title)),
+      );
+
       const prowlarrHost = process.env.PROWLARR_HOST || "localhost";
       return c.json({
-        results: results.map((r) => ({
+        results: prowlarrResults.map((r) => ({
           guid: r.guid,
           title: r.title,
           size: r.size,
@@ -302,6 +329,7 @@ export function createMediaRouter(services: Pick<Services, "db" | "plex" | "rada
           downloadUrl: r.downloadUrl.replace("http://localhost:", `http://${prowlarrHost}:`),
           infoUrl: r.infoUrl,
           publishDate: r.publishDate,
+          inLibrary: absLibraryTitles.has(normalizeTitleForAudiobook(r.title)),
         })),
       });
     } catch (err) {

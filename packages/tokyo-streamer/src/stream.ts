@@ -299,7 +299,7 @@ export function startStream(
   ];
 
   console.log(`[stream:${id}] Strategy: video=${(info.isHevc || info.is10Bit) ? "nvenc transcode" : "copy"}, audio=${info.audioCodec === "aac" ? "copy" : "transcode"}`);
-  const args = buildFfmpegArgs({ fullPath, offsetSeconds, info, outputArgs, channel });
+  const args = buildFfmpegArgs({ fullPath, offsetSeconds, info, outputArgs, channel, realtime: true });
 
   const proc = Bun.spawn(args, {
     stdout: "pipe",

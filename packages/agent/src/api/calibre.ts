@@ -6,7 +6,7 @@ import { detectAuthorVariants, saveAuthorMap, getAuthorMap } from "../skills/cal
 import { runLookups, runClassification, runPipeline } from "../skills/calibre/enrichment-pipeline";
 import { applyEnrichment, applyAllReviewed, applyAuthorMerge } from "../skills/calibre/enrichment-applier";
 import { calibreEnrichment } from "../services/schema";
-import { searchAnnasArchive, downloadBook } from "../skills/calibre/book-search";
+import { searchAnnasArchive, groupSearchResults, markInLibrary, downloadBook } from "../skills/calibre/book-search";
 import type { Services } from "./types";
 
 export function createCalibreRouter(services: Pick<Services, "db" | "calibre" | "claude" | "calibreExec">) {
@@ -298,29 +298,50 @@ export function createCalibreRouter(services: Pick<Services, "db" | "calibre" | 
       annasArchive: unknown[];
     } = { calibre: [], annasArchive: [] };
 
-    // Search Calibre first
-    if (source !== "aa" && services.calibre) {
-      try {
+    // Run Calibre search + full-library fetch + AA search all in parallel
+    const [calibreSearchResult, fullLibrary, aaRaw] = await Promise.allSettled([
+      // Calibre query search — for the "In Your Library" display section
+      (async () => {
+        if (source === "aa" || !services.calibre) return [];
         const info = await services.calibre!.getLibraryInfo();
         const libraryId = info.default_library;
         const search = await services.calibre!.search(libraryId, q, 20, 0, "timestamp", "desc");
-        if (search.book_ids.length > 0) {
-          const books = await services.calibre!.getBooks(search.book_ids, libraryId);
-          response.calibre = search.book_ids.map((id) => books[String(id)]).filter(Boolean);
-        }
-      } catch (err) {
-        console.error("[book-search] Calibre search error:", err);
-      }
+        if (!search.book_ids.length) return [];
+        const books = await services.calibre!.getBooks(search.book_ids, libraryId);
+        return search.book_ids.map((id) => books[String(id)]).filter(Boolean);
+      })(),
+
+      // Full Calibre library — for accurate "inLibrary" cross-referencing
+      (async () => {
+        if (source === "aa" || !services.calibre) return [];
+        const info = await services.calibre!.getLibraryInfo();
+        const libraryId = info.default_library;
+        // One search for all IDs, one bulk fetch — 2 HTTP calls regardless of library size
+        const allIds = await services.calibre!.search(libraryId, "", 2000, 0, "id", "asc");
+        if (!allIds.book_ids.length) return [];
+        const books = await services.calibre!.getBooks(allIds.book_ids, libraryId);
+        return allIds.book_ids.map((id) => books[String(id)]).filter(Boolean);
+      })(),
+
+      // Anna's Archive search
+      (async () => {
+        if (source === "calibre") return null;
+        return searchAnnasArchive(q, { lang, ext: ext || undefined, content: content || undefined });
+      })(),
+    ]);
+
+    if (calibreSearchResult.status === "fulfilled") {
+      response.calibre = calibreSearchResult.value;
+    } else {
+      console.error("[book-search] Calibre search error:", calibreSearchResult.reason);
     }
 
-    // Search Anna's Archive
-    if (source !== "calibre") {
-      try {
-        const results = await searchAnnasArchive(q, { lang, ext: ext || undefined, content: content || undefined });
-        response.annasArchive = results;
-      } catch (err) {
-        console.error("[book-search] AA search error:", err);
-      }
+    if (aaRaw.status === "fulfilled" && aaRaw.value) {
+      const library = fullLibrary.status === "fulfilled" ? fullLibrary.value : response.calibre as any[];
+      const groups = groupSearchResults(aaRaw.value);
+      response.annasArchive = markInLibrary(groups, library as any[]);
+    } else if (aaRaw.status === "rejected") {
+      console.error("[book-search] AA search error:", aaRaw.reason);
     }
 
     return c.json(response);
@@ -329,29 +350,36 @@ export function createCalibreRouter(services: Pick<Services, "db" | "calibre" | 
   router.post("/books/download", async (c) => {
     if (!services.calibreExec) return c.json({ error: "Calibre exec not configured" }, 503);
     try {
-      const { md5 } = await c.req.json<{ md5: string }>();
-      if (!md5) return c.json({ error: "md5 required" }, 400);
+      const body = await c.req.json<{ md5?: string; candidates?: string[] }>();
+      // Accept either a single md5 (legacy) or an ordered candidates list
+      const candidates = body.candidates?.length
+        ? body.candidates
+        : body.md5
+        ? [body.md5]
+        : [];
+      if (!candidates.length) return c.json({ error: "md5 or candidates required" }, 400);
 
       const apiKey = process.env.AA_API_KEY || "";
 
-      // Download the book file
-      const download = await downloadBook(md5, apiKey || undefined);
-      if (!download.success || !download.filePath) {
-        return c.json({ error: download.error || "Download failed" }, 500);
+      // Walk the candidates list best-first until one downloads successfully
+      let lastError = "Download failed";
+      for (const md5 of candidates) {
+        const download = await downloadBook(md5, apiKey || undefined);
+        if (download.success && download.filePath) {
+          const result = await services.calibreExec!.addBook(download.filePath);
+          try { await Bun.spawn(["rm", "-f", download.filePath]).exited; } catch {}
+          return c.json({
+            success: true,
+            bookId: result.bookId,
+            fileName: download.fileName,
+            output: result.output,
+          });
+        }
+        lastError = download.error || "Download failed";
+        console.warn(`[book-search] Candidate ${md5} failed (${lastError}), trying next...`);
       }
 
-      // Add to Calibre via calibredb add
-      const result = await services.calibreExec!.addBook(download.filePath);
-
-      // Clean up local temp file
-      try { await Bun.spawn(["rm", "-f", download.filePath]).exited; } catch {}
-
-      return c.json({
-        success: true,
-        bookId: result.bookId,
-        fileName: download.fileName,
-        output: result.output,
-      });
+      return c.json({ error: lastError }, 500);
     } catch (err) {
       console.error("[book-search] Download error:", err);
       return c.json({ error: String(err) }, 500);

@@ -8,17 +8,26 @@ interface MediaConfig {
   languageProfiles?: { id: number; name: string }[];
 }
 
-interface AAResult {
-  md5: string;
+interface AABookGroup {
   title: string;
   author: string;
   publisher: string;
   year: string;
   language: string;
-  fileType: string;
-  fileSize: string;
   coverUrl: string;
-  score: number;
+  bestMd5: string;
+  bestFileType: string;
+  bestFileSize: string;
+  candidates: Array<{
+    md5: string;
+    fileType: string;
+    fileSize: string;
+    fileSizeBytes: number;
+    score: number;
+  }>;
+  editionCount: number;
+  topScore: number;
+  inLibrary?: boolean;
 }
 
 interface CalibreResult {
@@ -47,7 +56,7 @@ export function MediaSearchPage({ onBack, initialTab }: { onBack: () => void; in
 
   // Book state
   const [calibreResults, setCalibreResults] = useState<CalibreResult[]>([]);
-  const [aaResults, setAaResults] = useState<AAResult[]>([]);
+  const [aaResults, setAaResults] = useState<AABookGroup[]>([]);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [bookFormat, setBookFormat] = useState("epub");
 
@@ -172,20 +181,26 @@ export function MediaSearchPage({ onBack, initialTab }: { onBack: () => void; in
     }
   }, [tab, config]);
 
-  const handleBookDownload = useCallback(async (book: AAResult) => {
-    setDownloading(book.md5);
+  const handleBookDownload = useCallback(async (book: AABookGroup) => {
+    setDownloading(book.bestMd5);
     setToast(null);
     try {
       const res = await fetch(`${API}/api/books/download`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ md5: book.md5 }),
+        // Send all candidates so the server can fall back automatically
+        body: JSON.stringify({ candidates: book.candidates.map((c) => c.md5) }),
       });
       const data = await res.json();
       if (data.success) {
         setToast({ text: `Added "${book.title}" to Calibre`, ok: true });
       } else {
-        setToast({ text: `Failed: ${data.error}`, ok: false });
+        const hint = data.error?.includes("not in AA fast-download catalog")
+          ? "Not available for download — no eligible copies found."
+          : data.error?.includes("All AA mirrors")
+          ? "Download servers unavailable — try again later."
+          : `Failed: ${data.error}`;
+        setToast({ text: hint, ok: false });
       }
     } catch (err) {
       setToast({ text: `Error: ${String(err)}`, ok: false });
@@ -392,13 +407,19 @@ export function MediaSearchPage({ onBack, initialTab }: { onBack: () => void; in
                       item.seeders !== undefined ? `${item.seeders} seeds` : null,
                     ].filter(Boolean).join(" · ")}
                   </div>
-                  <button
-                    className="bsp-add-btn"
-                    disabled={downloading === item.guid}
-                    onClick={() => handleAudiobookDownload(item)}
-                  >
-                    {downloading === item.guid ? "Sending..." : "Download"}
-                  </button>
+                  {item.inLibrary ? (
+                    <span className="bsp-badge library" style={{ position: "static", marginTop: "8px", display: "inline-block" }}>
+                      In Library
+                    </span>
+                  ) : (
+                    <button
+                      className="bsp-add-btn"
+                      disabled={downloading === item.guid}
+                      onClick={() => handleAudiobookDownload(item)}
+                    >
+                      {downloading === item.guid ? "Sending..." : "Download"}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -412,7 +433,7 @@ export function MediaSearchPage({ onBack, initialTab }: { onBack: () => void; in
           <h3 className="bsp-section-title">Anna's Archive</h3>
           <div className="bsp-grid">
             {aaResults.slice(0, 20).map((book) => (
-              <div key={book.md5} className="bsp-card">
+              <div key={book.bestMd5} className="bsp-card">
                 <div className="bsp-card-cover">
                   {book.coverUrl ? (
                     <img
@@ -422,30 +443,39 @@ export function MediaSearchPage({ onBack, initialTab }: { onBack: () => void; in
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                     />
                   ) : (
-                    <div className="bsp-no-cover">{book.fileType.toUpperCase()}</div>
+                    <div className="bsp-no-cover">{book.bestFileType.toUpperCase()}</div>
                   )}
-                  <span className={`bsp-badge format-${book.fileType}`}>
-                    {book.fileType.toUpperCase()}
+                  <span className={`bsp-badge format-${book.bestFileType}`}>
+                    {book.bestFileType.toUpperCase()}
                   </span>
                 </div>
                 <div className="bsp-card-info">
                   <div className="bsp-card-title">{book.title}</div>
                   <div className="bsp-card-author">{book.author}</div>
                   <div className="bsp-card-meta">
-                    {[book.year, book.fileSize, book.language].filter(Boolean).join(" · ")}
+                    {[book.year, book.bestFileSize, book.language].filter(Boolean).join(" · ")}
                   </div>
                   {book.publisher && (
                     <div className="bsp-card-meta">{book.publisher}</div>
                   )}
-                  <button
-                    className="bsp-add-btn"
-                    disabled={downloading === book.md5}
-                    onClick={() => handleBookDownload(book)}
-                  >
-                    {downloading === book.md5
-                      ? "Adding to Calibre..."
-                      : "Add to Calibre"}
-                  </button>
+                  {book.editionCount > 1 && (
+                    <div className="bsp-card-meta">{book.editionCount} copies available</div>
+                  )}
+                  {book.inLibrary ? (
+                    <span className="bsp-badge library" style={{ position: "static", marginTop: "8px", display: "inline-block" }}>
+                      In Library
+                    </span>
+                  ) : (
+                    <button
+                      className="bsp-add-btn"
+                      disabled={downloading === book.bestMd5}
+                      onClick={() => handleBookDownload(book)}
+                    >
+                      {downloading === book.bestMd5
+                        ? "Adding to Calibre..."
+                        : "Add to Calibre"}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
