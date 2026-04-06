@@ -60,6 +60,11 @@ export const TOPICS = {
     cameras: "home/protect/cameras",
     events: "home/protect/events",
   },
+  hpPrinter: {
+    status: "home/hp-printer/status",
+    supplyLow: "home/hp-printer/supply_low",
+    error: "home/hp-printer/error",
+  },
   system: {
     agent: {
       health: (skill: string) => `home/system/agent/${skill}/health` as const,

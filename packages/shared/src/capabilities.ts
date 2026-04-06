@@ -50,6 +50,12 @@ export const CAPABILITIES = {
     requiredActions: ['list_books', 'get_book'],
     optionalActions: ['list_authors', 'get_book_count'],
   },
+  'inkjet-printer': {
+    name: 'inkjet-printer',
+    description: 'Inkjet or laser printer monitored via Embedded Web Server (HP, Canon, Epson, etc.)',
+    requiredActions: ['get_supply_levels', 'get_status'],
+    optionalActions: ['get_usage'],
+  },
 } as const satisfies Record<string, CapabilityDefinition>
 
 export type CapabilityType = keyof typeof CAPABILITIES
