@@ -14,7 +14,6 @@ import { createPrinterRouter } from "./printer";
 import { createGamingRouter } from "./gaming";
 import { createProtectRouter } from "./protect";
 import { createMaintenanceRouter } from "./maintenance";
-import { createBridgeRouter } from "./bridge";
 import { createPlexImageRouter } from "./plex-image";
 import { createDashboardRouter } from "./dashboard";
 import { createChatRouter } from "./chat";
@@ -47,7 +46,6 @@ export function createApi(services: Services, agent?: Agent, plugins: MaisiePlug
   app.route("/api", createGamingRouter(services));
   app.route("/api", createProtectRouter(services));
   app.route("/api", createMaintenanceRouter(services));
-  app.route("/api", createBridgeRouter(services));
   app.route("/api", createPluginsRouter(plugins));
   app.route("/api", createPersonasRouter());
   app.route("/api", createLayoutRouter());

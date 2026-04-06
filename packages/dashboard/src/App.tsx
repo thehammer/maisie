@@ -21,8 +21,6 @@ import { MediaSearchPage } from "./pages/MediaSearchPage";
 import { ModelViewerPage } from "./pages/ModelViewerPage";
 import { CamerasPage } from "./pages/CamerasPage";
 import { TvPage } from "./pages/TvPage";
-import { BridgePage } from "./pages/BridgePage";
-import { BridgeAgentPage } from "./pages/BridgeAgentPage";
 import { ChatPage } from "./pages/ChatPage";
 import { PluginsPage } from "./pages/PluginsPage";
 import { PersonasPage } from "./pages/PersonasPage";
@@ -158,24 +156,6 @@ export function App() {
     return (
       <div className="dashboard">
         <CamerasPage onBack={() => navigate("dashboard")} />
-        {chatOverlay}
-      </div>
-    );
-  }
-
-  if (page === "bridge") {
-    return (
-      <div className="dashboard">
-        <BridgePage onBack={() => navigate("dashboard")} />
-        {chatOverlay}
-      </div>
-    );
-  }
-
-  if (page === "bridge-agent") {
-    return (
-      <div className="dashboard">
-        <BridgeAgentPage onBack={() => navigate("dashboard")} />
         {chatOverlay}
       </div>
     );
@@ -324,8 +304,6 @@ export function App() {
             <a href="#tv" className="nav-link">TV</a>
             <a href="#cameras" className="nav-link">Cameras</a>
             <a href="#model-viewer" className="nav-link">3D Models</a>
-            <a href="#bridge" className="nav-link">Bridge</a>
-            <a href="#bridge-agent" className="nav-link">Agent</a>
             <a href="#chat" className="nav-link">Chat</a>
             <a href="#plugins" className="nav-link">Plugins</a>
             <a href="#personas" className="nav-link">Personas</a>

@@ -60,9 +60,6 @@ export const TOPICS = {
     cameras: "home/protect/cameras",
     events: "home/protect/events",
   },
-  bridge: {
-    message: "home/bridge/message",
-  },
   system: {
     agent: {
       health: (skill: string) => `home/system/agent/${skill}/health` as const,
