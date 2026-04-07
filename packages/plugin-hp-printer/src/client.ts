@@ -87,7 +87,7 @@ function normalizePrinterState(raw: string): PrinterStatus['state'] {
 
 export function createHpPrinterClient(host: string): HpPrinterClient {
   const base = `http://${host}`
-  const timeout = 8_000
+  const timeout = 20_000
 
   async function fetchXml(path: string): Promise<string> {
     const controller = new AbortController()

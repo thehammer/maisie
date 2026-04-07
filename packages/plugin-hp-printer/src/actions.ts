@@ -50,7 +50,11 @@ export const getSupplyLevels = defineAction({
     realtimeTopic: 'home/hp-printer/status',
   },
   async execute(_input, _ctx) {
-    return getClient().getSupplyLevels()
+    try {
+      return await getClient().getSupplyLevels()
+    } catch {
+      return []
+    }
   },
 })
 
@@ -69,7 +73,11 @@ export const getStatus = defineAction({
     realtimeTopic: 'home/hp-printer/status',
   },
   async execute(_input, _ctx) {
-    return getClient().getStatus()
+    try {
+      return await getClient().getStatus()
+    } catch {
+      return { state: 'offline' as const, raw: 'unreachable' }
+    }
   },
 })
 
@@ -87,7 +95,11 @@ export const getUsage = defineAction({
     icon: 'file',
   },
   async execute(_input, _ctx) {
-    return getClient().getUsage()
+    try {
+      return await getClient().getUsage()
+    } catch {
+      return { totalPages: 0, colorPages: null, monoPages: null }
+    }
   },
 })
 
