@@ -117,10 +117,15 @@ export interface SignalRendererConfig {
 export interface ToggleRendererConfig {
   type: 'toggle'
   /**
-   * Action id to invoke when the toggle changes. The plugin action must accept
-   * { value: boolean } and be declared with http: { method: 'POST' }.
+   * POST endpoint to call when the toggle changes.
+   * The payload includes the value from `payloadField` on the current row.
    */
-  actionId?: string
+  writeEndpoint?: string
+  /**
+   * Which field from the current row to send as the identifier in the POST body.
+   * E.g. "entityId" → POST body: { entityId: "<value>", value: <newState> }
+   */
+  payloadField?: string
 }
 
 export interface ActionRendererConfig {
@@ -134,6 +139,8 @@ export interface ActionRendererConfig {
   confirm?: boolean
   /** Confirmation message (default: "Are you sure?"). */
   confirmMessage?: string
+  /** POST endpoint to call when the button is clicked. */
+  writeEndpoint?: string
 }
 
 export interface StreamRendererConfig {

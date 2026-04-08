@@ -419,6 +419,22 @@ body {
   color: var(--green);
 }
 
+.toggle-btn.pending {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.resource-action-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.resource-action-result {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
 .search-row {
   display: flex;
   gap: 0.5rem;

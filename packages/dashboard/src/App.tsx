@@ -4,7 +4,6 @@ import { useApi } from "./hooks/useApi";
 import { useMqtt } from "./hooks/useMqtt";
 import { NetworkCard } from "./components/NetworkCard";
 import { ServiceStatus } from "./components/ServiceStatus";
-import { SmartHomeCard } from "./components/SmartHomeCard";
 import { RecentlyAddedCard } from "./components/RecentlyAddedCard";
 import { CalibreEnrichmentCard } from "./components/CalibreEnrichmentCard";
 import { NightlyCard } from "./components/NightlyCard";
@@ -422,7 +421,33 @@ export function App() {
         return apis.plexApi.data && apis.plexApi.data.recentlyAdded.length > 0
           ? <RecentlyAddedCard items={apis.plexApi.data.recentlyAdded} />
           : null;
-      case "SmartHomeCard":    return <SmartHomeCard pollInterval={POLL_INTERVAL} />;
+      case "SmartHomeCard": {
+        const lights = (apis.switchesApi.data ?? []) as Array<{ entityId: string; name: string; state: string; brightness?: number }>;
+        // switchesApi.data contains all HA entities — lights endpoint is separate
+        // Merge both into a single list for the DynamicCard
+        const smartHomeData = lights.map((d) => ({
+          ...d,
+          state: d.state === "on" ? "on" : "off",
+        }));
+        return STATIC_DESCRIPTORS.SmartHomeCard && smartHomeData.length > 0 ? (
+          <DynamicCard
+            descriptor={STATIC_DESCRIPTORS.SmartHomeCard}
+            data={smartHomeData}
+            dataLoading={apis.switchesApi.loading}
+            dataError={apis.switchesApi.error}
+            onRefresh={apis.switchesApi.refresh}
+            rendererConfigs={widget.rendererConfigs ?? {
+              state: {
+                type: "toggle",
+                writeEndpoint: "/api/home-assistant/toggle",
+                payloadField: "entityId",
+              },
+            }}
+            visibleFields={widget.visibleFields ?? ["name", "state"]}
+            titleOverride={widget.title}
+          />
+        ) : null;
+      }
       default: {
         // Fall back to auto-rendered card from the widget catalog
         const descriptor = (catalogApi.data ?? []).find((w) => w.id === id);

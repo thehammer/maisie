@@ -13,6 +13,7 @@
 import { useApi } from "../hooks/useApi";
 import { FieldRenderer, inferRendererConfig } from "../lib/renderers/FieldRenderer";
 import { applyPipeline } from "../lib/pipeline";
+import { CardRefreshContext } from "../lib/CardRefreshContext";
 import type { MaisieFieldType, OpConfig, CardRendererConfig, SectionConfig } from "@maisie/shared";
 
 // Mirrors plugin-core's CardDescriptor — defined locally since the dashboard
@@ -56,6 +57,8 @@ interface DynamicCardProps {
   data?: unknown;
   dataLoading?: boolean;
   dataError?: unknown;
+  /** External refresh function — called after mutations when using pre-fetched data. */
+  onRefresh?: () => void;
   /**
    * Compound card sections — renders a record response as multiple sections,
    * each pulling data from a different field. Used for multi-section cards
@@ -90,6 +93,7 @@ export function DynamicCard({
   data: externalData,
   dataLoading,
   dataError,
+  onRefresh,
   sections,
 }: DynamicCardProps) {
   const derivedUrl = endpoint || `/api/${descriptor.pluginName}${deriveApiPath(descriptor.actionName)}`;
@@ -99,33 +103,13 @@ export function DynamicCard({
   const data = skipFetch ? externalData : internal.data;
   const loading = skipFetch ? (dataLoading ?? false) : internal.loading;
   const error = skipFetch ? dataError : internal.error;
+  const refresh = onRefresh ?? internal.refresh;
 
   // Apply the op pipeline to transform collection data before rendering
   const transformed = applyPipeline(data as never, ops);
 
   const errorMsg = error ? String(error) : null;
   const title = titleOverride || descriptor.label;
-
-  // Compound card — render sections from a record response
-  if (sections?.length && data && typeof data === "object" && !Array.isArray(data)) {
-    return (
-      <DynamicCompound
-        title={title}
-        data={data as Record<string, unknown>}
-        sections={sections}
-        topFields={visibleFields
-          ? visibleFields
-              .map((key) => descriptor.outputFields.find((f) => f.key === key))
-              .filter((f): f is CardDescriptor["outputFields"][number] => !!f)
-          : descriptor.outputFields.filter(
-              (f) => f.type !== "array" && f.type !== "object",
-            )}
-        rendererConfigs={rendererConfigs}
-        loading={loading}
-        error={errorMsg}
-      />
-    );
-  }
 
   // Filter and reorder fields if visibleFields is set
   const shownFields = visibleFields
@@ -134,26 +118,38 @@ export function DynamicCard({
         .filter((f): f is CardDescriptor["outputFields"][number] => !!f)
     : descriptor.outputFields;
 
-  if (Array.isArray(transformed)) {
-    // Use list-items layout when fields include an image or only a few
-    // text+status fields (typical list-item pattern). Table for many columns.
+  let content: React.ReactNode;
+
+  // Compound card — render sections from a record response
+  if (sections?.length && data && typeof data === "object" && !Array.isArray(data)) {
+    content = (
+      <DynamicCompound
+        title={title}
+        data={data as Record<string, unknown>}
+        sections={sections}
+        topFields={visibleFields
+          ? shownFields
+          : descriptor.outputFields.filter(
+              (f) => f.type !== "array" && f.type !== "object",
+            )}
+        rendererConfigs={rendererConfigs}
+        loading={loading}
+        error={errorMsg}
+      />
+    );
+  } else if (Array.isArray(transformed)) {
     const hasImage = shownFields.some((f) => f.maisieType === "image");
     const useListLayout = hasImage || shownFields.length <= 4;
-
-    if (useListLayout) {
-      return (
-        <DynamicListItems
-          title={title}
-          items={transformed as Record<string, unknown>[]}
-          fields={shownFields}
-          rendererConfigs={rendererConfigs}
-          loading={loading}
-          error={errorMsg}
-        />
-      );
-    }
-
-    return (
+    content = useListLayout ? (
+      <DynamicListItems
+        title={title}
+        items={transformed as Record<string, unknown>[]}
+        fields={shownFields}
+        rendererConfigs={rendererConfigs}
+        loading={loading}
+        error={errorMsg}
+      />
+    ) : (
       <DynamicList
         title={title}
         items={transformed as Record<string, unknown>[]}
@@ -163,17 +159,23 @@ export function DynamicCard({
         error={errorMsg}
       />
     );
+  } else {
+    content = (
+      <DynamicRecord
+        title={title}
+        data={transformed as Record<string, unknown> | null}
+        fields={shownFields}
+        rendererConfigs={rendererConfigs}
+        loading={loading}
+        error={errorMsg}
+      />
+    );
   }
 
   return (
-    <DynamicRecord
-      title={title}
-      data={transformed as Record<string, unknown> | null}
-      fields={shownFields}
-      rendererConfigs={rendererConfigs}
-      loading={loading}
-      error={errorMsg}
-    />
+    <CardRefreshContext.Provider value={refresh}>
+      {content}
+    </CardRefreshContext.Provider>
   );
 }
 
@@ -244,7 +246,7 @@ function DynamicList({ title, items, fields, rendererConfigs, loading, error }: 
                   const config = rendererConfigs[f.key] ?? inferRendererConfig(f.maisieType);
                   return (
                     <td key={f.key}>
-                      <FieldRenderer value={item[f.key]} config={config} />
+                      <FieldRenderer value={item[f.key]} config={config} row={item} />
                     </td>
                   );
                 })}
@@ -313,7 +315,7 @@ function DynamicListItems({ title, items, fields, rendererConfigs, loading, erro
                 return (
                   <span key={f.key}>
                     {j > 0 && " — "}
-                    <FieldRenderer value={val} config={config} />
+                    <FieldRenderer value={val} config={config} row={item} />
                   </span>
                 );
               })}
@@ -324,6 +326,7 @@ function DynamicListItems({ title, items, fields, rendererConfigs, loading, erro
               <FieldRenderer
                 value={item[statusField.key]}
                 config={rendererConfigs[statusField.key] ?? inferRendererConfig(statusField.maisieType)}
+                row={item}
               />
             </span>
           )}
@@ -369,7 +372,7 @@ function DynamicCompound({ title, data, sections, topFields, rendererConfigs, lo
                   <div key={f.key} className="resource-field">
                     <span className="resource-field-label">{f.label}</span>
                     <span className="resource-field-value">
-                      <FieldRenderer value={val} config={config} />
+                      <FieldRenderer value={val} config={config} row={data} />
                     </span>
                   </div>
                 );
@@ -446,7 +449,7 @@ function DynamicCompound({ title, data, sections, topFields, rendererConfigs, lo
                           <div key={f.key} className="resource-field">
                             <span className="resource-field-label">{f.label}</span>
                             <span className="resource-field-value">
-                              <FieldRenderer value={val} config={config} />
+                              <FieldRenderer value={val} config={config} row={limited[0]} />
                             </span>
                           </div>
                         );
@@ -495,7 +498,7 @@ function CompoundListItems({ items, fields, rendererConfigs }: {
                   return (
                     <span key={f.key}>
                       {j > 0 && " — "}
-                      <FieldRenderer value={val} config={config} />
+                      <FieldRenderer value={val} config={config} row={item} />
                     </span>
                   );
                 })}
@@ -507,6 +510,7 @@ function CompoundListItems({ items, fields, rendererConfigs }: {
               <FieldRenderer
                 value={item[statusField.key]}
                 config={rendererConfigs[statusField.key] ?? inferRendererConfig(statusField.maisieType)}
+                row={item}
               />
             </span>
           )}
@@ -532,7 +536,7 @@ function CompoundTable({ items, fields, rendererConfigs }: {
           <tr key={String(item.id ?? i)}>
             {fields.map((f) => {
               const config = rendererConfigs[f.key] ?? inferRendererConfig(f.maisieType);
-              return <td key={f.key}><FieldRenderer value={item[f.key]} config={config} /></td>;
+              return <td key={f.key}><FieldRenderer value={item[f.key]} config={config} row={item} /></td>;
             })}
           </tr>
         ))}

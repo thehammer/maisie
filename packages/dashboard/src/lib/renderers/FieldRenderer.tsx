@@ -31,8 +31,11 @@ import type {
   NumberRendererConfig,
   BooleanRendererConfig,
   StringRendererConfig,
+  ToggleRendererConfig,
 } from "@maisie/shared";
 import { RENDERER_DEFAULTS } from "@maisie/shared";
+import { useState, useCallback } from "react";
+import { useCardRefresh } from "../CardRefreshContext";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -269,21 +272,93 @@ function SignalRenderer({ value, config }: { value: unknown; config: SignalRende
   );
 }
 
-function ToggleRenderer({ value }: { value: unknown }) {
-  // Read-only display; write capability wired in the card configurator phase
+function ToggleRenderer({ value, config, row }: { value: unknown; config: ToggleRendererConfig; row?: Record<string, unknown> }) {
+  const refresh = useCardRefresh();
+  const [pending, setPending] = useState(false);
+  const [optimistic, setOptimistic] = useState<boolean | null>(null);
+  const isOn = optimistic ?? Boolean(value);
+
+  const handleToggle = useCallback(async () => {
+    if (!config.writeEndpoint || pending) return;
+    setPending(true);
+    setOptimistic(!isOn);
+    try {
+      const payload: Record<string, unknown> = {};
+      if (config.payloadField && row) {
+        payload[config.payloadField] = row[config.payloadField];
+      }
+      await fetch(config.writeEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      refresh();
+    } catch {
+      setOptimistic(null); // revert on error
+    }
+    setPending(false);
+    // Clear optimistic after refresh arrives
+    setTimeout(() => setOptimistic(null), 1000);
+  }, [config.writeEndpoint, config.payloadField, row, isOn, pending, refresh]);
+
+  if (config.writeEndpoint) {
+    return (
+      <button
+        className={`toggle-btn ${isOn ? "on" : ""} ${pending ? "pending" : ""}`}
+        onClick={handleToggle}
+        disabled={pending}
+      >
+        {isOn ? "ON" : "OFF"}
+      </button>
+    );
+  }
+
+  // Read-only display when no write endpoint configured
   return (
-    <span className={`resource-toggle resource-toggle-${Boolean(value) ? "on" : "off"}`}>
-      {Boolean(value) ? "On" : "Off"}
+    <span className={`resource-toggle resource-toggle-${isOn ? "on" : "off"}`}>
+      {isOn ? "On" : "Off"}
     </span>
   );
 }
 
 function ActionRenderer({ config }: { config: ActionRendererConfig }) {
-  // Placeholder; full action invocation wired in the card configurator phase
+  const refresh = useCardRefresh();
+  const [pending, setPending] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  const handleAction = useCallback(async () => {
+    if (!config.writeEndpoint || pending) return;
+    if (config.confirm && !window.confirm(config.confirmMessage ?? "Are you sure?")) return;
+    setPending(true);
+    setResult(null);
+    try {
+      const res = await fetch(config.writeEndpoint, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (data.error) {
+        setResult(`Error: ${data.error}`);
+      } else {
+        setResult("Done");
+        refresh();
+      }
+    } catch (err) {
+      setResult(`Error: ${err}`);
+    }
+    setPending(false);
+    // Clear result after 5s
+    setTimeout(() => setResult(null), 5000);
+  }, [config.writeEndpoint, config.confirm, config.confirmMessage, pending, refresh]);
+
   return (
-    <button className="resource-action" disabled>
-      {config.label ?? "Run"}
-    </button>
+    <span className="resource-action-wrapper">
+      <button
+        className="resource-action"
+        onClick={handleAction}
+        disabled={pending || !config.writeEndpoint}
+      >
+        {pending ? "Running…" : (config.label ?? "Run")}
+      </button>
+      {result && <span className="resource-action-result">{result}</span>}
+    </span>
   );
 }
 
@@ -328,13 +403,15 @@ function JsonRenderer({ value, config }: { value: unknown; config: { expanded?: 
 interface FieldRendererProps {
   value: MaisieValue | unknown;
   config: RendererConfig;
+  /** The full row object — needed by toggle/action renderers for payload context. */
+  row?: Record<string, unknown>;
 }
 
 /**
  * Renders a single value according to a RendererConfig.
  * Merges the provided config with RENDERER_DEFAULTS for that type.
  */
-export function FieldRenderer({ value, config }: FieldRendererProps) {
+export function FieldRenderer({ value, config, row }: FieldRendererProps) {
   if (value === null || value === undefined) {
     return <span className="resource-null">—</span>;
   }
@@ -357,7 +434,7 @@ export function FieldRenderer({ value, config }: FieldRendererProps) {
     case "progress":    return <ProgressRenderer value={value} config={merged} />;
     case "temperature": return <TemperatureRenderer value={value} config={merged} />;
     case "signal":      return <SignalRenderer value={value} config={merged} />;
-    case "toggle":      return <ToggleRenderer value={value} />;
+    case "toggle":      return <ToggleRenderer value={value} config={merged} row={row} />;
     case "action":      return <ActionRenderer config={merged} />;
     case "stream":      return <StreamRenderer value={value} config={merged} />;
     case "url":         return <UrlRenderer value={value} config={merged} />;
