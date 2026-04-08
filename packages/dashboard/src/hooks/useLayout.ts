@@ -95,14 +95,18 @@ export function useLayout(page: string) {
     }));
   }, []);
 
-  const addCard = useCallback((id: string) => {
+  const addCard = useCallback((id: string, templateConfig?: Record<string, unknown>) => {
     setState((s) => {
       if (s.widgets.find((w) => w.id === id)) return s;
       const maxOrder = s.widgets.reduce((m, w) => Math.max(m, w.order), -1);
-      return {
-        ...s,
-        widgets: [...s.widgets, { id, visible: true, col_span: 1 as const, order: maxOrder + 1 }],
+      const card: CardConfig = {
+        id,
+        visible: true,
+        col_span: 1 as const,
+        order: maxOrder + 1,
+        ...(templateConfig as Partial<CardConfig>),
       };
+      return { ...s, widgets: [...s.widgets, card] };
     });
   }, []);
 

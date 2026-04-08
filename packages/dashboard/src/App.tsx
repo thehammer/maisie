@@ -535,7 +535,7 @@ export function App() {
         onClose={() => setAddCardOpen(false)}
         catalog={catalogApi.data ?? []}
         existingIds={new Set(layout.widgets.map((w) => w.id))}
-        onAdd={(id) => layout.addCard(id)}
+        onAdd={(id, templateConfig) => layout.addCard(id, templateConfig)}
       />
 
       {configuringCardId && (() => {

@@ -27,6 +27,9 @@ const plugin: MaisiePlugin = {
     actionDefs.setWidgetVisibility,
     actionDefs.reorderWidgets,
     actionDefs.patchWidget,
+    actionDefs.listCardTemplates,
+    actionDefs.createCardTemplate,
+    actionDefs.deleteCardTemplate,
   ],
   events: [],
 

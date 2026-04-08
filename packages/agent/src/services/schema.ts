@@ -156,12 +156,56 @@ export const personaConfigs = sqliteTable('persona_configs', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 })
 
+// BLE device registry
+export const bleDevices = sqliteTable("ble_devices", {
+  mac: text("mac").primaryKey(),
+  name: text("name"),
+  companyId: integer("company_id"),
+  companyName: text("company_name"),
+  rssi: real("rssi").default(0),
+  persistence: real("persistence").default(0),
+  seenCount: integer("seen_count").default(0),
+  totalScans: integer("total_scans").default(0),
+  ownership: text("ownership").default("unknown"), // "home" | "neighbor" | "unknown"
+  room: text("room"),
+  label: text("label"),
+  protocol: text("protocol"), // "sleepnumber" | "govee" | "generic" | null
+  services: text("services").default("[]"), // JSON array of GATT service UUIDs
+  capabilities: text("capabilities").default("{}"), // JSON: Record<string, string[]>
+  gatewayNode: text("gateway_node").default("tokyo"),
+  firstSeen: text("first_seen").notNull(),
+  lastSeen: text("last_seen").notNull(),
+});
+
+// BLE auto-claim rules
+export const bleAutoClaimRules = sqliteTable("ble_auto_claim_rules", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  companyId: integer("company_id"),
+  namePattern: text("name_pattern"),
+  minPersistence: real("min_persistence"),
+  ownership: text("ownership").default("home"),
+  label: text("label"), // auto-assigned label when claimed
+  protocol: text("protocol"), // auto-assigned protocol
+  createdAt: text("created_at").notNull(),
+});
+
 // Dashboard layout per page
 export const dashboardLayouts = sqliteTable('dashboard_layouts', {
   id: text('id').primaryKey(),
   page: text('page').notNull().unique(), // 'home', 'media', 'network', etc.
   widgets: text('widgets').notNull().default('[]'), // JSON: CardConfig[]
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+})
+
+// Card templates — saved card configurations reusable from the Add Card panel
+export const cardTemplates = sqliteTable('card_templates', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  /** The card descriptor ID this template is based on (e.g. "hp-printer.get_supply_levels" or "HdhrCard"). */
+  descriptorId: text('descriptor_id').notNull(),
+  /** JSON-encoded CardConfig fields: ops, rendererConfigs, visibleFields, sections, title. */
+  config: text('config').notNull().default('{}'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 })
 
 // Plugin configuration overrides (env vars, enabled/disabled)

@@ -48,6 +48,29 @@ export function CardConfigurator({ widget, descriptor, onSave, onClose }: CardCo
     widget.rendererConfigs ?? {},
   );
 
+  const handleSaveTemplate = useCallback(async () => {
+    const name = prompt("Template name:", title || descriptor?.label || widget.id);
+    if (!name) return;
+    const config: Record<string, unknown> = {};
+    if (title) config.title = title;
+    if (visibleFields.length !== fields.length) config.visibleFields = visibleFields;
+    if (ops.length) config.ops = ops;
+    if (Object.keys(rendererConfigs).length) config.rendererConfigs = rendererConfigs;
+    try {
+      await fetch("/api/cards/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          descriptorId: widget.id.includes(".") ? widget.id : descriptor?.id ?? widget.id,
+          config,
+        }),
+      });
+    } catch {
+      // silent — template saved or not
+    }
+  }, [title, visibleFields, ops, rendererConfigs, fields.length, widget.id, descriptor]);
+
   const handleApply = useCallback(() => {
     onSave({
       title: title || undefined,
@@ -234,6 +257,16 @@ export function CardConfigurator({ widget, descriptor, onSave, onClose }: CardCo
         </div>
 
         <div className="card-configurator-footer">
+          {isDynamic && (
+            <button
+              className="card-configurator-btn template"
+              onClick={handleSaveTemplate}
+              title="Save current configuration as a reusable template"
+            >
+              Save Template
+            </button>
+          )}
+          <span style={{ flex: 1 }} />
           <button className="card-configurator-btn cancel" onClick={onClose}>
             Cancel
           </button>

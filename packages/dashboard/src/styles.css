@@ -3516,6 +3516,37 @@ body {
   line-height: 1;
 }
 
+.customize-catalog-item-sub {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
+.customize-catalog-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.customize-catalog-delete {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 0 0.2rem;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.customize-catalog-item:hover .customize-catalog-delete {
+  opacity: 1;
+}
+.customize-catalog-delete:hover {
+  color: var(--red);
+}
+
 /* Widget config popover */
 .widget-config-popover {
   position: absolute;
@@ -4096,6 +4127,15 @@ body {
 }
 .card-configurator-btn.apply:hover {
   opacity: 0.9;
+}
+.card-configurator-btn.template {
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.card-configurator-btn.template:hover {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 .card-configurator-btn-small {
   background: var(--surface);

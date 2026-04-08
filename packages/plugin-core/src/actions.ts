@@ -98,10 +98,10 @@ const cardConfigSchema = z.object({
 // ----------------------------------------------------------------
 
 async function getSchema() {
-  const { personaConfigs, dashboardLayouts, pluginConfigs } = await import(
+  const { personaConfigs, dashboardLayouts, pluginConfigs, cardTemplates } = await import(
     '../../../packages/agent/src/services/schema'
   )
-  return { personaConfigs, dashboardLayouts, pluginConfigs }
+  return { personaConfigs, dashboardLayouts, pluginConfigs, cardTemplates }
 }
 
 function requireDb() {
@@ -688,5 +688,86 @@ export const patchWidget = defineAction({
   async execute(input, _ctx) {
     const { cardId, page, ...patch } = input
     return requireLayout().patchWidget(page, cardId, patch)
+  },
+})
+
+// ----------------------------------------------------------------
+// Card Templates
+// ----------------------------------------------------------------
+
+const cardTemplateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  descriptorId: z.string(),
+  config: z.record(z.string(), z.unknown()),
+})
+
+export const listCardTemplates = defineAction({
+  name: 'list_card_templates',
+  description: 'List all saved card templates.',
+  input: z.object({}),
+  output: z.array(cardTemplateSchema),
+  http: { method: 'GET', path: '/api/cards/templates' },
+  ai: { tier: 'inform' },
+  ui: false,
+  async execute(_input, _ctx) {
+    const db = requireDb()
+    const { cardTemplates } = await getSchema()
+    const rows = await db.select().from(cardTemplates).all()
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      descriptorId: r.descriptorId,
+      config: JSON.parse(r.config) as Record<string, unknown>,
+    }))
+  },
+})
+
+export const createCardTemplate = defineAction({
+  name: 'create_card_template',
+  description: 'Save the current card configuration as a reusable template.',
+  input: z.object({
+    name: z.string().min(1),
+    descriptorId: z.string(),
+    config: z.record(z.string(), z.unknown()),
+  }),
+  output: cardTemplateSchema,
+  http: { method: 'POST', path: '/api/cards/templates' },
+  ai: { tier: 'act' },
+  ui: false,
+  async execute(input, _ctx) {
+    const db = requireDb()
+    const { cardTemplates } = await getSchema()
+    const { randomUUID } = await import('crypto')
+    const id = randomUUID()
+    await db.insert(cardTemplates).values({
+      id,
+      name: input.name,
+      descriptorId: input.descriptorId,
+      config: JSON.stringify(input.config),
+    })
+    return {
+      id,
+      name: input.name,
+      descriptorId: input.descriptorId,
+      config: input.config,
+    }
+  },
+})
+
+export const deleteCardTemplate = defineAction({
+  name: 'delete_card_template',
+  description: 'Delete a card template by ID.',
+  input: z.object({ id: z.string() }),
+  output: z.object({ success: z.boolean() }),
+  http: { method: 'DELETE', path: '/api/cards/templates/:id' },
+  ai: { tier: 'act' },
+  ui: false,
+  async execute(input, _ctx) {
+    const db = requireDb()
+    const { cardTemplates } = await getSchema()
+    const { eq } = await import('drizzle-orm')
+    await db.delete(cardTemplates).where(eq(cardTemplates.id, input.id))
+    return { success: true }
   },
 })
