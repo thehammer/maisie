@@ -31,6 +31,10 @@
         "typescript": "^5.7.0",
       },
     },
+    "packages/ble-gateway": {
+      "name": "@maisie/ble-gateway",
+      "version": "0.1.0",
+    },
     "packages/cli": {
       "name": "@maisie/cli",
       "version": "0.1.0",
@@ -121,6 +125,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@maisie/shared": "workspace:*",
+        "hono": "^4.0.0",
         "zod": "^4.3.6",
       },
     },
@@ -129,6 +134,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@maisie/shared": "workspace:*",
+        "hono": "^4.0.0",
         "zod": "^4.3.6",
       },
     },
@@ -137,6 +143,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@maisie/shared": "workspace:*",
+        "hono": "^4.0.0",
         "zod": "^4.3.6",
       },
     },
@@ -377,6 +384,8 @@
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
     "@maisie/agent": ["@maisie/agent@workspace:packages/agent"],
+
+    "@maisie/ble-gateway": ["@maisie/ble-gateway@workspace:packages/ble-gateway"],
 
     "@maisie/cli": ["@maisie/cli@workspace:packages/cli"],
 

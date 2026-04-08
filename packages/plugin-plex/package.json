@@ -5,7 +5,9 @@
   "main": "src/index.ts",
   "maisie": {
     "plugin": true,
-    "capabilities": ["media-server"],
+    "capabilities": [
+      "media-server"
+    ],
     "minCoreVersion": "0.1.0"
   },
   "scripts": {
@@ -14,6 +16,7 @@
   },
   "dependencies": {
     "@maisie/shared": "workspace:*",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "hono": "^4.0.0"
   }
 }
