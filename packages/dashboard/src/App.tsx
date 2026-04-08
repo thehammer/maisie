@@ -1,5 +1,5 @@
-import { useCallback, useState, useEffect } from "react";
-import type { Device, NasHealth, PlexStatus, HdhrStatus, CalibreStatus, NightlyStatus } from "@maisie/shared";
+import { useCallback, useState, useEffect, lazy, Suspense } from "react";
+import type { Device, NasHealth, PlexStatus, HdhrStatus, CalibreStatus } from "@maisie/shared";
 import { useApi } from "./hooks/useApi";
 import { useMqtt } from "./hooks/useMqtt";
 import { NetworkCard } from "./components/NetworkCard";
@@ -8,21 +8,23 @@ import { RecentlyAddedCard } from "./components/RecentlyAddedCard";
 import { CalibreEnrichmentCard } from "./components/CalibreEnrichmentCard";
 import { NightlyCard } from "./components/NightlyCard";
 import { YouTubeCleanupCard } from "./components/YouTubeCleanupCard";
-import { MediaSearchPage } from "./pages/MediaSearchPage";
-import { ModelViewerPage } from "./pages/ModelViewerPage";
-import { CamerasPage } from "./pages/CamerasPage";
-import { TvPage } from "./pages/TvPage";
-import { ChatPage } from "./pages/ChatPage";
-import { PluginsPage } from "./pages/PluginsPage";
-import { PersonasPage } from "./pages/PersonasPage";
+
+// Lazy-loaded pages — split into separate chunks
+const MediaSearchPage = lazy(() => import("./pages/MediaSearchPage").then((m) => ({ default: m.MediaSearchPage })));
+const ModelViewerPage = lazy(() => import("./pages/ModelViewerPage").then((m) => ({ default: m.ModelViewerPage })));
+const CamerasPage = lazy(() => import("./pages/CamerasPage").then((m) => ({ default: m.CamerasPage })));
+const TvPage = lazy(() => import("./pages/TvPage").then((m) => ({ default: m.TvPage })));
+const ChatPage = lazy(() => import("./pages/ChatPage").then((m) => ({ default: m.ChatPage })));
+const PluginsPage = lazy(() => import("./pages/PluginsPage").then((m) => ({ default: m.PluginsPage })));
+const PersonasPage = lazy(() => import("./pages/PersonasPage").then((m) => ({ default: m.PersonasPage })));
 import { ChatPanel } from "./components/ChatPanel";
 import { NotificationsFeed } from "./components/NotificationsFeed";
 import { AgentStatus } from "./components/AgentStatus";
 import { DraggableDashboardGrid } from "./components/DraggableDashboardGrid";
-import { CardSlot } from "./components/WidgetSlot";
+import { CardSlot } from "./components/CardSlot";
 import { useLayout } from "./hooks/useLayout";
 import { DynamicCard, type CardDescriptor } from "./components/DynamicCard";
-import { AddCardPanel } from "./components/AddWidgetPanel";
+import { AddCardPanel } from "./components/AddCardPanel";
 import { CardConfigurator } from "./components/CardConfigurator";
 import { STATIC_DESCRIPTORS, getDescriptor } from "./lib/static-descriptors";
 import type { SectionConfig } from "@maisie/shared";
@@ -173,10 +175,14 @@ export function App() {
     </>
   );
 
+  const pageFallback = <div className="dashboard"><div style={{ padding: "2rem", color: "var(--text-muted)" }}>Loading…</div></div>;
+
   if (page === "tv") {
     return (
       <div className="dashboard">
-        <TvPage onBack={() => navigate("dashboard")} />
+        <Suspense fallback={pageFallback}>
+          <TvPage onBack={() => navigate("dashboard")} />
+        </Suspense>
         {chatOverlay}
       </div>
     );
@@ -185,7 +191,9 @@ export function App() {
   if (page === "media") {
     return (
       <div className="dashboard">
-        <MediaSearchPage onBack={() => navigate("dashboard")} />
+        <Suspense fallback={pageFallback}>
+          <MediaSearchPage onBack={() => navigate("dashboard")} />
+        </Suspense>
         {chatOverlay}
       </div>
     );
@@ -194,7 +202,9 @@ export function App() {
   if (page === "cameras") {
     return (
       <div className="dashboard">
-        <CamerasPage onBack={() => navigate("dashboard")} />
+        <Suspense fallback={pageFallback}>
+          <CamerasPage onBack={() => navigate("dashboard")} />
+        </Suspense>
         {chatOverlay}
       </div>
     );
@@ -203,7 +213,9 @@ export function App() {
   if (page === "model-viewer" || page.startsWith("model-viewer/")) {
     return (
       <div className="dashboard">
-        <ModelViewerPage onBack={() => navigate("dashboard")} />
+        <Suspense fallback={pageFallback}>
+          <ModelViewerPage onBack={() => navigate("dashboard")} />
+        </Suspense>
         {chatOverlay}
       </div>
     );
@@ -212,7 +224,9 @@ export function App() {
   if (page === "chat") {
     return (
       <div className="dashboard">
-        <ChatPage onBack={() => navigate("dashboard")} />
+        <Suspense fallback={pageFallback}>
+          <ChatPage onBack={() => navigate("dashboard")} />
+        </Suspense>
       </div>
     );
   }
@@ -220,7 +234,9 @@ export function App() {
   if (page === "plugins") {
     return (
       <div className="dashboard">
-        <PluginsPage onBack={() => navigate("dashboard")} />
+        <Suspense fallback={pageFallback}>
+          <PluginsPage onBack={() => navigate("dashboard")} />
+        </Suspense>
         {chatOverlay}
       </div>
     );
@@ -229,7 +245,9 @@ export function App() {
   if (page === "personas") {
     return (
       <div className="dashboard">
-        <PersonasPage onBack={() => navigate("dashboard")} />
+        <Suspense fallback={pageFallback}>
+          <PersonasPage onBack={() => navigate("dashboard")} />
+        </Suspense>
         {chatOverlay}
       </div>
     );
