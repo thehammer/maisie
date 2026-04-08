@@ -2,13 +2,18 @@
  * DynamicCard — auto-renders any plugin action output using the widget catalog.
  *
  * When a card ID doesn't match a hand-written component, App falls back here.
- * DynamicCard fetches its own data and delegates to ResourceCard or ResourceList
- * based on whether the response is an object or array.
+ * DynamicCard fetches its own data, optionally transforms it via ops pipeline,
+ * and delegates rendering to FieldRenderer for each field.
+ *
+ * Card layout (ops + rendererConfigs) will be stored in the DB and injected here
+ * once the card configurator UI is built. For now, defaults are inferred from
+ * maisieType annotations on each field.
  */
 
 import { useApi } from "../hooks/useApi";
-import { ResourceCard, ResourceList, type ResourceFieldDef } from "./ResourceCard";
-import type { MaisieFieldType } from "@maisie/shared";
+import { FieldRenderer, inferRendererConfig } from "../lib/renderers/FieldRenderer";
+import { applyPipeline } from "../lib/pipeline";
+import type { MaisieFieldType, OpConfig, CardRendererConfig } from "@maisie/shared";
 
 // Mirrors plugin-core's CardDescriptor — defined locally since the dashboard
 // only depends on @maisie/shared, not @maisie/plugin-core.
@@ -18,6 +23,7 @@ export interface CardDescriptor {
   actionName: string;
   label: string;
   section: string;
+  schemaType?: "scalar" | "record" | "collection" | "json";
   outputFields: Array<{
     key: string;
     type: "string" | "number" | "boolean" | "array" | "object" | "unknown";
@@ -30,15 +36,10 @@ export interface CardDescriptor {
 interface DynamicCardProps {
   descriptor: CardDescriptor;
   pollInterval?: number;
-}
-
-/** Last-resort mapping when no maisieType annotation is present. */
-function fallbackMaisieType(type: CardDescriptor["outputFields"][number]["type"]): MaisieFieldType | null {
-  switch (type) {
-    case "boolean": return "boolean";
-    case "object":  return "json";
-    default:        return null;
-  }
+  /** Op pipeline to apply before rendering (from stored card layout). */
+  ops?: OpConfig[];
+  /** Per-field renderer config overrides (from stored card layout). */
+  rendererConfigs?: CardRendererConfig;
 }
 
 // Mirrors deriveHttpPath() in plugin-core/registry.ts — strips verb prefix,
@@ -56,26 +57,27 @@ function deriveApiPath(actionName: string): string {
   return "/" + name.replace(/_/g, "-");
 }
 
-export function DynamicCard({ descriptor, pollInterval = 30_000 }: DynamicCardProps) {
+export function DynamicCard({
+  descriptor,
+  pollInterval = 30_000,
+  ops = [],
+  rendererConfigs = {},
+}: DynamicCardProps) {
   const url = `/api/${descriptor.pluginName}${deriveApiPath(descriptor.actionName)}`;
   const { data, loading, error } = useApi<unknown>(url, pollInterval);
 
-  // Prefer the semantic maisieType from the catalog (Phase 2); fall back to
-  // the raw Zod type mapping for fields that have no annotation.
-  const fields: ResourceFieldDef[] = descriptor.outputFields.map((f) => ({
-    key: f.key,
-    label: f.label,
-    type: f.maisieType ?? fallbackMaisieType(f.type),
-  }));
+  // Apply the op pipeline to transform collection data before rendering
+  const transformed = applyPipeline(data as never, ops);
 
   const errorMsg = error ? String(error) : null;
 
-  if (Array.isArray(data)) {
+  if (Array.isArray(transformed)) {
     return (
-      <ResourceList
+      <DynamicList
         title={descriptor.label}
-        items={data as Record<string, unknown>[]}
-        fields={fields}
+        items={transformed as Record<string, unknown>[]}
+        fields={descriptor.outputFields}
+        rendererConfigs={rendererConfigs}
         loading={loading}
         error={errorMsg}
       />
@@ -83,12 +85,93 @@ export function DynamicCard({ descriptor, pollInterval = 30_000 }: DynamicCardPr
   }
 
   return (
-    <ResourceCard
+    <DynamicRecord
       title={descriptor.label}
-      data={data as Record<string, unknown> | null}
-      fields={fields}
+      data={transformed as Record<string, unknown> | null}
+      fields={descriptor.outputFields}
+      rendererConfigs={rendererConfigs}
       loading={loading}
       error={errorMsg}
     />
+  );
+}
+
+// ── DynamicRecord ─────────────────────────────────────────────────────────────
+
+interface DynamicRecordProps {
+  title: string;
+  data: Record<string, unknown> | null;
+  fields: CardDescriptor["outputFields"];
+  rendererConfigs: CardRendererConfig;
+  loading?: boolean;
+  error?: string | null;
+}
+
+function DynamicRecord({ title, data, fields, rendererConfigs, loading, error }: DynamicRecordProps) {
+  return (
+    <div className="resource-card">
+      <h3 className="card-title">{title}</h3>
+      {loading && <div className="resource-loading">Loading…</div>}
+      {error && <div className="resource-error">{error}</div>}
+      {data && !loading && (
+        <div className="resource-fields">
+          {fields.map((f) => {
+            const config = rendererConfigs[f.key] ?? inferRendererConfig(f.maisieType);
+            return (
+              <div key={f.key} className="resource-field">
+                <span className="resource-field-label">{f.label}</span>
+                <span className="resource-field-value">
+                  <FieldRenderer value={data[f.key]} config={config} />
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── DynamicList ───────────────────────────────────────────────────────────────
+
+interface DynamicListProps {
+  title: string;
+  items: Record<string, unknown>[] | null;
+  fields: CardDescriptor["outputFields"];
+  rendererConfigs: CardRendererConfig;
+  loading?: boolean;
+  error?: string | null;
+}
+
+function DynamicList({ title, items, fields, rendererConfigs, loading, error }: DynamicListProps) {
+  return (
+    <div className="resource-card">
+      <h3 className="card-title">{title}</h3>
+      {loading && <div className="resource-loading">Loading…</div>}
+      {error && <div className="resource-error">{error}</div>}
+      {items && !loading && (
+        <table className="resource-table">
+          <thead>
+            <tr>
+              {fields.map((f) => <th key={f.key}>{f.label}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, i) => (
+              <tr key={String(item.id ?? i)}>
+                {fields.map((f) => {
+                  const config = rendererConfigs[f.key] ?? inferRendererConfig(f.maisieType);
+                  return (
+                    <td key={f.key}>
+                      <FieldRenderer value={item[f.key]} config={config} />
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
   );
 }

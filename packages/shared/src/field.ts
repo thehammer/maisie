@@ -27,6 +27,7 @@ export type MaisieFieldType =
   | 'status'         // Named state from shared vocabulary → colored badge
   | 'image'          // URL to image → <img> thumbnail
   | 'timestamp'      // ISO 8601 date → relative time "2h ago"
+  | 'epoch_ms'       // Unix milliseconds → relative time "2h ago"
   | 'duration'       // Seconds → "2h 34m"
   | 'progress'       // { current, total, label? } → progress bar + fraction
   | 'temperature'    // Celsius → "72°C" with threshold color
@@ -35,6 +36,8 @@ export type MaisieFieldType =
   | 'action'         // Triggerable command → button
   | 'stream'         // URL to media stream → player / channel tile
   | 'url'            // Clickable link → <a>
+  | 'record'         // Nested object with typed fields → sub-card
+  | 'collection'     // Nested array of records → inline table
   | 'json'           // Untyped structured data → collapsed viewer
 
 /**
