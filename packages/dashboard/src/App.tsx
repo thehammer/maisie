@@ -81,6 +81,11 @@ const MQTT_TOPICS = [
   "home/network/devices/new",
   "home/network/devices/missing",
   "home/media/plex/now_playing",
+  "home/media/plex/new",
+  "home/media/sonarr/downloaded",
+  "home/media/sonarr/grabbed",
+  "home/media/radarr/downloaded",
+  "home/media/radarr/grabbed",
   "home/nas/health",
   "home/smarthome/state",
   "home/printer/status",
@@ -140,7 +145,14 @@ export function App() {
           devicesApi.refresh();
           break;
         case "home/media/plex/now_playing":
+        case "home/media/plex/new":
           plexApi.refresh();
+          break;
+        case "home/media/sonarr/downloaded":
+        case "home/media/sonarr/grabbed":
+        case "home/media/radarr/downloaded":
+        case "home/media/radarr/grabbed":
+          mediaApi.refresh();
           break;
         case "home/nas/health":
           nasApi.refresh();
@@ -156,7 +168,7 @@ export function App() {
           break;
       }
     },
-    [devicesApi.refresh, plexApi.refresh, nasApi.refresh, switchesApi.refresh, bambuApi.refresh, health.refresh],
+    [devicesApi.refresh, plexApi.refresh, nasApi.refresh, switchesApi.refresh, bambuApi.refresh, health.refresh, mediaApi.refresh],
   );
 
   const { connected: mqttConnected } = useMqtt({
