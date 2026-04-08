@@ -3767,3 +3767,389 @@ body {
 .resource-table tr:last-child td {
   border-bottom: none;
 }
+
+/* ── Card configure button (hover reveal) ──────────────── */
+
+.card-configure-btn {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  z-index: 5;
+  background: rgba(15, 17, 23, 0.75);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.85rem;
+  line-height: 1;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.2s, color 0.15s;
+}
+.card:hover .card-configure-btn {
+  opacity: 1;
+}
+.card-configure-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* ── Card Configurator overlay ─────────────────────────── */
+
+.card-configurator-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-configurator {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 480px;
+  max-width: 95vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.card-configurator-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.card-configurator-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.card-configurator-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  line-height: 1;
+}
+.card-configurator-close:hover { color: var(--text); }
+
+.card-configurator-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.card-configurator-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Sections */
+.card-configurator-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.card-configurator-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+/* Inputs */
+.card-configurator-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  width: 100%;
+}
+.card-configurator-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.card-configurator-input.small {
+  width: 100px;
+}
+.card-configurator-input.tiny {
+  width: 60px;
+}
+
+/* Fields list */
+.card-configurator-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.card-configurator-field-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.82rem;
+}
+.card-configurator-field-row:hover {
+  background: var(--surface-hover);
+}
+
+.card-configurator-field-label {
+  flex: 1;
+}
+
+.card-configurator-field-type {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  background: var(--bg);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+
+.card-configurator-field-order {
+  display: flex;
+  gap: 0.1rem;
+}
+
+.card-configurator-arrow {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0 0.15rem;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+.card-configurator-arrow:hover { color: var(--text); }
+.card-configurator-arrow:disabled { opacity: 0.3; cursor: default; }
+
+/* Ops pipeline */
+.card-configurator-ops {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.card-configurator-op-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  background: var(--bg);
+  border-radius: 6px;
+  font-size: 0.82rem;
+}
+
+.card-configurator-op-type {
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  min-width: 40px;
+}
+
+.card-configurator-op-row select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.2rem 0.3rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.card-configurator-op-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  margin-left: auto;
+}
+.card-configurator-op-remove:hover { color: var(--red); }
+
+.card-configurator-op-buttons {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+
+/* Renderer editor */
+.card-configurator-renderers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.card-configurator-renderer-row {
+  font-size: 0.82rem;
+  padding: 0.25rem 0.35rem;
+  border-radius: 4px;
+}
+.card-configurator-renderer-row:hover {
+  background: var(--surface-hover);
+}
+.card-configurator-renderer-row summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  list-style: none;
+}
+.card-configurator-renderer-row summary::-webkit-details-marker {
+  display: none;
+}
+
+.card-configurator-renderer-controls {
+  padding: 0.5rem 0 0.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+}
+.card-configurator-renderer-controls label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-muted);
+}
+
+.card-configurator-reset {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+  margin-left: auto;
+}
+.card-configurator-reset:hover { color: var(--red); }
+
+.card-configurator-no-options {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.75rem;
+}
+
+/* Buttons */
+.card-configurator-btn {
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  transition: all 0.15s;
+}
+.card-configurator-btn.cancel {
+  background: var(--bg);
+  color: var(--text-muted);
+}
+.card-configurator-btn.cancel:hover {
+  color: var(--text);
+}
+.card-configurator-btn.apply {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+  font-weight: 500;
+}
+.card-configurator-btn.apply:hover {
+  opacity: 0.9;
+}
+.card-configurator-btn-small {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+.card-configurator-btn-small:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* Progress bar color variants */
+.resource-progress-bar-ok span { background: var(--accent); }
+.resource-progress-bar-warn span { background: var(--yellow, #fbbf24); }
+.resource-progress-bar-crit span { background: var(--red, #f87171); }
+
+/* Signal bars */
+.resource-signal {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 14px;
+}
+.resource-signal-bar {
+  display: inline-block;
+  width: 3px;
+  border-radius: 1px;
+}
+.resource-signal-bar:nth-child(1) { height: 25%; }
+.resource-signal-bar:nth-child(2) { height: 50%; }
+.resource-signal-bar:nth-child(3) { height: 75%; }
+.resource-signal-bar:nth-child(4) { height: 100%; }
+.resource-signal-bar-filled { background: var(--accent); }
+.resource-signal-bar-empty  { background: var(--border); }
+
+/* Temperature color */
+.resource-temperature-ok   { color: var(--text); }
+.resource-temperature-warn { color: var(--yellow, #fbbf24); }
+.resource-temperature-crit { color: var(--red, #f87171); }
+
+/* Toggle */
+.resource-toggle { font-size: 0.85rem; }
+.resource-toggle-on  { color: var(--green, #4ade80); }
+.resource-toggle-off { color: var(--text-muted); }
+
+/* Boolean */
+.resource-boolean-true  { color: var(--green, #4ade80); }
+.resource-boolean-false { color: var(--text-muted); }
+
+/* JSON viewer */
+.resource-json-summary {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+/* Action button */
+.resource-action {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.resource-action:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.resource-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -60,6 +60,7 @@ const personaConfigSchema = z.object({
 const cardFieldSchema = z.object({
   key: z.string(),
   type: z.enum(['string', 'number', 'boolean', 'array', 'object', 'unknown']),
+  maisieType: z.string().nullable(),
   label: z.string(),
   optional: z.boolean(),
 })

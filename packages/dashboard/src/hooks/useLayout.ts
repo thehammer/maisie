@@ -6,6 +6,11 @@ export interface CardConfig {
   visible: boolean;
   col_span: 1 | 2;
   order: number;
+  // ── Card configurator fields (optional — absent until user configures) ────
+  title?: string;
+  visibleFields?: string[];
+  ops?: import("@maisie/shared").OpConfig[];
+  rendererConfigs?: import("@maisie/shared").CardRendererConfig;
 }
 
 interface LayoutState {
@@ -107,6 +112,26 @@ export function useLayout(page: string) {
     }));
   }, []);
 
+  /** Update the configurator fields on a specific card and persist immediately. */
+  const updateCardConfig = useCallback(
+    async (id: string, patch: Pick<CardConfig, "title" | "visibleFields" | "ops" | "rendererConfigs">) => {
+      const updated = state.widgets.map((w) => (w.id === id ? { ...w, ...patch } : w));
+      setState((s) => ({ ...s, widgets: updated }));
+      // Persist immediately — config changes shouldn't require entering edit mode
+      try {
+        await fetch(`/api/layout/${page}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ widgets: updated }),
+        });
+        setSnapshot(updated);
+      } catch {
+        // Swallow — layout was applied locally regardless
+      }
+    },
+    [page, state.widgets],
+  );
+
   // Called by DraggableDashboardGrid after a drag ends
   const reorder = useCallback((activeId: string, overId: string) => {
     setState((s) => {
@@ -135,5 +160,6 @@ export function useLayout(page: string) {
     reorder,
     addCard,
     removeCard,
+    updateCardConfig,
   };
 }

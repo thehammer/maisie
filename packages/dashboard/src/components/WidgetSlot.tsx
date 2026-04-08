@@ -9,10 +9,12 @@ interface Props {
   onToggleColSpan: () => void;
   /** If provided, a remove button is shown — used for catalog-sourced widgets */
   onRemove?: () => void;
+  /** Open the card configurator for this card. */
+  onConfigure?: () => void;
   children: React.ReactNode;
 }
 
-export function CardSlot({ widget, isEditMode, onToggleVisible, onToggleColSpan, onRemove, children }: Props) {
+export function CardSlot({ widget, isEditMode, onToggleVisible, onToggleColSpan, onRemove, onConfigure, children }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: widget.id,
     disabled: !isEditMode,
@@ -54,6 +56,15 @@ export function CardSlot({ widget, isEditMode, onToggleVisible, onToggleColSpan,
           >
             {widget.col_span === 2 ? "⇥" : "⇔"}
           </button>
+          {onConfigure && (
+            <button
+              className="card-edit-btn"
+              onClick={onConfigure}
+              title="Configure card"
+            >
+              &#9881;
+            </button>
+          )}
           {onRemove && (
             <button
               className="card-edit-btn"
@@ -65,6 +76,15 @@ export function CardSlot({ widget, isEditMode, onToggleVisible, onToggleColSpan,
             </button>
           )}
         </div>
+      )}
+      {!isEditMode && onConfigure && (
+        <button
+          className="card-configure-btn"
+          onClick={onConfigure}
+          title="Configure card"
+        >
+          &#9881;
+        </button>
       )}
       {children}
     </div>

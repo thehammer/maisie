@@ -32,6 +32,7 @@ import { CardSlot } from "./components/WidgetSlot";
 import { useLayout } from "./hooks/useLayout";
 import { DynamicCard, type CardDescriptor } from "./components/DynamicCard";
 import { AddCardPanel } from "./components/AddWidgetPanel";
+import { CardConfigurator } from "./components/CardConfigurator";
 
 
 const POLL_INTERVAL = 30_000; // 30 seconds
@@ -68,6 +69,7 @@ export function App() {
   const [notifCount, setNotifCount] = useState(0);
   const [notifsOpen, setNotifsOpen] = useState(false);
   const [addCardOpen, setAddCardOpen] = useState(false);
+  const [configuringCardId, setConfiguringCardId] = useState<string | null>(null);
 
   const health = useApi<{ status: string }>("/api/health", POLL_INTERVAL);
   const devicesApi = useApi<Device[]>("/api/devices", POLL_INTERVAL);
@@ -256,7 +258,7 @@ export function App() {
     },
   ];
 
-  function renderCard(id: string, apis: {
+  function renderCard(id: string, widget: import("./hooks/useLayout").CardConfig, apis: {
     services: typeof services;
     devicesApi: typeof devicesApi; nasApi: typeof nasApi; plexApi: typeof plexApi;
     mediaApi: typeof mediaApi; hdhrApi: typeof hdhrApi; dakboardApi: typeof dakboardApi;
@@ -285,7 +287,16 @@ export function App() {
       default: {
         // Fall back to auto-rendered card from the widget catalog
         const descriptor = (catalogApi.data ?? []).find((w) => w.id === id);
-        if (descriptor) return <DynamicCard descriptor={descriptor} pollInterval={POLL_INTERVAL} />;
+        if (descriptor) return (
+          <DynamicCard
+            descriptor={descriptor}
+            pollInterval={POLL_INTERVAL}
+            ops={widget.ops}
+            rendererConfigs={widget.rendererConfigs}
+            visibleFields={widget.visibleFields}
+            titleOverride={widget.title}
+          />
+        );
         return null;
       }
     }
@@ -343,8 +354,9 @@ export function App() {
             onToggleVisible={() => layout.setVisible(widget.id, !widget.visible)}
             onToggleColSpan={() => layout.setColSpan(widget.id, widget.col_span === 1 ? 2 : 1)}
             onRemove={widget.id.includes(".") ? () => layout.removeCard(widget.id) : undefined}
+            onConfigure={() => setConfiguringCardId(widget.id)}
           >
-            {renderCard(widget.id, {
+            {renderCard(widget.id, widget, {
               services,
               devicesApi, nasApi, plexApi, mediaApi, hdhrApi,
               dakboardApi, bambuApi, calibreApi, packagesApi,
@@ -361,6 +373,20 @@ export function App() {
         existingIds={new Set(layout.widgets.map((w) => w.id))}
         onAdd={(id) => layout.addCard(id)}
       />
+
+      {configuringCardId && (() => {
+        const widget = layout.widgets.find((w) => w.id === configuringCardId);
+        if (!widget) return null;
+        const descriptor = (catalogApi.data ?? []).find((d) => d.id === configuringCardId);
+        return (
+          <CardConfigurator
+            widget={widget}
+            descriptor={descriptor}
+            onSave={(patch) => layout.updateCardConfig(configuringCardId, patch)}
+            onClose={() => setConfiguringCardId(null)}
+          />
+        );
+      })()}
 
       {chatOverlay}
     </div>

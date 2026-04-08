@@ -36,6 +36,15 @@ export interface CardConfig {
   visible: boolean
   col_span: 1 | 2    // 1 = normal, 2 = full-width (.card.wide)
   order: number       // 0-based sort position; array kept sorted by this
+  // ── Card configurator fields (optional — absent until user configures) ────
+  /** Override the card's default title. */
+  title?: string
+  /** Ordered subset of output field keys to display. If omitted, show all. */
+  visibleFields?: string[]
+  /** OpConfig pipeline — applied to collection data before rendering. */
+  ops?: import('@maisie/shared').OpConfig[]
+  /** Per-field renderer overrides. */
+  rendererConfigs?: import('@maisie/shared').CardRendererConfig
 }
 
 export interface PersonaConfig {

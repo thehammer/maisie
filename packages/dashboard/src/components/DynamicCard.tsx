@@ -40,6 +40,10 @@ interface DynamicCardProps {
   ops?: OpConfig[];
   /** Per-field renderer config overrides (from stored card layout). */
   rendererConfigs?: CardRendererConfig;
+  /** Ordered subset of field keys to display (from card configurator). */
+  visibleFields?: string[];
+  /** Override the card title (from card configurator). */
+  titleOverride?: string;
 }
 
 // Mirrors deriveHttpPath() in plugin-core/registry.ts — strips verb prefix,
@@ -62,6 +66,8 @@ export function DynamicCard({
   pollInterval = 30_000,
   ops = [],
   rendererConfigs = {},
+  visibleFields,
+  titleOverride,
 }: DynamicCardProps) {
   const url = `/api/${descriptor.pluginName}${deriveApiPath(descriptor.actionName)}`;
   const { data, loading, error } = useApi<unknown>(url, pollInterval);
@@ -70,13 +76,21 @@ export function DynamicCard({
   const transformed = applyPipeline(data as never, ops);
 
   const errorMsg = error ? String(error) : null;
+  const title = titleOverride || descriptor.label;
+
+  // Filter and reorder fields if visibleFields is set
+  const shownFields = visibleFields
+    ? visibleFields
+        .map((key) => descriptor.outputFields.find((f) => f.key === key))
+        .filter((f): f is CardDescriptor["outputFields"][number] => !!f)
+    : descriptor.outputFields;
 
   if (Array.isArray(transformed)) {
     return (
       <DynamicList
-        title={descriptor.label}
+        title={title}
         items={transformed as Record<string, unknown>[]}
-        fields={descriptor.outputFields}
+        fields={shownFields}
         rendererConfigs={rendererConfigs}
         loading={loading}
         error={errorMsg}
@@ -86,9 +100,9 @@ export function DynamicCard({
 
   return (
     <DynamicRecord
-      title={descriptor.label}
+      title={title}
       data={transformed as Record<string, unknown> | null}
-      fields={descriptor.outputFields}
+      fields={shownFields}
       rendererConfigs={rendererConfigs}
       loading={loading}
       error={errorMsg}
