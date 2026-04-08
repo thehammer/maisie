@@ -1,9 +1,12 @@
-import type { MaisiePlugin } from '@maisie/shared'
+import type { MaisiePlugin, MaisieCore } from '@maisie/shared'
 import * as actionDefs from './actions'
 import * as eventDefs from './events'
 import { initSonarrClient, getSonarrClient } from './client'
+import { createSonarrWebhookRouter } from './webhook'
 
 export { getSonarrClient, initSonarrClient }
+
+let _core: MaisieCore | null = null
 
 const plugin: MaisiePlugin = {
   name: 'sonarr',
@@ -22,8 +25,10 @@ const plugin: MaisiePlugin = {
   ],
   actions: Object.values(actionDefs),
   events: Object.values(eventDefs),
+  customRoutes: createSonarrWebhookRouter(() => _core),
 
   async init(core) {
+    _core = core
     const client = initSonarrClient()
     if (!client) core.log('sonarr', 'warn', 'Sonarr not configured — TV show actions unavailable')
   },

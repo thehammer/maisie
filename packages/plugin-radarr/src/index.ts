@@ -1,9 +1,12 @@
-import type { MaisiePlugin } from '@maisie/shared'
+import type { MaisiePlugin, MaisieCore } from '@maisie/shared'
 import * as actionDefs from './actions'
 import * as eventDefs from './events'
 import { initRadarrClient, getRadarrClient } from './client'
+import { createRadarrWebhookRouter } from './webhook'
 
 export { getRadarrClient, initRadarrClient }
+
+let _core: MaisieCore | null = null
 
 const plugin: MaisiePlugin = {
   name: 'radarr',
@@ -22,8 +25,10 @@ const plugin: MaisiePlugin = {
   ],
   actions: Object.values(actionDefs),
   events: Object.values(eventDefs),
+  customRoutes: createRadarrWebhookRouter(() => _core),
 
   async init(core) {
+    _core = core
     const client = initRadarrClient()
     if (!client) core.log('radarr', 'warn', 'Radarr not configured — movie actions unavailable')
   },

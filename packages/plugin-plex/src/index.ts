@@ -1,9 +1,12 @@
-import type { MaisiePlugin } from '@maisie/shared'
+import type { MaisiePlugin, MaisieCore } from '@maisie/shared'
 import * as actionDefs from './actions'
 import * as eventDefs from './events'
 import { initPlexClient, getPlexClient } from './client'
+import { createPlexWebhookRouter } from './webhook'
 
 export { getPlexClient, initPlexClient }
+
+let _core: MaisieCore | null = null
 
 const plugin: MaisiePlugin = {
   name: 'plex',
@@ -22,8 +25,10 @@ const plugin: MaisiePlugin = {
   ],
   actions: Object.values(actionDefs),
   events: Object.values(eventDefs),
+  customRoutes: createPlexWebhookRouter(() => _core),
 
   async init(core) {
+    _core = core
     const client = initPlexClient()
     if (!client) core.log('plex', 'warn', 'Plex not configured — media-server actions unavailable')
   },
