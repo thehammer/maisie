@@ -1,6 +1,12 @@
 import { z } from 'zod'
 import { getMaisieType } from '@maisie/shared'
+import type { MaisieSchemaType } from '@maisie/shared'
 import type { CardField } from './types'
+
+export interface IntrospectResult {
+  schemaType: MaisieSchemaType
+  fields: CardField[]
+}
 
 /**
  * Prettifies a camelCase or snake_case key into a human-readable label.
@@ -70,36 +76,57 @@ function zodTypeToFieldType(schema: z.ZodTypeAny): CardField['type'] {
 }
 
 /**
- * Inspects a Zod schema and returns CardField[] — one entry per top-level
- * key for ZodObject schemas. Non-object top-level schemas return [].
+ * Inspects a Zod schema and returns the schema-level type plus CardField[].
  *
- * Nested objects are typed as 'object' (not recursively flattened),
- * and arrays are typed as 'array'.
+ *   scalar     — top-level primitive (string, number, boolean, enum, literal)
+ *   record     — ZodObject with fixed named fields
+ *   collection — ZodArray whose element is a ZodObject
+ *   json       — ZodAny, ZodUnknown, ZodRecord (dynamic keys), or unrecognised
+ *
+ * Fields are the introspected columns for record/collection; empty for scalar/json.
  */
-export function introspectSchema(schema: z.ZodTypeAny): CardField[] {
+export function introspectSchema(schema: z.ZodTypeAny): IntrospectResult {
   const inner = unwrapSchema(schema)
 
-  // ZodAny / ZodUnknown — can't introspect
+  // Untyped — json
   if (inner instanceof z.ZodAny || inner instanceof z.ZodUnknown) {
-    return []
+    return { schemaType: 'json', fields: [] }
   }
 
-  // ZodArray — top-level array: introspect the element type if it's an object
+  // Dynamic keys — json
+  if (inner instanceof z.ZodRecord) {
+    return { schemaType: 'json', fields: [] }
+  }
+
+  // collection — ZodArray of ZodObject
   if (inner instanceof z.ZodArray) {
     const elementInner = unwrapSchema(inner.element as z.ZodTypeAny)
     if (elementInner instanceof z.ZodObject) {
-      return introspectObject(elementInner)
+      return { schemaType: 'collection', fields: introspectObject(elementInner) }
     }
-    return []
+    // Array of primitives — treat as json
+    return { schemaType: 'json', fields: [] }
   }
 
-  // ZodObject — introspect directly
+  // record — ZodObject
   if (inner instanceof z.ZodObject) {
-    return introspectObject(inner)
+    return { schemaType: 'record', fields: introspectObject(inner) }
   }
 
-  // Primitives and everything else at the top level — no fields to expose
-  return []
+  // scalar — primitives
+  if (
+    inner instanceof z.ZodString ||
+    inner instanceof z.ZodNumber ||
+    inner instanceof z.ZodBoolean ||
+    inner instanceof z.ZodEnum ||
+    inner instanceof z.ZodLiteral ||
+    inner instanceof z.ZodDate
+  ) {
+    return { schemaType: 'scalar', fields: [] }
+  }
+
+  // Fallback — json
+  return { schemaType: 'json', fields: [] }
 }
 
 function introspectObject(schema: z.ZodObject<z.ZodRawShape>): CardField[] {

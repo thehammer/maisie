@@ -70,6 +70,7 @@ const cardDescriptorSchema = z.object({
   actionName: z.string(),
   label: z.string(),
   section: z.string(),
+  schemaType: z.enum(['scalar', 'record', 'collection', 'json']),
   outputFields: z.array(cardFieldSchema),
 })
 
@@ -562,14 +563,15 @@ export const getCardCatalog = defineAction({
       for (const action of plugin.actions) {
         if (action.ui === false) continue
 
-        const outputFields = introspectSchema(action.output)
+        const { schemaType, fields } = introspectSchema(action.output)
         descriptors.push({
           id: `${plugin.name}.${action.name}`,
           pluginName: plugin.name,
           actionName: action.name,
           label: action.ui.label,
           section: action.ui.section,
-          outputFields,
+          schemaType,
+          outputFields: fields,
         })
       }
     }

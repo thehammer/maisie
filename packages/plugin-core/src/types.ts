@@ -4,6 +4,8 @@ export interface CardDescriptor {
   actionName: string
   label: string
   section: string
+  /** Overall shape of the action output — drives card builder affordances. */
+  schemaType: import('@maisie/shared').MaisieSchemaType
   outputFields: CardField[]
 }
 

@@ -1,6 +1,18 @@
 import { z } from 'zod'
 
 /**
+ * Schema-level type — describes the overall shape of an action's output.
+ * Inferred from the Zod output schema; determines what affordances the card
+ * builder offers (filter/sort for collection, key-value for record, etc.).
+ *
+ *   scalar     — a single typed value (string, number, boolean, timestamp…)
+ *   record     — one object with fixed named fields, heterogeneous values
+ *   collection — array of records sharing the same schema; supports filter/sort/group
+ *   json       — untyped or dynamic structure; rendered as a collapsed viewer
+ */
+export type MaisieSchemaType = 'scalar' | 'record' | 'collection' | 'json'
+
+/**
  * Semantic field types — the vocabulary that lets the framework render and reason
  * about resource fields without plugin-specific knowledge.
  *
