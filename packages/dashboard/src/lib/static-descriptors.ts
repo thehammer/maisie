@@ -171,6 +171,105 @@ export const STATIC_DESCRIPTORS: Record<string, StaticDescriptor> = {
       { key: "screen", type: "string",  maisieType: "string", label: "Screen",   optional: true  },
     ],
   },
+
+  // ── Cards that stay hand-written (descriptors for configurator) ──────────
+
+  CalibreCard: {
+    id: "CalibreCard",
+    pluginName: "calibre",
+    actionName: "get_calibre_status",
+    label: "Calibre",
+    section: "media",
+    schemaType: "record",
+    endpoint: "/api/calibre/calibre-status",
+    outputFields: [
+      { key: "totalBooks",  type: "number",  maisieType: "number",     label: "Total Books",  optional: false },
+      { key: "libraries",   type: "array",   maisieType: "collection", label: "Libraries",    optional: false },
+      { key: "recentBooks", type: "array",   maisieType: "collection", label: "Recent Books", optional: false },
+    ],
+  },
+
+  CalibreEnrichmentCard: {
+    id: "CalibreEnrichmentCard",
+    pluginName: "calibre",
+    actionName: "get_enrichment_status",
+    label: "Book Enrichment",
+    section: "media",
+    schemaType: "record",
+    endpoint: "/api/calibre/enrichment-status",
+    outputFields: [
+      { key: "pending",   type: "number", maisieType: "number", label: "Pending",   optional: false },
+      { key: "enriched",  type: "number", maisieType: "number", label: "Enriched",  optional: false },
+      { key: "failed",    type: "number", maisieType: "number", label: "Failed",    optional: false },
+    ],
+  },
+
+  NightlyCard: {
+    id: "NightlyCard",
+    pluginName: "core",
+    actionName: "get_nightly_status",
+    label: "Nightly Tasks",
+    section: "system",
+    schemaType: "record",
+    endpoint: "/api/nightly/status",
+    outputFields: [
+      { key: "state",      type: "string",  maisieType: "status",    label: "State",      optional: false },
+      { key: "lastRun",    type: "string",  maisieType: "timestamp", label: "Last Run",   optional: true  },
+      { key: "nextRun",    type: "string",  maisieType: "timestamp", label: "Next Run",   optional: true  },
+      { key: "taskCount",  type: "number",  maisieType: "number",    label: "Tasks",      optional: false },
+      { key: "failedCount",type: "number",  maisieType: "number",    label: "Failed",     optional: false },
+    ],
+  },
+
+  YouTubeCleanupCard: {
+    id: "YouTubeCleanupCard",
+    pluginName: "youtube",
+    actionName: "get_cleanup_status",
+    label: "YouTube Cleanup",
+    section: "system",
+    schemaType: "record",
+    endpoint: "/api/youtube/cleanup/status",
+    outputFields: [
+      { key: "status",         type: "string",  maisieType: "status",     label: "Status",       optional: false },
+      { key: "likesRemaining", type: "number",  maisieType: "number",     label: "Likes Left",   optional: false },
+      { key: "subsRemaining",  type: "number",  maisieType: "number",     label: "Subs Left",    optional: false },
+      { key: "likesRemoved",   type: "number",  maisieType: "number",     label: "Likes Removed",optional: false },
+      { key: "subsRemoved",    type: "number",  maisieType: "number",     label: "Subs Removed", optional: false },
+      { key: "lastRun",        type: "string",  maisieType: "timestamp",  label: "Last Run",     optional: true  },
+    ],
+  },
+
+  SmartHomeCard: {
+    id: "SmartHomeCard",
+    pluginName: "home-assistant",
+    actionName: "get_devices",
+    label: "Smart Home",
+    section: "devices",
+    schemaType: "collection",
+    endpoint: "",  // multi-API (lights + switches) — no single endpoint
+    outputFields: [
+      { key: "name",       type: "string",  maisieType: "string",  label: "Device",     optional: false },
+      { key: "state",      type: "string",  maisieType: "status",  label: "State",      optional: false },
+      { key: "brightness", type: "number",  maisieType: "percentage", label: "Brightness", optional: true  },
+    ],
+  },
+
+  RecentlyAddedCard: {
+    id: "RecentlyAddedCard",
+    pluginName: "plex",
+    actionName: "get_recently_added",
+    label: "Recently Added",
+    section: "media",
+    schemaType: "collection",
+    endpoint: "",  // derived from PlexStatus.recentlyAdded — no direct endpoint
+    outputFields: [
+      { key: "title",    type: "string",  maisieType: "string",    label: "Title",     optional: false },
+      { key: "type",     type: "string",  maisieType: "string",    label: "Type",      optional: false },
+      { key: "thumb",    type: "string",  maisieType: "image",     label: "Thumbnail", optional: true  },
+      { key: "addedAt",  type: "number",  maisieType: "epoch_ms",  label: "Added",     optional: false },
+    ],
+  },
+
 };
 
 /**
