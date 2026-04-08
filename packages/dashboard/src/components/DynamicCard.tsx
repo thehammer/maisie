@@ -44,6 +44,18 @@ interface DynamicCardProps {
   visibleFields?: string[];
   /** Override the card title (from card configurator). */
   titleOverride?: string;
+  /**
+   * Direct endpoint URL — bypasses pluginName/actionName URL derivation.
+   * Used by static descriptors for hand-written cards.
+   */
+  endpoint?: string;
+  /**
+   * Pre-fetched data — skip internal fetch. Used when App.tsx already has
+   * the data from a shared useApi call.
+   */
+  data?: unknown;
+  dataLoading?: boolean;
+  dataError?: unknown;
 }
 
 // Mirrors deriveHttpPath() in plugin-core/registry.ts — strips verb prefix,
@@ -68,9 +80,18 @@ export function DynamicCard({
   rendererConfigs = {},
   visibleFields,
   titleOverride,
+  endpoint,
+  data: externalData,
+  dataLoading,
+  dataError,
 }: DynamicCardProps) {
-  const url = `/api/${descriptor.pluginName}${deriveApiPath(descriptor.actionName)}`;
-  const { data, loading, error } = useApi<unknown>(url, pollInterval);
+  const derivedUrl = endpoint || `/api/${descriptor.pluginName}${deriveApiPath(descriptor.actionName)}`;
+  // Skip fetch if external data is provided (from shared useApi in App.tsx)
+  const skipFetch = externalData !== undefined;
+  const internal = useApi<unknown>(skipFetch ? null : derivedUrl, pollInterval);
+  const data = skipFetch ? externalData : internal.data;
+  const loading = skipFetch ? (dataLoading ?? false) : internal.loading;
+  const error = skipFetch ? dataError : internal.error;
 
   // Apply the op pipeline to transform collection data before rendering
   const transformed = applyPipeline(data as never, ops);

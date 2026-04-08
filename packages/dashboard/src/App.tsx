@@ -8,9 +8,6 @@ import { PlexCard } from "./components/PlexCard";
 import { MediaCard } from "./components/MediaCard";
 import { ServiceStatus } from "./components/ServiceStatus";
 import { SmartHomeCard } from "./components/SmartHomeCard";
-import { HdhrCard } from "./components/HdhrCard";
-import { DakboardCard } from "./components/DakboardCard";
-import { BambuCard } from "./components/BambuCard";
 import { PackagesCard } from "./components/PackagesCard";
 import { RecentlyAddedCard } from "./components/RecentlyAddedCard";
 import { CalibreCard } from "./components/CalibreCard";
@@ -33,6 +30,7 @@ import { useLayout } from "./hooks/useLayout";
 import { DynamicCard, type CardDescriptor } from "./components/DynamicCard";
 import { AddCardPanel } from "./components/AddWidgetPanel";
 import { CardConfigurator } from "./components/CardConfigurator";
+import { STATIC_DESCRIPTORS, getDescriptor } from "./lib/static-descriptors";
 
 
 const POLL_INTERVAL = 30_000; // 30 seconds
@@ -271,9 +269,46 @@ export function App() {
       case "NasCard":          return apis.nasApi.data ? <NasCard health={apis.nasApi.data} /> : null;
       case "PlexCard":         return apis.plexApi.data ? <PlexCard status={apis.plexApi.data} /> : null;
       case "MediaCard":        return apis.mediaApi.data ? <MediaCard calendar={apis.mediaApi.data} /> : null;
-      case "HdhrCard":         return apis.hdhrApi.data ? <HdhrCard status={apis.hdhrApi.data} /> : null;
-      case "DakboardCard":     return <DakboardCard pollInterval={POLL_INTERVAL} />;
-      case "BambuCard":        return apis.bambuApi.data ? <BambuCard status={apis.bambuApi.data} /> : null;
+      case "HdhrCard":
+        return STATIC_DESCRIPTORS.HdhrCard ? (
+          <DynamicCard
+            descriptor={STATIC_DESCRIPTORS.HdhrCard}
+            endpoint={STATIC_DESCRIPTORS.HdhrCard.endpoint}
+            data={apis.hdhrApi.data}
+            dataLoading={apis.hdhrApi.loading}
+            dataError={apis.hdhrApi.error}
+            ops={widget.ops}
+            rendererConfigs={widget.rendererConfigs}
+            visibleFields={widget.visibleFields ?? ["name", "channelCount", "firmware", "tuners"]}
+            titleOverride={widget.title}
+          />
+        ) : null;
+      case "DakboardCard":
+        return STATIC_DESCRIPTORS.DakboardCard ? (
+          <DynamicCard
+            descriptor={STATIC_DESCRIPTORS.DakboardCard}
+            endpoint={STATIC_DESCRIPTORS.DakboardCard.endpoint}
+            pollInterval={POLL_INTERVAL}
+            ops={widget.ops}
+            rendererConfigs={widget.rendererConfigs}
+            visibleFields={widget.visibleFields}
+            titleOverride={widget.title}
+          />
+        ) : null;
+      case "BambuCard":
+        return STATIC_DESCRIPTORS.BambuCard ? (
+          <DynamicCard
+            descriptor={STATIC_DESCRIPTORS.BambuCard}
+            endpoint={STATIC_DESCRIPTORS.BambuCard.endpoint}
+            data={apis.bambuApi.data}
+            dataLoading={apis.bambuApi.loading}
+            dataError={apis.bambuApi.error}
+            ops={widget.ops}
+            rendererConfigs={widget.rendererConfigs}
+            visibleFields={widget.visibleFields}
+            titleOverride={widget.title}
+          />
+        ) : null;
       case "CalibreCard":      return apis.calibreApi.data ? <CalibreCard status={apis.calibreApi.data} /> : null;
       case "CalibreEnrichmentCard": return <CalibreEnrichmentCard pollInterval={POLL_INTERVAL} />;
       case "NightlyCard":      return <NightlyCard pollInterval={POLL_INTERVAL} />;
@@ -377,7 +412,7 @@ export function App() {
       {configuringCardId && (() => {
         const widget = layout.widgets.find((w) => w.id === configuringCardId);
         if (!widget) return null;
-        const descriptor = (catalogApi.data ?? []).find((d) => d.id === configuringCardId);
+        const descriptor = getDescriptor(configuringCardId, catalogApi.data ?? []);
         return (
           <CardConfigurator
             widget={widget}
