@@ -264,6 +264,11 @@ body {
   border: 1px solid var(--border);
 }
 
+.list-item-badge {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 .carousel-wrapper {
   overflow: hidden;
   position: relative;

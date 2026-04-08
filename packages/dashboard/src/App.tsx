@@ -8,7 +8,6 @@ import { PlexCard } from "./components/PlexCard";
 import { MediaCard } from "./components/MediaCard";
 import { ServiceStatus } from "./components/ServiceStatus";
 import { SmartHomeCard } from "./components/SmartHomeCard";
-import { PackagesCard } from "./components/PackagesCard";
 import { RecentlyAddedCard } from "./components/RecentlyAddedCard";
 import { CalibreCard } from "./components/CalibreCard";
 import { CalibreEnrichmentCard } from "./components/CalibreEnrichmentCard";
@@ -313,7 +312,20 @@ export function App() {
       case "CalibreEnrichmentCard": return <CalibreEnrichmentCard pollInterval={POLL_INTERVAL} />;
       case "NightlyCard":      return <NightlyCard pollInterval={POLL_INTERVAL} />;
       case "YouTubeCleanupCard": return <YouTubeCleanupCard pollInterval={POLL_INTERVAL} />;
-      case "PackagesCard":     return apis.packagesApi.data ? <PackagesCard orders={apis.packagesApi.data.orders} /> : null;
+      case "PackagesCard":
+        return STATIC_DESCRIPTORS.PackagesCard ? (
+          <DynamicCard
+            descriptor={STATIC_DESCRIPTORS.PackagesCard}
+            endpoint={STATIC_DESCRIPTORS.PackagesCard.endpoint}
+            data={apis.packagesApi.data?.orders ?? null}
+            dataLoading={apis.packagesApi.loading}
+            dataError={apis.packagesApi.error}
+            ops={widget.ops ?? [{ type: "limit", n: 10 }]}
+            rendererConfigs={widget.rendererConfigs}
+            visibleFields={widget.visibleFields}
+            titleOverride={widget.title}
+          />
+        ) : null;
       case "RecentlyAddedCard":
         return apis.plexApi.data && apis.plexApi.data.recentlyAdded.length > 0
           ? <RecentlyAddedCard items={apis.plexApi.data.recentlyAdded} />

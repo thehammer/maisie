@@ -107,6 +107,24 @@ export function DynamicCard({
     : descriptor.outputFields;
 
   if (Array.isArray(transformed)) {
+    // Use list-items layout when fields include an image or only a few
+    // text+status fields (typical list-item pattern). Table for many columns.
+    const hasImage = shownFields.some((f) => f.maisieType === "image");
+    const useListLayout = hasImage || shownFields.length <= 4;
+
+    if (useListLayout) {
+      return (
+        <DynamicListItems
+          title={title}
+          items={transformed as Record<string, unknown>[]}
+          fields={shownFields}
+          rendererConfigs={rendererConfigs}
+          loading={loading}
+          error={errorMsg}
+        />
+      );
+    }
+
     return (
       <DynamicList
         title={title}
@@ -207,6 +225,82 @@ function DynamicList({ title, items, fields, rendererConfigs, loading, error }: 
           </tbody>
         </table>
       )}
+    </div>
+  );
+}
+
+// ── DynamicListItems ──────────────────────────────────────────────────────────
+// List-item layout: thumbnail + primary text + secondary text + badge.
+// Auto-derives roles from maisieType annotations:
+//   image → thumbnail, first string → title, status → badge, rest → subtitle
+
+function DynamicListItems({ title, items, fields, rendererConfigs, loading, error }: DynamicListProps) {
+  // Classify fields by role
+  const imageField = fields.find((f) => f.maisieType === "image");
+  const statusField = fields.find((f) => f.maisieType === "status");
+  const stringFields = fields.filter(
+    (f) => f !== imageField && f !== statusField &&
+           (f.maisieType === "string" || f.maisieType === null || f.type === "string"),
+  );
+  const titleField = stringFields[0];
+  const subFields = stringFields.slice(1);
+  // Remaining fields (numbers, timestamps, etc.) go into subtitle
+  const otherFields = fields.filter(
+    (f) => f !== imageField && f !== statusField && !stringFields.includes(f),
+  );
+
+  return (
+    <div className="resource-card">
+      <h3 className="card-title">{title}</h3>
+      {loading && <div className="resource-loading">Loading…</div>}
+      {error && <div className="resource-error">{error}</div>}
+      {items && !loading && items.length === 0 && (
+        <div className="empty-state">No items</div>
+      )}
+      {items && !loading && items.map((item, i) => (
+        <div key={String(item.id ?? i)} className="list-item">
+          {imageField && item[imageField.key] ? (
+            <img
+              src={String(item[imageField.key])}
+              alt=""
+              className="list-item-thumb"
+              loading="lazy"
+            />
+          ) : imageField ? (
+            <div className="list-item-thumb list-item-thumb-placeholder">
+              {String(item[titleField?.key ?? ""] ?? "").charAt(0).toUpperCase() || "?"}
+            </div>
+          ) : null}
+          <div className="list-item-text">
+            {titleField && (
+              <div className="list-item-title">
+                {String(item[titleField.key] ?? "")}
+              </div>
+            )}
+            <div className="list-item-sub">
+              {[...subFields, ...otherFields].map((f, j) => {
+                const val = item[f.key];
+                if (val === null || val === undefined) return null;
+                const config = rendererConfigs[f.key] ?? inferRendererConfig(f.maisieType);
+                return (
+                  <span key={f.key}>
+                    {j > 0 && " — "}
+                    <FieldRenderer value={val} config={config} />
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+          {statusField && item[statusField.key] != null && (
+            <span className="list-item-badge">
+              <FieldRenderer
+                value={item[statusField.key]}
+                config={rendererConfigs[statusField.key] ?? inferRendererConfig(statusField.maisieType)}
+              />
+            </span>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
