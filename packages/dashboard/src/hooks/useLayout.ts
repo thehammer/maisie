@@ -11,6 +11,7 @@ export interface CardConfig {
   visibleFields?: string[];
   ops?: import("@maisie/shared").OpConfig[];
   rendererConfigs?: import("@maisie/shared").CardRendererConfig;
+  sections?: import("@maisie/shared").SectionConfig[];
 }
 
 interface LayoutState {
@@ -114,7 +115,7 @@ export function useLayout(page: string) {
 
   /** Update the configurator fields on a specific card and persist immediately. */
   const updateCardConfig = useCallback(
-    async (id: string, patch: Pick<CardConfig, "title" | "visibleFields" | "ops" | "rendererConfigs">) => {
+    async (id: string, patch: Pick<CardConfig, "title" | "visibleFields" | "ops" | "rendererConfigs" | "sections">) => {
       const updated = state.widgets.map((w) => (w.id === id ? { ...w, ...patch } : w));
       setState((s) => ({ ...s, widgets: updated }));
       // Persist immediately — config changes shouldn't require entering edit mode

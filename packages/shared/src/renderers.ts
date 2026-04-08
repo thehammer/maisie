@@ -215,6 +215,31 @@ export type RendererConfig =
  */
 export type CardRendererConfig = Record<string, RendererConfig>
 
+// ── Compound card sections ────────────────────────────────────────────────────
+
+/**
+ * A section within a compound card. Each section extracts a field from the
+ * parent response and renders it as an independent block (record or collection).
+ */
+export interface SectionConfig {
+  /** Which field in the parent record provides this section's data. */
+  sourceField: string
+  /** Section title (e.g. "Now Playing", "Libraries"). */
+  title: string
+  /** How to render this section's data. */
+  display: 'record' | 'list' | 'table' | 'hidden'
+  /** Ordered list of field keys to display within this section. */
+  visibleFields?: string[]
+  /** Ops pipeline applied to collection data in this section. */
+  ops?: import('./ops').OpConfig[]
+  /** Per-field renderer overrides within this section. */
+  rendererConfigs?: CardRendererConfig
+  /** Maximum items to show for collection sections (default: no limit). */
+  maxItems?: number
+  /** Hide this section when it has no data (default: true). */
+  hideWhenEmpty?: boolean
+}
+
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
 /**

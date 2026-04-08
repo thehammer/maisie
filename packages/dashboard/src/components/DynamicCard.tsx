@@ -13,7 +13,7 @@
 import { useApi } from "../hooks/useApi";
 import { FieldRenderer, inferRendererConfig } from "../lib/renderers/FieldRenderer";
 import { applyPipeline } from "../lib/pipeline";
-import type { MaisieFieldType, OpConfig, CardRendererConfig } from "@maisie/shared";
+import type { MaisieFieldType, OpConfig, CardRendererConfig, SectionConfig } from "@maisie/shared";
 
 // Mirrors plugin-core's CardDescriptor — defined locally since the dashboard
 // only depends on @maisie/shared, not @maisie/plugin-core.
@@ -56,6 +56,12 @@ interface DynamicCardProps {
   data?: unknown;
   dataLoading?: boolean;
   dataError?: unknown;
+  /**
+   * Compound card sections — renders a record response as multiple sections,
+   * each pulling data from a different field. Used for multi-section cards
+   * like NasCard, PlexCard, MediaCard.
+   */
+  sections?: SectionConfig[];
 }
 
 // Mirrors deriveHttpPath() in plugin-core/registry.ts — strips verb prefix,
@@ -84,6 +90,7 @@ export function DynamicCard({
   data: externalData,
   dataLoading,
   dataError,
+  sections,
 }: DynamicCardProps) {
   const derivedUrl = endpoint || `/api/${descriptor.pluginName}${deriveApiPath(descriptor.actionName)}`;
   // Skip fetch if external data is provided (from shared useApi in App.tsx)
@@ -98,6 +105,27 @@ export function DynamicCard({
 
   const errorMsg = error ? String(error) : null;
   const title = titleOverride || descriptor.label;
+
+  // Compound card — render sections from a record response
+  if (sections?.length && data && typeof data === "object" && !Array.isArray(data)) {
+    return (
+      <DynamicCompound
+        title={title}
+        data={data as Record<string, unknown>}
+        sections={sections}
+        topFields={visibleFields
+          ? visibleFields
+              .map((key) => descriptor.outputFields.find((f) => f.key === key))
+              .filter((f): f is CardDescriptor["outputFields"][number] => !!f)
+          : descriptor.outputFields.filter(
+              (f) => f.type !== "array" && f.type !== "object",
+            )}
+        rendererConfigs={rendererConfigs}
+        loading={loading}
+        error={errorMsg}
+      />
+    );
+  }
 
   // Filter and reorder fields if visibleFields is set
   const shownFields = visibleFields
@@ -302,5 +330,213 @@ function DynamicListItems({ title, items, fields, rendererConfigs, loading, erro
         </div>
       ))}
     </div>
+  );
+}
+
+// ── DynamicCompound ───────────────────────────────────────────────────────────
+// Multi-section card: top-level scalar fields as a record header, then each
+// section renders a nested field (usually a collection) as its own block.
+
+interface DynamicCompoundProps {
+  title: string;
+  data: Record<string, unknown>;
+  sections: SectionConfig[];
+  /** Top-level scalar fields to show in the card header (before sections). */
+  topFields: CardDescriptor["outputFields"];
+  rendererConfigs: CardRendererConfig;
+  loading?: boolean;
+  error?: string | null;
+}
+
+function DynamicCompound({ title, data, sections, topFields, rendererConfigs, loading, error }: DynamicCompoundProps) {
+  return (
+    <div className="resource-card">
+      <h3 className="card-title">{title}</h3>
+      {loading && <div className="resource-loading">Loading…</div>}
+      {error && <div className="resource-error">{error}</div>}
+      {data && !loading && (
+        <>
+          {/* Top-level scalar fields */}
+          {topFields.length > 0 && (
+            <div className="resource-fields">
+              {topFields.map((f) => {
+                const val = data[f.key];
+                if (val === null || val === undefined) return null;
+                // Skip fields that are used as section sources
+                if (sections.some((s) => s.sourceField === f.key)) return null;
+                const config = rendererConfigs[f.key] ?? inferRendererConfig(f.maisieType);
+                return (
+                  <div key={f.key} className="resource-field">
+                    <span className="resource-field-label">{f.label}</span>
+                    <span className="resource-field-value">
+                      <FieldRenderer value={val} config={config} />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Sections */}
+          {sections.map((section) => {
+            if (section.display === "hidden") return null;
+            const sectionData = data[section.sourceField];
+            const hideWhenEmpty = section.hideWhenEmpty !== false;
+
+            // Handle both arrays (collections) and single objects (records)
+            let items: Record<string, unknown>[] | null;
+            if (Array.isArray(sectionData)) {
+              items = sectionData as Record<string, unknown>[];
+            } else if (sectionData && typeof sectionData === "object") {
+              // Single object — wrap in array for uniform processing
+              items = [sectionData as Record<string, unknown>];
+            } else {
+              items = null;
+            }
+
+            if (!items || (items.length === 0 && hideWhenEmpty)) return null;
+
+            // Apply section-level ops
+            const processed = section.ops?.length
+              ? applyPipeline(items as never, section.ops) as Record<string, unknown>[]
+              : items;
+
+            // Limit
+            const limited = section.maxItems
+              ? (processed ?? []).slice(0, section.maxItems)
+              : processed ?? [];
+
+            // Infer fields from first item if no visibleFields specified
+            const sectionFields: CardDescriptor["outputFields"] = section.visibleFields
+              ? section.visibleFields.map((key) => ({
+                  key,
+                  type: "string" as const,
+                  maisieType: null,
+                  label: key.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/\b\w/g, (c) => c.toUpperCase()),
+                  optional: false,
+                }))
+              : limited.length > 0
+                ? Object.keys(limited[0]).map((key) => ({
+                    key,
+                    type: "string" as const,
+                    maisieType: null,
+                    label: key.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/\b\w/g, (c) => c.toUpperCase()),
+                    optional: false,
+                  }))
+                : [];
+
+            const sectionRenderers = section.rendererConfigs ?? {};
+
+            return (
+              <div key={section.sourceField} className="compound-section">
+                <div className="compound-section-title">{section.title}</div>
+                {section.display === "list" ? (
+                  <CompoundListItems items={limited} fields={sectionFields} rendererConfigs={sectionRenderers} />
+                ) : section.display === "table" ? (
+                  <CompoundTable items={limited} fields={sectionFields} rendererConfigs={sectionRenderers} />
+                ) : (
+                  // 'record' — show as key-value pairs (first item only)
+                  limited[0] && (
+                    <div className="resource-fields">
+                      {sectionFields.map((f) => {
+                        const val = limited[0][f.key];
+                        if (val === null || val === undefined) return null;
+                        const config = sectionRenderers[f.key] ?? inferRendererConfig(f.maisieType);
+                        return (
+                          <div key={f.key} className="resource-field">
+                            <span className="resource-field-label">{f.label}</span>
+                            <span className="resource-field-value">
+                              <FieldRenderer value={val} config={config} />
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
+                )}
+              </div>
+            );
+          })}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** List items within a compound section. */
+function CompoundListItems({ items, fields, rendererConfigs }: {
+  items: Record<string, unknown>[];
+  fields: CardDescriptor["outputFields"];
+  rendererConfigs: CardRendererConfig;
+}) {
+  // Classify: first string → title, status → badge, rest → sub
+  const statusField = fields.find((f) => f.maisieType === "status");
+  const stringFields = fields.filter(
+    (f) => f !== statusField && (f.maisieType === "string" || f.maisieType === null || f.type === "string"),
+  );
+  const titleField = stringFields[0];
+  const subFields = stringFields.slice(1);
+  const otherFields = fields.filter((f) => f !== statusField && !stringFields.includes(f));
+
+  return (
+    <>
+      {items.map((item, i) => (
+        <div key={String(item.id ?? i)} className="list-item">
+          <div className="list-item-text">
+            {titleField && (
+              <div className="list-item-title">{String(item[titleField.key] ?? "")}</div>
+            )}
+            {(subFields.length > 0 || otherFields.length > 0) && (
+              <div className="list-item-sub">
+                {[...subFields, ...otherFields].map((f, j) => {
+                  const val = item[f.key];
+                  if (val === null || val === undefined) return null;
+                  const config = rendererConfigs[f.key] ?? inferRendererConfig(f.maisieType);
+                  return (
+                    <span key={f.key}>
+                      {j > 0 && " — "}
+                      <FieldRenderer value={val} config={config} />
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          {statusField && item[statusField.key] != null && (
+            <span className="list-item-badge">
+              <FieldRenderer
+                value={item[statusField.key]}
+                config={rendererConfigs[statusField.key] ?? inferRendererConfig(statusField.maisieType)}
+              />
+            </span>
+          )}
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** Table within a compound section. */
+function CompoundTable({ items, fields, rendererConfigs }: {
+  items: Record<string, unknown>[];
+  fields: CardDescriptor["outputFields"];
+  rendererConfigs: CardRendererConfig;
+}) {
+  return (
+    <table className="resource-table">
+      <thead>
+        <tr>{fields.map((f) => <th key={f.key}>{f.label}</th>)}</tr>
+      </thead>
+      <tbody>
+        {items.map((item, i) => (
+          <tr key={String(item.id ?? i)}>
+            {fields.map((f) => {
+              const config = rendererConfigs[f.key] ?? inferRendererConfig(f.maisieType);
+              return <td key={f.key}><FieldRenderer value={item[f.key]} config={config} /></td>;
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

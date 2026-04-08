@@ -45,6 +45,8 @@ export interface CardConfig {
   ops?: import('@maisie/shared').OpConfig[]
   /** Per-field renderer overrides. */
   rendererConfigs?: import('@maisie/shared').CardRendererConfig
+  /** Compound card — sections that each render a field from the response. */
+  sections?: import('@maisie/shared').SectionConfig[]
 }
 
 export interface PersonaConfig {

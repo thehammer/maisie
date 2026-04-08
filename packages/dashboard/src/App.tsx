@@ -3,13 +3,9 @@ import type { Device, NasHealth, PlexStatus, HdhrStatus, CalibreStatus, NightlyS
 import { useApi } from "./hooks/useApi";
 import { useMqtt } from "./hooks/useMqtt";
 import { NetworkCard } from "./components/NetworkCard";
-import { NasCard } from "./components/NasCard";
-import { PlexCard } from "./components/PlexCard";
-import { MediaCard } from "./components/MediaCard";
 import { ServiceStatus } from "./components/ServiceStatus";
 import { SmartHomeCard } from "./components/SmartHomeCard";
 import { RecentlyAddedCard } from "./components/RecentlyAddedCard";
-import { CalibreCard } from "./components/CalibreCard";
 import { CalibreEnrichmentCard } from "./components/CalibreEnrichmentCard";
 import { NightlyCard } from "./components/NightlyCard";
 import { YouTubeCleanupCard } from "./components/YouTubeCleanupCard";
@@ -30,9 +26,54 @@ import { DynamicCard, type CardDescriptor } from "./components/DynamicCard";
 import { AddCardPanel } from "./components/AddWidgetPanel";
 import { CardConfigurator } from "./components/CardConfigurator";
 import { STATIC_DESCRIPTORS, getDescriptor } from "./lib/static-descriptors";
+import type { SectionConfig } from "@maisie/shared";
 
 
 const POLL_INTERVAL = 30_000; // 30 seconds
+
+// ── Default compound sections for converted cards ───────────────────────────
+
+const NAS_SECTIONS: SectionConfig[] = [
+  { sourceField: "system", title: "System", display: "record",
+    visibleFields: ["model", "uptime", "cpuLoad", "ramUsedPercent"],
+    rendererConfigs: {
+      uptime: { type: "duration" },
+      cpuLoad: { type: "percentage", warnAt: 70, critAt: 90 },
+      ramUsedPercent: { type: "percentage", warnAt: 70, critAt: 90 },
+    } },
+  { sourceField: "volumes", title: "Volumes", display: "list",
+    visibleFields: ["id", "usedPercent"],
+    rendererConfigs: { usedPercent: { type: "percentage", warnAt: 85, critAt: 95 } } },
+  { sourceField: "containers", title: "Containers", display: "list",
+    visibleFields: ["name", "status"],
+    rendererConfigs: { status: { type: "status" } } },
+];
+
+const PLEX_SECTIONS: SectionConfig[] = [
+  { sourceField: "libraries", title: "Libraries", display: "list",
+    visibleFields: ["title", "count"] },
+  { sourceField: "nowPlaying", title: "Now Playing", display: "list",
+    visibleFields: ["title", "seriesTitle", "user", "player", "state"] },
+  { sourceField: "recentlyAdded", title: "Recently Added", display: "list", maxItems: 5,
+    visibleFields: ["title", "seriesTitle", "seasonEpisode", "addedAt"],
+    rendererConfigs: { addedAt: { type: "timestamp", format: "relative" } } },
+];
+
+const MEDIA_SECTIONS: SectionConfig[] = [
+  { sourceField: "queue", title: "Downloading", display: "list",
+    visibleFields: ["title", "seriesTitle", "quality", "status"],
+    rendererConfigs: { status: { type: "status" } } },
+  { sourceField: "upcoming", title: "Upcoming", display: "list", maxItems: 10,
+    visibleFields: ["title", "seriesTitle", "type", "date", "status"],
+    rendererConfigs: { status: { type: "status" }, date: { type: "timestamp", format: "date" } } },
+];
+
+const CALIBRE_SECTIONS: SectionConfig[] = [
+  { sourceField: "libraries", title: "Libraries", display: "list",
+    visibleFields: ["name", "bookCount"] },
+  { sourceField: "recentlyAdded", title: "Recently Added", display: "list", maxItems: 5,
+    visibleFields: ["title", "authors"] },
+];
 
 const MQTT_TOPICS = [
   "home/system/agent/heartbeat",
@@ -265,9 +306,47 @@ export function App() {
     switch (id) {
       case "ServiceStatus":    return <ServiceStatus services={apis.services} />;
       case "NetworkCard":      return apis.devicesApi.data ? <NetworkCard devices={apis.devicesApi.data} /> : null;
-      case "NasCard":          return apis.nasApi.data ? <NasCard health={apis.nasApi.data} /> : null;
-      case "PlexCard":         return apis.plexApi.data ? <PlexCard status={apis.plexApi.data} /> : null;
-      case "MediaCard":        return apis.mediaApi.data ? <MediaCard calendar={apis.mediaApi.data} /> : null;
+      case "NasCard":
+        return STATIC_DESCRIPTORS.NasCard ? (
+          <DynamicCard
+            descriptor={STATIC_DESCRIPTORS.NasCard}
+            endpoint={STATIC_DESCRIPTORS.NasCard.endpoint}
+            data={apis.nasApi.data}
+            dataLoading={apis.nasApi.loading}
+            dataError={apis.nasApi.error}
+            sections={widget.sections ?? NAS_SECTIONS}
+            visibleFields={widget.visibleFields}
+            rendererConfigs={widget.rendererConfigs}
+            titleOverride={widget.title}
+          />
+        ) : null;
+      case "PlexCard":
+        return STATIC_DESCRIPTORS.PlexCard ? (
+          <DynamicCard
+            descriptor={STATIC_DESCRIPTORS.PlexCard}
+            endpoint={STATIC_DESCRIPTORS.PlexCard.endpoint}
+            data={apis.plexApi.data}
+            dataLoading={apis.plexApi.loading}
+            dataError={apis.plexApi.error}
+            sections={widget.sections ?? PLEX_SECTIONS}
+            visibleFields={widget.visibleFields ?? ["name", "version", "online"]}
+            rendererConfigs={widget.rendererConfigs}
+            titleOverride={widget.title}
+          />
+        ) : null;
+      case "MediaCard":
+        return STATIC_DESCRIPTORS.MediaCard ? (
+          <DynamicCard
+            descriptor={STATIC_DESCRIPTORS.MediaCard}
+            endpoint={STATIC_DESCRIPTORS.MediaCard.endpoint}
+            data={apis.mediaApi.data}
+            dataLoading={apis.mediaApi.loading}
+            dataError={apis.mediaApi.error}
+            sections={widget.sections ?? MEDIA_SECTIONS}
+            rendererConfigs={widget.rendererConfigs}
+            titleOverride={widget.title}
+          />
+        ) : null;
       case "HdhrCard":
         return STATIC_DESCRIPTORS.HdhrCard ? (
           <DynamicCard
@@ -308,7 +387,20 @@ export function App() {
             titleOverride={widget.title}
           />
         ) : null;
-      case "CalibreCard":      return apis.calibreApi.data ? <CalibreCard status={apis.calibreApi.data} /> : null;
+      case "CalibreCard":
+        return STATIC_DESCRIPTORS.CalibreCard ? (
+          <DynamicCard
+            descriptor={STATIC_DESCRIPTORS.CalibreCard}
+            endpoint={STATIC_DESCRIPTORS.CalibreCard.endpoint}
+            data={apis.calibreApi.data}
+            dataLoading={apis.calibreApi.loading}
+            dataError={apis.calibreApi.error}
+            sections={widget.sections ?? CALIBRE_SECTIONS}
+            visibleFields={widget.visibleFields ?? ["totalBooks"]}
+            rendererConfigs={widget.rendererConfigs}
+            titleOverride={widget.title}
+          />
+        ) : null;
       case "CalibreEnrichmentCard": return <CalibreEnrichmentCard pollInterval={POLL_INTERVAL} />;
       case "NightlyCard":      return <NightlyCard pollInterval={POLL_INTERVAL} />;
       case "YouTubeCleanupCard": return <YouTubeCleanupCard pollInterval={POLL_INTERVAL} />;
