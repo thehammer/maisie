@@ -12,9 +12,32 @@
 
 import { Hono } from 'hono'
 import type { MaisieCore } from '@maisie/shared'
+import { getPlexClient } from './client'
 
 export function createPlexWebhookRouter(getCore: () => MaisieCore | null) {
   const router = new Hono()
+
+  /**
+   * Image proxy — serves Plex images without exposing the token to the browser.
+   * Usage: /api/plex/image?path=/library/metadata/12345/thumb/1234567890
+   */
+  router.get('/image', async (c) => {
+    const path = c.req.query('path')
+    if (!path) return c.text('Missing path parameter', 400)
+    const plex = getPlexClient()
+    if (!plex) return c.text('Plex not configured', 503)
+    try {
+      const res = await plex.proxyImage(path)
+      const contentType = res.headers.get('content-type') ?? 'image/jpeg'
+      const body = await res.arrayBuffer()
+      return c.body(body, 200, {
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=86400',
+      })
+    } catch {
+      return c.text('Image not found', 404)
+    }
+  })
 
   router.post('/webhook', async (c) => {
     const core = getCore()
