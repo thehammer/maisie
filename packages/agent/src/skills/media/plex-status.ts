@@ -32,8 +32,8 @@ export async function getPlexStatus(plex: Plex): Promise<PlexStatus> {
     transcoding: !!m.TranscodeSession,
     progress: m.viewOffset,
     duration: m.duration,
-    thumb: m.thumb ? `/api/plex/image?path=${encodeURIComponent(m.thumb)}` : undefined,
-    art: m.art ? `/api/plex/image?path=${encodeURIComponent(m.art)}` : undefined,
+    thumb: m.thumb ? `/api/plex/image${m.thumb}` : undefined,
+    art: m.art ? `/api/plex/image${m.art}` : undefined,
   }));
 
   const recentlyAdded: PlexRecentlyAdded[] = rawRecent.map((m) => {
