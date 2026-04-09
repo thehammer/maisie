@@ -24,25 +24,28 @@ export function createPlexWebhookRouter(getCore: () => MaisieCore | null) {
   router.get('/image', async (c) => {
     const path = c.req.query('path')
     if (!path) return c.text('Missing path parameter', 400)
-    const plex = getPlexClient()
-    if (!plex) return c.json({ error: 'Plex client not initialized', path }, 503)
+
+    const host = process.env.PLEX_HOST
+    const token = process.env.PLEX_TOKEN
+    const port = process.env.PLEX_PORT ?? '32400'
+    if (!host || !token) return c.text('Plex not configured', 503)
+
+    const url = `http://${host}:${port}${path}?X-Plex-Token=${token}`
     try {
-      const res = await plex.proxyImage(path)
-      if (!res.ok) {
-        const core = getCore()
-        core?.log('plex', 'warn', `Image proxy failed: ${res.status} for ${path}`)
-        return c.text(`Plex returned ${res.status}`, 502)
-      }
+      const res = await fetch(url)
+      if (!res.ok) return c.text(`Plex ${res.status}`, 502)
       const contentType = res.headers.get('content-type') ?? 'image/jpeg'
-      const body = await res.arrayBuffer()
-      return c.body(body, 200, {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=86400',
+      return new Response(res.body, {
+        status: 200,
+        headers: {
+          'Content-Type': contentType,
+          'Cache-Control': 'public, max-age=86400',
+        },
       })
     } catch (err) {
       const core = getCore()
       core?.log('plex', 'warn', `Image proxy error: ${err instanceof Error ? err.message : err}`)
-      return c.text('Image not found', 404)
+      return c.text('Image proxy failed', 502)
     }
   })
 
