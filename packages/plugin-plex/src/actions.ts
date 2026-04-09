@@ -21,6 +21,10 @@ const nowPlayingSchema = z.object({
   transcoding: z.boolean(),
   progress: z.number(),
   duration: z.number(),
+  /** Poster/cover art URL (full URL with token). */
+  thumb: field(z.string().optional(), 'image'),
+  /** Background art URL (full URL with token). */
+  art: field(z.string().optional(), 'image'),
 })
 
 const mediaItemSchema = z.object({
@@ -124,6 +128,8 @@ export const getNowPlaying = defineAction({
       transcoding: !!m.TranscodeSession,
       progress: m.viewOffset,
       duration: m.duration,
+      thumb: m.thumb ? plex.getImageUrl(m.thumb) : undefined,
+      art: m.art ? plex.getImageUrl(m.art) : undefined,
     }))
   },
 })

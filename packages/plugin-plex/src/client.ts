@@ -96,6 +96,8 @@ export function createPlexClient(config: PlexConfig) {
         grandparentTitle?: string
         parentIndex?: number
         index?: number
+        thumb?: string
+        art?: string
         User: { title: string }
         Player: { title: string; state: string }
         TranscodeSession?: { videoDecision: string }
@@ -107,7 +109,7 @@ export function createPlexClient(config: PlexConfig) {
       return data.MediaContainer.Metadata ?? []
     },
 
-    async getImageUrl(thumbPath: string): Promise<string> {
+    getImageUrl(thumbPath: string): string {
       return `${baseUrl}${thumbPath}?X-Plex-Token=${config.token}`
     },
 

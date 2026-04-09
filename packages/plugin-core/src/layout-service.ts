@@ -17,6 +17,7 @@ export const DEFAULT_WIDGET_ORDER: CardConfig[] = [
   { id: 'PackagesCard',          visible: true,  col_span: 1, order: 12 },
   { id: 'RecentlyAddedCard',     visible: true,  col_span: 2, order: 13 },
   { id: 'SmartHomeCard',         visible: true,  col_span: 1, order: 14 },
+  { id: 'NowPlayingCard',       visible: true,  col_span: 1, order: 15 },
 ]
 
 export function createLayoutService(db: BunSQLiteDatabase<any>) {

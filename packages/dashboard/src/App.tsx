@@ -4,6 +4,7 @@ import { useApi } from "./hooks/useApi";
 import { useMqtt } from "./hooks/useMqtt";
 import { NetworkCard } from "./components/NetworkCard";
 import { ServiceStatus } from "./components/ServiceStatus";
+import { NowPlayingCard } from "./components/NowPlayingCard";
 import { RecentlyAddedCard } from "./components/RecentlyAddedCard";
 import { CalibreEnrichmentCard } from "./components/CalibreEnrichmentCard";
 import { NightlyCard } from "./components/NightlyCard";
@@ -334,6 +335,7 @@ export function App() {
   }) {
     switch (id) {
       case "ServiceStatus":    return <ServiceStatus services={apis.services} />;
+      case "NowPlayingCard":   return apis.plexApi.data ? <NowPlayingCard nowPlaying={apis.plexApi.data.nowPlaying} /> : null;
       case "NetworkCard":      return apis.devicesApi.data ? <NetworkCard devices={apis.devicesApi.data} /> : null;
       case "NasCard":
         return STATIC_DESCRIPTORS.NasCard ? (

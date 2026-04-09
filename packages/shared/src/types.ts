@@ -147,6 +147,10 @@ export interface PlexNowPlaying {
   transcoding: boolean;
   progress: number;
   duration: number;
+  /** Poster/cover art URL (full URL with Plex token). */
+  thumb?: string;
+  /** Background art URL (full URL with Plex token). */
+  art?: string;
 }
 
 export interface PlexRecentlyAdded {
@@ -382,5 +386,80 @@ export interface NightlyStatus {
   windowEnd: number;
   inWindow: boolean;
   recentRuns: NightlyRun[];
+}
+
+// BLE types
+
+export type BleDeviceOwnership = "home" | "neighbor" | "unknown";
+
+export interface BleDevice {
+  /** BLE MAC address (or CoreBluetooth UUID on macOS) */
+  mac: string;
+  name: string | null;
+  companyId: number | null;
+  companyName: string | null;
+  /** Average RSSI from recent samples */
+  rssi: number;
+  /** How often this device appears across scans (0-1) */
+  persistence: number;
+  /** Total times seen */
+  seenCount: number;
+  /** Total scans run */
+  totalScans: number;
+  ownership: BleDeviceOwnership;
+  /** User-assigned room */
+  room: string | null;
+  /** User-friendly label */
+  label: string | null;
+  /** Protocol adapter name (e.g. "sleepnumber", "govee", "generic") */
+  protocol: string | null;
+  /** GATT services discovered on connection */
+  services: string[];
+  /** What this device can do (protocol-specific) */
+  capabilities: Record<string, string[]>;
+  /** Which gateway node discovered this device */
+  gatewayNode: string;
+  firstSeen: string;
+  lastSeen: string;
+}
+
+export interface BleDeviceState {
+  mac: string;
+  protocol: string;
+  state: Record<string, unknown>;
+  timestamp: string;
+}
+
+export interface BleCommand {
+  mac: string;
+  protocol: string;
+  command: string;
+  params: Record<string, unknown>;
+}
+
+export interface BleCommandResult {
+  mac: string;
+  command: string;
+  success: boolean;
+  result?: Record<string, unknown>;
+  error?: string;
+  timestamp: string;
+}
+
+/** Auto-claim rule — devices matching these criteria are automatically claimed as "home" */
+export interface BleAutoClaimRule {
+  companyId?: number;
+  namePattern?: string;
+  /** Minimum persistence (0-1) before auto-claim applies */
+  minPersistence?: number;
+}
+
+export interface BleGatewayStatus {
+  node: string;
+  scanning: boolean;
+  scanCount: number;
+  uniqueDevices: number;
+  uptime: number;
+  timestamp: string;
 }
 

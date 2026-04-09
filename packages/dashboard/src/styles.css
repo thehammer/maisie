@@ -4234,3 +4234,84 @@ body {
   color: var(--text-muted);
   margin-bottom: 0.4rem;
 }
+
+/* ── Now Playing card ──────────────────────────────────── */
+
+.now-playing-card {
+  overflow: hidden;
+}
+
+.now-playing-session {
+  margin-top: 0.5rem;
+}
+
+.now-playing-session + .now-playing-session {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.now-playing-art {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.now-playing-art img {
+  width: 100%;
+  display: block;
+  aspect-ratio: 2/3;
+  object-fit: cover;
+}
+
+.now-playing-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.now-playing-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 1s linear;
+}
+
+.now-playing-state {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.now-playing-state-paused {
+  opacity: 0.7;
+}
+
+.now-playing-meta {
+  padding: 0 0.15rem;
+}
+
+.now-playing-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+.now-playing-subtitle {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
+.now-playing-info {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}

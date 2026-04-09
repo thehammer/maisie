@@ -254,6 +254,27 @@ export const STATIC_DESCRIPTORS: Record<string, StaticDescriptor> = {
     ],
   },
 
+  NowPlayingCard: {
+    id: "NowPlayingCard",
+    pluginName: "plex",
+    actionName: "get_now_playing",
+    label: "Now Playing",
+    section: "media",
+    schemaType: "collection",
+    endpoint: "",  // derived from PlexStatus.nowPlaying
+    outputFields: [
+      { key: "title",         type: "string",  maisieType: "string",    label: "Title",       optional: false },
+      { key: "seriesTitle",   type: "string",  maisieType: "string",    label: "Series",      optional: true  },
+      { key: "seasonEpisode", type: "string",  maisieType: "string",    label: "Episode",     optional: true  },
+      { key: "user",          type: "string",  maisieType: "string",    label: "User",        optional: false },
+      { key: "player",        type: "string",  maisieType: "string",    label: "Player",      optional: false },
+      { key: "state",         type: "string",  maisieType: "status",    label: "State",       optional: false },
+      { key: "thumb",         type: "string",  maisieType: "image",     label: "Cover Art",   optional: true  },
+      { key: "progress",      type: "number",  maisieType: "duration",  label: "Progress",    optional: false },
+      { key: "duration",      type: "number",  maisieType: "duration",  label: "Duration",    optional: false },
+    ],
+  },
+
   RecentlyAddedCard: {
     id: "RecentlyAddedCard",
     pluginName: "plex",
