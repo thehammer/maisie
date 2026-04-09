@@ -32,6 +32,8 @@ export async function getPlexStatus(plex: Plex): Promise<PlexStatus> {
     transcoding: !!m.TranscodeSession,
     progress: m.viewOffset,
     duration: m.duration,
+    thumb: m.thumb ? plex.getImageUrl(m.thumb) : undefined,
+    art: m.art ? plex.getImageUrl(m.art) : undefined,
   }));
 
   const recentlyAdded: PlexRecentlyAdded[] = rawRecent.map((m) => {
