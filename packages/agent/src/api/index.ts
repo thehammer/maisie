@@ -21,6 +21,7 @@ import { createPluginsRouter } from "./plugins";
 import { createPersonasRouter } from "./personas";
 import { createLayoutRouter } from "./layout";
 import { createPluginActionRouter } from "./plugin-actions";
+import { createBleRouter } from "./ble";
 import type { Agent } from "../agent/index";
 import type { MaisiePlugin } from "@maisie/shared";
 
@@ -46,20 +47,22 @@ export function createApi(services: Services, agent?: Agent, plugins: MaisiePlug
   app.route("/api", createGamingRouter(services));
   app.route("/api", createProtectRouter(services));
   app.route("/api", createMaintenanceRouter(services));
+  app.route("/api", createBleRouter(services));
   app.route("/api", createPluginsRouter(plugins));
   app.route("/api", createPersonasRouter());
   app.route("/api", createLayoutRouter());
 
-  // Generic action routing — auto-registers all plugin actions as HTTP endpoints.
-  // Hand-written domain routers above take precedence; these fill in the rest.
-  app.route("/api", createPluginActionRouter(plugins, services));
-
-  // Mount custom routes from plugins (OAuth flows, streaming endpoints, webhooks)
+  // Mount custom routes from plugins BEFORE auto-router so they take precedence
+  // (webhooks, image proxies, OAuth flows, streaming endpoints)
   for (const plugin of plugins) {
     if (plugin.customRoutes) {
       app.route(`/api/${plugin.name}`, plugin.customRoutes);
     }
   }
+
+  // Generic action routing — auto-registers all plugin actions as HTTP endpoints.
+  // Hand-written domain routers and custom routes above take precedence.
+  app.route("/api", createPluginActionRouter(plugins, services));
 
   if (agent) {
     app.route("/api", createChatRouter(agent));
