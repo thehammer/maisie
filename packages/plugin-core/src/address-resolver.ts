@@ -155,6 +155,11 @@ export function createAddressResolver(actionContext: ActionContext): AddressReso
     actionName: string,
     input: MaisieRecord,
   ): Promise<MaisieValue> {
+    // Special sentinel: return the live entity list as entity descriptors.
+    if (actionName === '__catalog_items') {
+      return entityRegistry.list().map(entityToDescriptor) as MaisieValue
+    }
+
     const registered = registry.getAction(pluginName, actionName)
     if (!registered) {
       throw new Error(`Plugin action not found: ${pluginName}.${actionName}`)
@@ -296,6 +301,26 @@ export function createAddressResolver(actionContext: ActionContext): AddressReso
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Convert an EntityDef to a plain descriptor record suitable for MEL queries.
+ * This is the value shape returned by `catalog.items`.
+ */
+function entityToDescriptor(entity: EntityDef): MaisieRecord {
+  return {
+    name: entity.name,
+    description: entity.description ?? null,
+    source: entity.source,
+    section: entity.section ?? null,
+    pluginName: entity.pluginName ?? null,
+    fields: Object.fromEntries(
+      Object.entries(entity.fields).map(([k, f]) => [
+        k,
+        { kind: f.kind, type: f.kind === 'data' ? f.type : f.returnType },
+      ]),
+    ),
+  } as MaisieRecord
+}
 
 /**
  * Returns true if the expression tree contains a RefNode named 'self'.

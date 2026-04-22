@@ -87,7 +87,8 @@ describe('EntityRegistry', () => {
     const entity = makeValidPluginEntity()
     registry.register(entity)
 
-    expect(registry.list()).toHaveLength(1)
+    // +1 for the synthetic catalog entity always registered at construction
+    expect(registry.list()).toHaveLength(2)
     expect(registry.get('test-plugin.list_devices')).toEqual(entity)
   })
 
@@ -101,7 +102,8 @@ describe('EntityRegistry', () => {
     const removed = registry.unregister('test-plugin.list_devices')
 
     expect(removed).toBe(true)
-    expect(registry.list()).toHaveLength(0)
+    // Only the synthetic catalog entity remains
+    expect(registry.list()).toHaveLength(1)
     expect(registry.get('test-plugin.list_devices')).toBeUndefined()
   })
 

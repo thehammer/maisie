@@ -9,6 +9,27 @@ import { validateEntityDef, inferTier, STD_LIB } from '@maisie/shared'
 export class EntityRegistry {
   private entities = new Map<string, EntityDef>()
 
+  constructor() {
+    // Register the synthetic catalog entity. It is always present — its single
+    // 'items' data field uses a special sentinel action name that the address
+    // resolver intercepts to return the live entity list.
+    const catalogEntity: EntityDef = {
+      name: 'catalog',
+      description: 'The registry of all entities in the system',
+      source: 'plugin',
+      pluginName: 'core',
+      section: 'system',
+      fields: {
+        items: {
+          kind: 'data',
+          type: 'collection',
+          actionName: '__catalog_items',
+        },
+      },
+    }
+    this.entities.set('catalog', catalogEntity)
+  }
+
   /** Register an entity. Throws if validation fails. */
   register(entity: EntityDef): void {
     const errors = validateEntityDef(entity)

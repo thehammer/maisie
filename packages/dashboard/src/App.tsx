@@ -9,6 +9,7 @@ import { RecentlyAddedCard } from "./components/RecentlyAddedCard";
 import { CalibreEnrichmentCard } from "./components/CalibreEnrichmentCard";
 import { NightlyCard } from "./components/NightlyCard";
 import { YouTubeCleanupCard } from "./components/YouTubeCleanupCard";
+import { DockerUpgradesCard } from "./components/DockerUpgradesCard";
 
 // Lazy-loaded pages — split into separate chunks
 const MediaSearchPage = lazy(() => import("./pages/MediaSearchPage").then((m) => ({ default: m.MediaSearchPage })));
@@ -18,6 +19,7 @@ const TvPage = lazy(() => import("./pages/TvPage").then((m) => ({ default: m.TvP
 const ChatPage = lazy(() => import("./pages/ChatPage").then((m) => ({ default: m.ChatPage })));
 const PluginsPage = lazy(() => import("./pages/PluginsPage").then((m) => ({ default: m.PluginsPage })));
 const PersonasPage = lazy(() => import("./pages/PersonasPage").then((m) => ({ default: m.PersonasPage })));
+const EntityEditorPage = lazy(() => import("./pages/EntityEditorPage").then((m) => ({ default: m.EntityEditorPage })));
 import { ChatPanel } from "./components/ChatPanel";
 import { NotificationsFeed } from "./components/NotificationsFeed";
 import { AgentStatus } from "./components/AgentStatus";
@@ -27,6 +29,7 @@ import { useLayout } from "./hooks/useLayout";
 import { DynamicCard, type CardDescriptor } from "./components/DynamicCard";
 import { AddCardPanel } from "./components/AddCardPanel";
 import { CardConfigurator } from "./components/CardConfigurator";
+import { CardWizard } from "./components/CardWizard";
 import { STATIC_DESCRIPTORS, getDescriptor } from "./lib/static-descriptors";
 import type { SectionConfig } from "@maisie/shared";
 
@@ -115,6 +118,7 @@ export function App() {
   const [notifsOpen, setNotifsOpen] = useState(false);
   const [addCardOpen, setAddCardOpen] = useState(false);
   const [configuringCardId, setConfiguringCardId] = useState<string | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const health = useApi<{ status: string }>("/api/health", POLL_INTERVAL);
   const devicesApi = useApi<Device[]>("/api/devices", POLL_INTERVAL);
@@ -266,6 +270,17 @@ export function App() {
     );
   }
 
+  if (page === "entities") {
+    return (
+      <div className="dashboard">
+        <Suspense fallback={pageFallback}>
+          <EntityEditorPage onBack={() => navigate("dashboard")} />
+        </Suspense>
+        {chatOverlay}
+      </div>
+    );
+  }
+
   const services = [
     {
       name: "Agent",
@@ -325,6 +340,16 @@ export function App() {
       detail: calibreApi.data ? `${calibreApi.data.totalBooks} books` : undefined,
     },
   ];
+
+  function handleWizardAdd(card: import("./hooks/useLayout").CardConfig) {
+    layout.addCard(card.id, {
+      title: card.title,
+      ops: card.ops,
+      displayStyle: card.displayStyle,
+      visibleFields: card.visibleFields,
+      rendererConfigs: card.rendererConfigs,
+    } as Partial<import("./hooks/useLayout").CardConfig>);
+  }
 
   function renderCard(id: string, widget: import("./hooks/useLayout").CardConfig, apis: {
     services: typeof services;
@@ -435,6 +460,7 @@ export function App() {
       case "CalibreEnrichmentCard": return <CalibreEnrichmentCard pollInterval={POLL_INTERVAL} />;
       case "NightlyCard":      return <NightlyCard pollInterval={POLL_INTERVAL} />;
       case "YouTubeCleanupCard": return <YouTubeCleanupCard pollInterval={POLL_INTERVAL} />;
+      case "DockerUpgradesCard": return <DockerUpgradesCard pollInterval={POLL_INTERVAL} />;
       case "PackagesCard":
         return STATIC_DESCRIPTORS.PackagesCard ? (
           <DynamicCard
@@ -491,6 +517,7 @@ export function App() {
             rendererConfigs={widget.rendererConfigs}
             visibleFields={widget.visibleFields}
             titleOverride={widget.title}
+            displayStyle={widget.displayStyle}
           />
         );
         return null;
@@ -514,6 +541,7 @@ export function App() {
             <a href="#chat" className="nav-link">Chat</a>
             <a href="#plugins" className="nav-link">Plugins</a>
             <a href="#personas" className="nav-link">Personas</a>
+            <a href="#entities" className="nav-link">Entities</a>
           </nav>
         </div>
         <div className="status">
@@ -521,6 +549,9 @@ export function App() {
           <div className={`status-dot ${agentUp ? "" : "down"}`} />
           {agentUp ? "Agent connected" : "Agent offline"}
           {mqttConnected && <span className="mqtt-badge">LIVE</span>}
+          <button className="edit-layout-btn wizard-btn-header" onClick={() => setWizardOpen(true)}>
+            ✦ Build a Card
+          </button>
           {layout.isEditMode ? (
             <>
               <button className="edit-layout-btn" onClick={() => setAddCardOpen((o) => !o)}>
@@ -583,6 +614,12 @@ export function App() {
           />
         );
       })()}
+
+      <CardWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onAdd={handleWizardAdd}
+      />
 
       {chatOverlay}
     </div>
