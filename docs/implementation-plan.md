@@ -2,6 +2,8 @@
 
 *Last updated 2026-04-22*
 
+**Status: ALL PHASES COMPLETE.** Phases 1 through 7 shipped on 2026-04-22. Final test count: 689 pass. The entity model is live end-to-end: async MEL evaluator, entity registry, derived entity persistence, self references with safety tier inference, CodeMirror editor with autocomplete and inline errors, catalog as a queryable entity, MQTT-driven event propagation, and the wizard understanding entities with function fields.
+
 Phased implementation plan for the entity model described in `docs/model.md`. Each phase is deployable on its own. The existing PluginAction system continues to work unchanged throughout.
 
 **Reference documents:**

@@ -181,13 +181,23 @@ Phase 1: Taxonomy & Protocol  [COMPLETE — docs/protocol.md, April 2026]
 Phase 2: Core Framework       [COMPLETE — resource model, semantic types, plugin protocol v0.1]
 Phase 3: Integration Gaps     [IN PROGRESS — webhooks done; UniFi/HA/Bambu gaps remain]
 Phase 4: Three Surface Layers [IN PROGRESS]
-  4a: API surface              [partial — plugin action router, no address resolver yet]
+  4a: API surface              [COMPLETE — plugin action router + entity address resolver (2026-04-22)]
   4b: Agent surface            [partial — tool registry wired; generic address tools not built]
-  4c: REPL                     [NOT STARTED]
+  4c: REPL                     [COMPLETE — MEL editor with autocomplete + inline errors (2026-04-22)]
   4d: UX component spec        [partial — DynamicCard + CardDescriptor implemented; full JSON spec not extracted]
-  4e: React implementation     [IN PROGRESS — DynamicCard, write path, card configurator done]
+  4e: React implementation     [COMPLETE — DynamicCard, write path, card configurator, CardWizard with entity/function field support (2026-04-22)]
   4f: iOS/Swift (future)       [NOT STARTED]
 ```
+
+**Entity model (added 2026-04-22)** — see `docs/model.md`, `docs/grammar.md`, `docs/implementation-plan.md`. 7 phases shipped, 689 tests. Key capabilities:
+- Entities as the unified unit (base + derived share the same shape)
+- MEL (Maisie Expression Language) — formal grammar, parser, pretty-printer
+- Async expression evaluator with address resolution
+- Derived entities persisted to SQLite, registered alongside plugin actions
+- `self` references with cycle detection; safety tier inference
+- Catalog is itself an entity: `catalog.items | filter: section == "system"`
+- MQTT-driven invalidation propagates base entity changes to derived entities
+- Dashboard entity editor at `/entities` route with CodeMirror + MEL syntax highlighting
 
 ---
 
