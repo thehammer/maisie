@@ -1,5 +1,6 @@
 import type { MaisiePlugin, PluginAction } from '@maisie/shared'
 import { validatePlugin } from './validators'
+import { entityRegistry, synthesizeEntitiesForPlugin } from './entity-registry'
 
 export interface RegisteredAction {
   plugin: string
@@ -41,6 +42,11 @@ export class PluginRegistry {
         action,
         httpPath: deriveHttpPath(action),
       })
+    }
+
+    // Also register in the entity registry (Phase 2a bridge)
+    for (const entity of synthesizeEntitiesForPlugin(plugin)) {
+      entityRegistry.register(entity)
     }
   }
 

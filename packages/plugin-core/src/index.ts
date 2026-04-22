@@ -51,4 +51,5 @@ export { setPlugins, setCore, registry }
 export { configurePlugin } from './actions'
 export { validatePlugin, validateActionName, VERB_PREFIXES } from './validators'
 export { deriveHttpPath } from './registry'
+export { EntityRegistry, entityRegistry, synthesizeEntityFromAction, synthesizeEntitiesForPlugin } from './entity-registry'
 export default plugin

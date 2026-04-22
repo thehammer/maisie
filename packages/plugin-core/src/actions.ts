@@ -5,6 +5,8 @@ import { introspectSchema } from './schema-introspector'
 import type { CardDescriptor, CardPlacement, CardConfig, PersonaConfig } from './types'
 import { createLayoutService } from './layout-service'
 import type { LayoutService } from './layout-service'
+import { entityRegistry } from './entity-registry'
+import { registry } from './registry'
 
 // ----------------------------------------------------------------
 // Module-level state — injected by plugin init()
@@ -22,6 +24,12 @@ export function setDb(db: unknown) {
 
 export function setPlugins(plugins: MaisiePlugin[]) {
   _loadedPlugins = plugins
+  // Phase 2a bridge: register all plugins into the singleton PluginRegistry so that
+  // getCardCatalog (which now queries entityRegistry + registry) works whether plugins
+  // were loaded via the real boot path or injected directly in tests.
+  for (const plugin of plugins) {
+    registry.register(plugin, () => {})
+  }
 }
 
 export function setCore(core: MaisieCore) {
@@ -560,21 +568,29 @@ export const getCardCatalog = defineAction({
   async execute(_input, _ctx) {
     const descriptors: CardDescriptor[] = []
 
-    for (const plugin of _loadedPlugins) {
-      for (const action of plugin.actions) {
-        if (action.ui === false) continue
+    for (const entity of entityRegistry.list()) {
+      if (entity.source !== 'plugin') continue  // Phase 2b will add derived entities to the catalog differently
 
-        const { schemaType, fields } = introspectSchema(action.output)
-        descriptors.push({
-          id: `${plugin.name}.${action.name}`,
-          pluginName: plugin.name,
-          actionName: action.name,
-          label: action.ui.label,
-          section: action.ui.section,
-          schemaType,
-          outputFields: fields,
-        })
-      }
+      const field = entity.fields.result
+      const actionName = field?.actionName
+      if (!actionName || !entity.pluginName) continue
+
+      const registered = registry.getAction(entity.pluginName, actionName)
+      if (!registered) continue
+
+      const action = registered.action
+      if (action.ui === false) continue
+
+      const { schemaType, fields } = introspectSchema(action.output)
+      descriptors.push({
+        id: entity.name,
+        pluginName: entity.pluginName,
+        actionName,
+        label: action.ui.label,
+        section: action.ui.section,
+        schemaType,
+        outputFields: fields,
+      })
     }
 
     return descriptors
