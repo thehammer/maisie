@@ -230,6 +230,105 @@ describe('address resolver — invoke', () => {
   })
 })
 
+// ── Self-reference resolution (Phase 3) ──────────────────────────────────────
+
+describe('address resolver — self references', () => {
+  it('derived entity with self.otherField resolves correctly', async () => {
+    // Entity with two data fields: 'base' is a literal, 'derived' uses self.base
+    const entity: EntityDef = {
+      name: 'self-test-entity',
+      source: 'derived',
+      fields: {
+        base: {
+          kind: 'data',
+          type: 'number',
+          expression: { kind: 'literal', value: 10 },
+        },
+        doubled: {
+          kind: 'data',
+          type: 'number',
+          // self.base * 2 — using apply(add, [get(self, 'base'), get(self, 'base')])
+          expression: {
+            kind: 'apply',
+            fn: 'add',
+            args: [
+              { kind: 'apply', fn: 'get', args: [{ kind: 'ref', name: 'self' }, { kind: 'literal', value: 'base' }] },
+              { kind: 'apply', fn: 'get', args: [{ kind: 'ref', name: 'self' }, { kind: 'literal', value: 'base' }] },
+            ],
+          },
+        },
+      },
+    }
+    entityRegistry.register(entity)
+
+    const resolver = createAddressResolver(ctx)
+    const value = await resolver.resolve('self-test-entity.doubled')
+    expect(value).toBe(20)
+  })
+
+  it('self record includes data fields resolved and function wrappers', async () => {
+    // Entity with one data field and one function field
+    // The function field's body reads self.count and returns it + 1
+    const entity: EntityDef = {
+      name: 'self-fn-entity',
+      source: 'derived',
+      fields: {
+        count: {
+          kind: 'data',
+          type: 'number',
+          expression: { kind: 'literal', value: 5 },
+        },
+        countPlusOne: {
+          kind: 'function',
+          params: [],
+          returnType: 'number',
+          tier: 'inform',
+          expression: {
+            kind: 'apply',
+            fn: 'add',
+            args: [
+              { kind: 'apply', fn: 'get', args: [{ kind: 'ref', name: 'self' }, { kind: 'literal', value: 'count' }] },
+              { kind: 'literal', value: 1 },
+            ],
+          },
+        },
+      },
+    }
+    entityRegistry.register(entity)
+
+    const resolver = createAddressResolver(ctx)
+    const result = await resolver.invoke('self-fn-entity.countPlusOne', {})
+    expect(result).toBe(6)
+  })
+
+  it('cycle detection: field A → self.B → self.A throws clear error', async () => {
+    // fieldA expression reads self.fieldB
+    // fieldB expression reads self.fieldA → cycle
+    const fieldAExpr = {
+      kind: 'apply' as const,
+      fn: 'get',
+      args: [{ kind: 'ref' as const, name: 'self' }, { kind: 'literal' as const, value: 'fieldB' }],
+    }
+    const fieldBExpr = {
+      kind: 'apply' as const,
+      fn: 'get',
+      args: [{ kind: 'ref' as const, name: 'self' }, { kind: 'literal' as const, value: 'fieldA' }],
+    }
+    const entity: EntityDef = {
+      name: 'cyclic-entity',
+      source: 'derived',
+      fields: {
+        fieldA: { kind: 'data', type: 'number', expression: fieldAExpr },
+        fieldB: { kind: 'data', type: 'number', expression: fieldBExpr },
+      },
+    }
+    entityRegistry.register(entity)
+
+    const resolver = createAddressResolver(ctx)
+    await expect(resolver.resolve('cyclic-entity.fieldA')).rejects.toThrow('Cycle detected')
+  })
+})
+
 // ── Longest prefix matching ───────────────────────────────────────────────────
 
 describe('address resolver — longest prefix matching', () => {

@@ -1,6 +1,5 @@
-import type { EntityDef } from '@maisie/shared'
-import { validateEntityDef } from '@maisie/shared'
-import type { MaisiePlugin, PluginAction } from '@maisie/shared'
+import type { EntityDef, MaisiePlugin, PluginAction, ActionTier } from '@maisie/shared'
+import { validateEntityDef, inferTier, STD_LIB } from '@maisie/shared'
 
 /**
  * The EntityRegistry holds all entities in the system — base entities
@@ -16,6 +15,20 @@ export class EntityRegistry {
     if (errors.length > 0) {
       throw new Error(`Invalid entity "${entity.name}": ${errors.join(', ')}`)
     }
+
+    // Phase 3: infer safety tiers for derived function fields from their expressions.
+    // This overrides the conservative 'advise' default set by entity-convert.ts —
+    // the default is still the safe fallback when inference can't resolve a reference.
+    if (entity.source === 'derived') {
+      for (const field of Object.values(entity.fields)) {
+        if (field.kind === 'function' && field.expression) {
+          field.tier = inferTier(field.expression, (ref) =>
+            resolveTierForRef(ref, this.entities),
+          )
+        }
+      }
+    }
+
     this.entities.set(entity.name, entity)
   }
 
@@ -139,3 +152,58 @@ export function synthesizeEntitiesForPlugin(plugin: MaisiePlugin): EntityDef[] {
 
 /** Singleton instance. */
 export const entityRegistry = new EntityRegistry()
+
+// ── Tier resolution ───────────────────────────────────────────────────────────
+
+/**
+ * All known primitive names. Primitives are pure (read-only) operations,
+ * so they always resolve to 'inform'.
+ */
+const KNOWN_PRIMITIVES = new Set([
+  'reduce', 'sort', 'append',
+  'get', 'set', 'merge',
+  'eq', 'neq', 'lt', 'lte', 'gt', 'gte', 'contains', 'startsWith',
+  'add', 'sub', 'mul', 'div', 'mod',
+  'and', 'or', 'not',
+  'concat', 'len', 'str',
+  'if', 'identity', 'call',
+])
+
+/**
+ * Resolve a function reference or address to its safety tier.
+ *
+ * Resolution order:
+ * 1. Known primitives → 'inform' (pure operations)
+ * 2. Std lib functions → 'inform' (all std lib is read-only)
+ * 3. Entity function fields (dotted path) → field.tier
+ * 4. Returns null if the reference cannot be resolved (not a function)
+ *
+ * Used by inferTier at entity registration time. Takes the entity map as a
+ * parameter to avoid relying on the singleton before it is populated.
+ */
+function resolveTierForRef(
+  ref: string,
+  entities: Map<string, EntityDef>,
+): ActionTier | null {
+  // Primitives are inform (pure).
+  if (KNOWN_PRIMITIVES.has(ref)) return 'inform'
+
+  // Std lib functions are inform (they're pure higher-order ops).
+  if (ref in STD_LIB) return 'inform'
+
+  // Dotted path — try entity.field lookup.
+  const lastDot = ref.lastIndexOf('.')
+  if (lastDot >= 0) {
+    const entityName = ref.slice(0, lastDot)
+    const fieldName = ref.slice(lastDot + 1)
+    const entity = entities.get(entityName)
+    if (entity) {
+      const field = entity.fields[fieldName]
+      if (field?.kind === 'function') return field.tier
+    }
+    // Plugin action format is handled via the entity registry (plugin entities
+    // are registered before derived entities that reference them).
+  }
+
+  return null
+}

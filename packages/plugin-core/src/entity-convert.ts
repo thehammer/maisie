@@ -30,7 +30,10 @@ export function parsedToEntityDef(parsed: ParsedEntity): EntityDef {
         // Default return type; Phase 3 will infer from expression.
         returnType: 'record',
         expression: field.body,
-        // Default to 'advise' until safety-tier inference lands in Phase 3.
+        // Conservative fallback tier. The entity registry (Phase 3) overrides this
+        // at registration time by running inferTier against the field's expression.
+        // 'advise' is intentionally the safe default — if inference cannot resolve
+        // a reference, the function requires human approval.
         tier: 'advise',
       }
     }

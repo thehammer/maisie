@@ -5,18 +5,26 @@
  * - Evaluating derived entity field expressions via `evalExprAsync`
  * - Delegating to plugin actions for base entity fields
  *
- * NOTE: `self` references are stubbed for Phase 2b. Derived entity expressions
- * that reference `self.xxx` will receive an empty record for `self`. Full self
- * support with lazy resolution and cycle detection is Phase 3.
+ * Phase 3: `self` references in derived entity expressions are resolved by
+ * pre-populating a record of all data fields and function wrappers before the
+ * field expression runs. Cycle detection prevents infinite recursion when field
+ * A depends on self.B which depends on self.A.
  */
 
-import type { AddressResolver, MaisieValue, MaisieRecord, EntityDef, FieldDef } from '@maisie/shared'
+import type { AddressResolver, MaisieValue, MaisieRecord, MaisieFunction, EntityDef, FieldDef, ExprNode } from '@maisie/shared'
 import { evalExprAsync, STD_LIB } from '@maisie/shared'
 import { entityRegistry } from './entity-registry'
 import { registry } from './registry'
 
 // ActionContext is a minimal context object passed to plugin actions.
 // In Phase 2b we only need enough for action.execute() to work.
+
+/** Tracks which entity fields are currently being resolved (for cycle detection). */
+interface ResolutionFrame {
+  entityName: string
+  fieldName: string
+}
+
 export interface ActionContext {
   [key: string]: unknown
 }
@@ -99,24 +107,46 @@ export function createAddressResolver(actionContext: ActionContext): AddressReso
     return result
   }
 
-  async function resolveField(entity: EntityDef, fieldName: string, field: FieldDef): Promise<MaisieValue> {
+  async function resolveField(
+    entity: EntityDef,
+    fieldName: string,
+    field: FieldDef,
+    resolutionStack: ResolutionFrame[] = [],
+  ): Promise<MaisieValue> {
     if (field.kind === 'data') {
       if (entity.source === 'plugin') {
         // Invoke the underlying plugin action.
         return invokePluginAction(entity.pluginName!, field.actionName!, {})
       }
-      // Derived data field: evaluate the MEL expression.
+      // Derived data field: evaluate the MEL expression with self in scope.
       if (!field.expression) {
         throw new Error(`Derived field "${fieldName}" on "${entity.name}" has no expression`)
       }
-      const env = { self: makeSelfStub(entity) }
+      const frame: ResolutionFrame = { entityName: entity.name, fieldName }
+      if (resolutionStack.some((f) => f.entityName === frame.entityName && f.fieldName === frame.fieldName)) {
+        throw new Error(`Cycle detected in entity "${entity.name}" field "${fieldName}"`)
+      }
+      // Push current field to stack BEFORE building self.
+      // buildSelfRecord uses this stack to detect when the expression of another field
+      // would circularly re-enter the current field's resolution.
+      const newStack = [...resolutionStack, frame]
+
+      // Only build `self` if the expression actually references it. This avoids
+      // the eager-resolution overhead for simple literal/non-self fields.
+      let env: Record<string, MaisieValue> = {}
+      if (expressionReferencesSelf(field.expression)) {
+        // Pass `fieldName` so buildSelfRecord knows which field is "current" and
+        // should be skipped (not a cycle — just the field resolving itself).
+        const selfRecord = await buildSelfRecord(entity, newStack, fieldName)
+        env = { self: selfRecord }
+      }
       return evalExprAsync(field.expression, resolver, env, STD_LIB)
     }
 
     // Function field: return a MaisieFunction wrapper.
     // Callers can invoke this via `invoke()` or by calling the returned function.
     return (args: MaisieRecord): MaisieValue => {
-      return invokeField(entity, fieldName, field, args) as unknown as MaisieValue
+      return invokeField(entity, fieldName, field, args, resolutionStack) as unknown as MaisieValue
     }
   }
 
@@ -138,6 +168,7 @@ export function createAddressResolver(actionContext: ActionContext): AddressReso
     _fieldName: string,
     field: FieldDef,
     args: MaisieRecord,
+    resolutionStack: ResolutionFrame[] = [],
   ): Promise<MaisieValue> {
     if (field.kind !== 'function') {
       throw new Error(`Not a function field`)
@@ -149,7 +180,13 @@ export function createAddressResolver(actionContext: ActionContext): AddressReso
     if (!field.expression) {
       throw new Error(`Derived function field has no expression`)
     }
-    const env = { ...args, self: makeSelfStub(entity) }
+    let env: Record<string, MaisieValue> = { ...args }
+    if (expressionReferencesSelf(field.expression)) {
+      // Function fields are invoked (not resolved), so no frame for _fieldName
+      // is in the stack — pass null as currentFieldName.
+      const selfRecord = await buildSelfRecord(entity, resolutionStack, null)
+      env = { ...args, self: selfRecord }
+    }
     return evalExprAsync(field.expression, resolver, env, STD_LIB)
   }
 
@@ -204,16 +241,83 @@ export function createAddressResolver(actionContext: ActionContext): AddressReso
   }
 
   /**
-   * Phase 2b stub for `self` references in derived entity expressions.
+   * Build a `self` record for use in derived entity field expressions.
    *
-   * Returns an empty record. Derived entity expressions must not use `self.xxx`
-   * in Phase 2b — those references will silently resolve to null. Full `self`
-   * support (lazy resolution, cycle detection) lands in Phase 3.
+   * Pre-resolves all data fields (using the resolution stack for cycle detection) and
+   * wraps all function fields as callable MaisieFunctions. This gives expressions
+   * access to `self.fieldName` for any field on the entity.
+   *
+   * `currentFieldName` is the field whose expression is about to be evaluated. It
+   * will always appear in `resolutionStack` — but this is expected (not a cycle),
+   * so we skip it with a null placeholder rather than throwing. Any OTHER field in
+   * the stack indicates a real cycle and throws immediately.
    */
-  function makeSelfStub(_entity: EntityDef): MaisieValue {
-    // Phase 3: replace with a lazy proxy that resolves entity fields on demand.
-    return {} as MaisieValue
+  async function buildSelfRecord(
+    entity: EntityDef,
+    resolutionStack: ResolutionFrame[],
+    currentFieldName: string | null,
+  ): Promise<MaisieRecord> {
+    const record: MaisieRecord = {}
+
+    for (const [name, field] of Object.entries(entity.fields)) {
+      if (field.kind === 'data') {
+        const inStack = resolutionStack.some(
+          (f) => f.entityName === entity.name && f.fieldName === name,
+        )
+        if (inStack) {
+          if (name === currentFieldName) {
+            // The current field being resolved is always in the stack.
+            // Provide a null placeholder — accessing self.currentField within its
+            // own expression is unusual but not inherently a cycle.
+            record[name] = null
+          } else {
+            // A different field is in the stack while we're trying to include it
+            // in self. This is a real cycle: the chain of self references loops back.
+            throw new Error(`Cycle detected in entity "${entity.name}" field "${name}"`)
+          }
+          continue
+        }
+        record[name] = await resolveField(entity, name, field, resolutionStack)
+      } else {
+        // Function field — wrap as a callable MaisieFunction.
+        // The closure captures `name` and `field` per iteration.
+        const capturedField = field
+        const capturedName = name
+        record[capturedName] = ((args: MaisieRecord): MaisieValue => {
+          return invokeField(entity, capturedName, capturedField, args, resolutionStack) as unknown as MaisieValue
+        }) as MaisieFunction
+      }
+    }
+
+    return record
   }
 
   return resolver
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Returns true if the expression tree contains a RefNode named 'self'.
+ * Used to skip the expensive `buildSelfRecord` call for expressions that
+ * don't reference self at all (most base expressions like literals and
+ * external entity refs).
+ */
+function expressionReferencesSelf(node: ExprNode): boolean {
+  switch (node.kind) {
+    case 'literal':
+      return false
+    case 'ref':
+      return node.name === 'self'
+    case 'lambda':
+      return expressionReferencesSelf(node.body)
+    case 'apply':
+      return node.args.some(expressionReferencesSelf)
+    case 'let':
+      return node.bindings.some((b) => expressionReferencesSelf(b.value)) ||
+        expressionReferencesSelf(node.body)
+    case 'pipe':
+      return expressionReferencesSelf(node.value) ||
+        node.steps.some(expressionReferencesSelf)
+  }
 }
