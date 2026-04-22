@@ -618,13 +618,51 @@ class Parser {
   /**
    * lambda_or_expr ::= lambda_expr | atom_expr
    *
-   * For pipe stage arguments. Uses atom (no pipe) to avoid consuming outer `|`.
+   * For predicate pipe stage arguments. Uses atom (no pipe) to avoid consuming
+   * outer `|`. If the expression is not already a lambda, wraps it in an
+   * implicit single-parameter lambda `(__row) => <expr>`. This enables
+   * shorthand like `filter: name contains "x"` where `name` resolves from the
+   * row via row-scope env extension in the evaluator.
+   *
+   * When a lambda IS present, its body is also parsed with parseAtom (not
+   * parseExpression) so the lambda body does not greedily consume outer pipe
+   * stages. This avoids the ambiguity in:
+   *   list | filter: (__row) => name contains "x" | sort: name desc
+   * where the `| sort:` must be an outer pipe step, not part of the lambda body.
    */
-  private parseLambdaOrExpr(): ExprNode {
+  private parseLambdaOrExpr(wrapImplicit = true): ExprNode {
     if (this.isLambdaAhead()) {
-      return this.parseLambda()
+      // Parse the lambda with an atom body (no outer pipe consumption).
+      return this.parseLambdaWithAtomBody()
     }
-    return this.parseAtom()
+    const inner = this.parseAtom()
+    if (wrapImplicit) {
+      // Wrap bare expression in implicit lambda so the evaluator receives
+      // the row record bound to `__row` and row fields in scope.
+      return { kind: 'lambda', params: ['__row'], body: inner }
+    }
+    return inner
+  }
+
+  /**
+   * Parse a lambda whose body is an atom (no pipe), preventing the body from
+   * consuming outer pipe stages. Used in pipe-stage predicate positions.
+   *
+   * lambda_params "=>" atom_expr
+   */
+  private parseLambdaWithAtomBody(): LambdaNode {
+    this.expect('LPAREN')
+    const params: string[] = []
+    if (!this.check('RPAREN')) {
+      params.push(this.expect('IDENT').value)
+      while (this.tryConsume('COMMA')) {
+        params.push(this.expect('IDENT').value)
+      }
+    }
+    this.expect('RPAREN')
+    this.expect('FAT_ARROW')
+    const body = this.parseAtom()
+    return { kind: 'lambda', params, body }
   }
 
   /**

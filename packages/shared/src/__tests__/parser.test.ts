@@ -479,6 +479,104 @@ describe('parser — define blocks', () => {
   })
 })
 
+// ── Implicit lambda wrapping (Phase 2b) ──────────────────────────────────────
+
+describe('parser — implicit predicate lambda wrapping', () => {
+  it('filter: bare expression wraps in implicit (__row) => lambda', () => {
+    // `list | filter: name contains "x"` should produce a lambda wrapper
+    const node = expr('list | filter: name contains "x"') as PipeNode
+    expect(node.kind).toBe('pipe')
+    const step = node.steps[0] as ApplyNode
+    expect(step.fn).toBe('std.filter')
+    const pred = step.args[0] as LambdaNode
+    expect(pred.kind).toBe('lambda')
+    expect(pred.params).toEqual(['__row'])
+    // The body should be the comparison expression
+    const body = pred.body as ApplyNode
+    expect(body.fn).toBe('contains')
+  })
+
+  it('filter: explicit lambda passes through unchanged', () => {
+    // `list | filter: (sw) => sw.state == "on"` should NOT get double-wrapped
+    const node = expr('list | filter: (sw) => sw.state == "on"') as PipeNode
+    const step = node.steps[0] as ApplyNode
+    const pred = step.args[0] as LambdaNode
+    expect(pred.kind).toBe('lambda')
+    expect(pred.params).toEqual(['sw']) // original param name, not __row
+  })
+
+  it('sort: field name is NOT wrapped (bare field arg)', () => {
+    // `list | sort: name desc` — no lambda wrapper
+    const node = expr('list | sort: name desc') as PipeNode
+    const step = node.steps[0] as ApplyNode
+    expect(step.fn).toBe('std.sort')
+    // First arg should be a LiteralNode with the field name, not a lambda
+    expect(step.args[0]).toEqual({ kind: 'literal', value: 'name' })
+  })
+
+  it('map: bare expression wraps in implicit (__row) => lambda', () => {
+    // `list | map: name` → implicit lambda (__row) => name
+    const node = expr('list | map: name') as PipeNode
+    const step = node.steps[0] as ApplyNode
+    expect(step.fn).toBe('std.map')
+    const fn = step.args[0] as LambdaNode
+    expect(fn.kind).toBe('lambda')
+    expect(fn.params).toEqual(['__row'])
+  })
+
+  it('map: explicit lambda passes through unchanged', () => {
+    const node = expr('items | map: (x) => x + 1') as PipeNode
+    const step = node.steps[0] as ApplyNode
+    const fn = step.args[0] as LambdaNode
+    expect(fn.params).toEqual(['x'])
+  })
+
+  it('any: bare expression wraps in implicit lambda', () => {
+    const node = expr('items | any: state == "on"') as PipeNode
+    const step = node.steps[0] as ApplyNode
+    const pred = step.args[0] as LambdaNode
+    expect(pred.kind).toBe('lambda')
+    expect(pred.params).toEqual(['__row'])
+  })
+
+  it('all: bare expression wraps in implicit lambda', () => {
+    const node = expr('items | all: active') as PipeNode
+    const step = node.steps[0] as ApplyNode
+    const pred = step.args[0] as LambdaNode
+    expect(pred.kind).toBe('lambda')
+    expect(pred.params).toEqual(['__row'])
+  })
+
+  it('pluck: field name is NOT wrapped', () => {
+    const node = expr('items | pluck: state') as PipeNode
+    const step = node.steps[0] as ApplyNode
+    // pluck takes a field name literal, not a predicate
+    expect(step.args[0]).toEqual({ kind: 'literal', value: 'state' })
+  })
+
+  it('group: field name is NOT wrapped', () => {
+    const node = expr('items | group: category') as PipeNode
+    const step = node.steps[0] as ApplyNode
+    expect(step.args[0]).toEqual({ kind: 'literal', value: 'category' })
+  })
+
+  it('sum: field name is NOT wrapped', () => {
+    const node = expr('items | sum: value') as PipeNode
+    const step = node.steps[0] as ApplyNode
+    expect(step.args[0]).toEqual({ kind: 'literal', value: 'value' })
+  })
+
+  it('multi-step: filter wraps, sort does not', () => {
+    const node = expr('list | filter: name contains "x" | sort: name desc') as PipeNode
+    const filterStep = node.steps[0] as ApplyNode
+    const sortStep = node.steps[1] as ApplyNode
+    // filter pred is a lambda
+    expect((filterStep.args[0] as LambdaNode).kind).toBe('lambda')
+    // sort field arg is a literal
+    expect(sortStep.args[0]).toEqual({ kind: 'literal', value: 'name' })
+  })
+})
+
 // ── Error handling ────────────────────────────────────────────────────────────
 
 describe('parser — errors', () => {

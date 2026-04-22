@@ -335,8 +335,22 @@ export function evalExpr(
       // Capture the current env (closure).
       return (args: MaisieRecord): MaisieValue => {
         const newEnv: Record<string, MaisieValue> = { ...env }
-        for (const param of node.params) {
-          newEnv[param] = args[param] ?? null
+        if (node.params.length === 1) {
+          // Single-param convention: bind the whole args record to the param.
+          // This allows `(sw) => sw.state == "on"` to receive an item record
+          // and access it as `sw`, rather than looking up args["sw"].
+          newEnv[node.params[0]] = args as MaisieValue
+          // Row-scope: also expose the record's own fields as env vars
+          // so `(__row) => name contains "x"` can resolve `name` from the row.
+          if (args && typeof args === 'object' && !Array.isArray(args)) {
+            for (const [k, v] of Object.entries(args)) {
+              if (!(k in newEnv)) newEnv[k] = v
+            }
+          }
+        } else {
+          for (const param of node.params) {
+            newEnv[param] = args[param] ?? null
+          }
         }
         return evalExpr(node.body, newEnv, defs)
       }

@@ -205,19 +205,44 @@ describe('evalExpr', () => {
     expect(evalExpr(eq)).toBe(true)
   })
 
-  it('evaluates lambda to a function', () => {
+  it('evaluates single-param lambda — binds whole args record to param', () => {
+    // Single-param convention: (rec) => rec.x + 1.
+    // The whole args record is bound to `rec`; access fields via get.
     const lambda: ExprNode = {
-      kind: 'lambda', params: ['x'],
-      body: { kind: 'apply', fn: 'add', args: [{ kind: 'ref', name: 'x' }, { kind: 'literal', value: 1 }] },
+      kind: 'lambda', params: ['rec'],
+      body: {
+        kind: 'apply', fn: 'add',
+        args: [
+          { kind: 'apply', fn: 'get', args: [{ kind: 'ref', name: 'rec' }, { kind: 'literal', value: 'x' }] },
+          { kind: 'literal', value: 1 },
+        ],
+      },
     }
     const fn = evalExpr(lambda) as (args: Record<string, unknown>) => unknown
     expect(fn({ x: 10 })).toBe(11)
   })
 
-  it('lambda closes over outer env', () => {
+  it('multi-param lambda destructures by name', () => {
+    // Two params: (x, base) receives { x: 5, base: 100 } and destructures.
     const lambda: ExprNode = {
-      kind: 'lambda', params: ['x'],
+      kind: 'lambda', params: ['x', 'base'],
       body: { kind: 'apply', fn: 'add', args: [{ kind: 'ref', name: 'x' }, { kind: 'ref', name: 'base' }] },
+    }
+    const fn = evalExpr(lambda) as (args: Record<string, unknown>) => unknown
+    expect(fn({ x: 5, base: 100 })).toBe(105)
+  })
+
+  it('single-param lambda closes over outer env', () => {
+    // (rec) => rec.x + base — `base` comes from captured outer env.
+    const lambda: ExprNode = {
+      kind: 'lambda', params: ['rec'],
+      body: {
+        kind: 'apply', fn: 'add',
+        args: [
+          { kind: 'apply', fn: 'get', args: [{ kind: 'ref', name: 'rec' }, { kind: 'literal', value: 'x' }] },
+          { kind: 'ref', name: 'base' },
+        ],
+      },
     }
     const fn = evalExpr(lambda, { base: 100 }) as (args: Record<string, unknown>) => unknown
     expect(fn({ x: 5 })).toBe(105)

@@ -203,6 +203,85 @@ function migrate(sqlite: Database) {
       env_overrides TEXT NOT NULL DEFAULT '{}',
       updated_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS ble_devices (
+      mac TEXT PRIMARY KEY,
+      name TEXT,
+      company_id INTEGER,
+      company_name TEXT,
+      rssi REAL DEFAULT 0,
+      persistence REAL DEFAULT 0,
+      seen_count INTEGER DEFAULT 0,
+      total_scans INTEGER DEFAULT 0,
+      ownership TEXT DEFAULT 'unknown',
+      room TEXT,
+      label TEXT,
+      protocol TEXT,
+      services TEXT DEFAULT '[]',
+      capabilities TEXT DEFAULT '{}',
+      gateway_node TEXT DEFAULT 'tokyo',
+      node_rssi TEXT DEFAULT '{}',
+      estimated_room TEXT,
+      first_seen TEXT NOT NULL,
+      last_seen TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS ble_auto_claim_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER,
+      name_pattern TEXT,
+      min_persistence REAL,
+      ownership TEXT DEFAULT 'home',
+      label TEXT,
+      protocol TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS ble_gateway_nodes (
+      node_id TEXT PRIMARY KEY,
+      room TEXT,
+      floor INTEGER DEFAULT 0,
+      x REAL,
+      y REAL,
+      active INTEGER DEFAULT 1,
+      last_seen TEXT,
+      notes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS docker_services (
+      service TEXT PRIMARY KEY,
+      image TEXT NOT NULL,
+      current_digest TEXT,
+      last_checked TEXT,
+      last_updated TEXT,
+      auto_update INTEGER NOT NULL DEFAULT 1,
+      enabled INTEGER NOT NULL DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS docker_upgrade_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      service TEXT NOT NULL,
+      image TEXT NOT NULL,
+      status TEXT NOT NULL,
+      error_message TEXT,
+      checked_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS derived_entities (
+      name TEXT PRIMARY KEY,
+      description TEXT,
+      fields TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS card_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      descriptor_id TEXT NOT NULL,
+      config TEXT NOT NULL DEFAULT '{}',
+      created_at INTEGER NOT NULL
+    );
   `);
 
   // Column migrations — ALTER TABLE ADD COLUMN for columns added after initial release
@@ -214,4 +293,6 @@ function migrate(sqlite: Database) {
   };
   addColumnIfMissing("ps4_apps", "storage", 'TEXT DEFAULT "internal"');
   addColumnIfMissing("library_channels", "icon_url", "TEXT");
+  addColumnIfMissing("ble_devices", "node_rssi", "TEXT DEFAULT '{}'");
+  addColumnIfMissing("ble_devices", "estimated_room", "TEXT");
 }

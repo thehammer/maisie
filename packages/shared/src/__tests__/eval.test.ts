@@ -105,34 +105,68 @@ describe('evalExprAsync — lambda', () => {
     expect(typeof fn).toBe('function')
   })
 
-  it('invokes lambda with params correctly', async () => {
+  it('invokes single-param lambda — param binds the whole args record', async () => {
+    // Single-param convention: (rec) => binds rec to the whole args record.
+    // To add a number field, access it via get(rec, "x").
     const lambdaNode: ExprNode = {
       kind: 'lambda',
-      params: ['x'],
-      body: { kind: 'apply', fn: 'add', args: [{ kind: 'ref', name: 'x' }, { kind: 'literal', value: 10 }] },
+      params: ['rec'],
+      body: {
+        kind: 'apply', fn: 'add',
+        args: [
+          { kind: 'apply', fn: 'get', args: [{ kind: 'ref', name: 'rec' }, { kind: 'literal', value: 'x' }] },
+          { kind: 'literal', value: 10 },
+        ],
+      },
     }
     const fn = await evalExprAsync(lambdaNode, resolver) as (args: MaisieRecord) => Promise<MaisieValue>
     const result = await fn({ x: 5 })
     expect(result).toBe(15)
   })
 
-  it('lambda closes over outer env', async () => {
+  it('invokes multi-param lambda with named destructuring', async () => {
+    // Two-param lambdas destructure by name: (x, y) receives { x, y }.
     const lambdaNode: ExprNode = {
       kind: 'lambda',
-      params: ['x'],
-      body: { kind: 'apply', fn: 'add', args: [{ kind: 'ref', name: 'x' }, { kind: 'ref', name: 'base' }] },
+      params: ['x', 'y'],
+      body: { kind: 'apply', fn: 'add', args: [{ kind: 'ref', name: 'x' }, { kind: 'ref', name: 'y' }] },
+    }
+    const fn = await evalExprAsync(lambdaNode, resolver) as (args: MaisieRecord) => Promise<MaisieValue>
+    const result = await fn({ x: 5, y: 10 })
+    expect(result).toBe(15)
+  })
+
+  it('lambda closes over outer env (single-param)', async () => {
+    // Single-param: (rec) => rec.x + base, where base comes from outer env.
+    const lambdaNode: ExprNode = {
+      kind: 'lambda',
+      params: ['rec'],
+      body: {
+        kind: 'apply', fn: 'add',
+        args: [
+          { kind: 'apply', fn: 'get', args: [{ kind: 'ref', name: 'rec' }, { kind: 'literal', value: 'x' }] },
+          { kind: 'ref', name: 'base' },
+        ],
+      },
     }
     const fn = await evalExprAsync(lambdaNode, resolver, { base: 100 }) as (args: MaisieRecord) => Promise<MaisieValue>
     const result = await fn({ x: 5 })
     expect(result).toBe(105)
   })
 
-  it('lambda can capture async-resolved values', async () => {
-    // A lambda that references a resolver address in its body
+  it('lambda can capture async-resolved values (single-param)', async () => {
+    // Lambda body references a resolver address and a field on the bound record.
+    // (row) => sensor.temperature + row.offset
     const lambdaNode: ExprNode = {
       kind: 'lambda',
-      params: ['offset'],
-      body: { kind: 'apply', fn: 'add', args: [{ kind: 'ref', name: 'sensor.temperature' }, { kind: 'ref', name: 'offset' }] },
+      params: ['row'],
+      body: {
+        kind: 'apply', fn: 'add',
+        args: [
+          { kind: 'ref', name: 'sensor.temperature' },
+          { kind: 'apply', fn: 'get', args: [{ kind: 'ref', name: 'row' }, { kind: 'literal', value: 'offset' }] },
+        ],
+      },
     }
     const fn = await evalExprAsync(lambdaNode, resolver) as (args: MaisieRecord) => Promise<MaisieValue>
     const result = await fn({ offset: 3 })
@@ -441,6 +475,119 @@ describe('evalExprAsync — let + pipe combined', () => {
     }
     const result = await evalExprAsync(node, resolver, {}, STD_LIB)
     expect(result).toBe(2)
+  })
+})
+
+// ── Predicate scope (Phase 2b fix) ───────────────────────────────────────────
+
+describe('evalExprAsync — predicate scope / single-param lambda', () => {
+  const switches: MaisieCollection = [
+    { name: 'front exterior lights', state: 'on' },
+    { name: 'back exterior lights', state: 'off' },
+    { name: 'living room', state: 'on' },
+  ]
+
+  it('single-param lambda binds whole args record', async () => {
+    // Lambda (sw) => sw.state receives the full item record as `sw`
+    const lambdaNode: ExprNode = {
+      kind: 'lambda',
+      params: ['sw'],
+      body: {
+        kind: 'apply', fn: 'get',
+        args: [{ kind: 'ref', name: 'sw' }, { kind: 'literal', value: 'state' }],
+      },
+    }
+    const fn = await evalExprAsync(lambdaNode, resolver) as (args: MaisieRecord) => Promise<MaisieValue>
+    // Pass the record as args (as the std.filter's call(pred, item) does)
+    const result = await fn({ name: 'front', state: 'on' })
+    expect(result).toBe('on')
+  })
+
+  it('multi-param lambda destructures by name (existing behavior preserved)', async () => {
+    // Lambda (acc, item) receives acc and item from { acc: ..., item: ... }
+    const lambdaNode: ExprNode = {
+      kind: 'lambda',
+      params: ['acc', 'item'],
+      body: {
+        kind: 'apply', fn: 'add',
+        args: [{ kind: 'ref', name: 'acc' }, { kind: 'ref', name: 'item' }],
+      },
+    }
+    const fn = await evalExprAsync(lambdaNode, resolver) as (args: MaisieRecord) => Promise<MaisieValue>
+    const result = await fn({ acc: 10, item: 5 })
+    expect(result).toBe(15)
+  })
+
+  it('row-scope: lambda body can reference item field as bare identifier', async () => {
+    // (__row) => state == "on"  resolves `state` from the row via env extension
+    const lambdaNode: ExprNode = {
+      kind: 'lambda',
+      params: ['__row'],
+      body: {
+        kind: 'apply', fn: 'eq',
+        args: [{ kind: 'ref', name: 'state' }, { kind: 'literal', value: 'on' }],
+      },
+    }
+    const fn = await evalExprAsync(lambdaNode, resolver) as (args: MaisieRecord) => Promise<MaisieValue>
+    expect(await fn({ name: 'front', state: 'on' })).toBe(true)
+    expect(await fn({ name: 'back', state: 'off' })).toBe(false)
+  })
+
+  it('outer binding is not shadowed by item field of same name', async () => {
+    // Outer env has `state = "always-wins"`. Row has `state = "on"`.
+    // The outer binding should be preserved because row-scope only fills gaps.
+    const lambdaNode: ExprNode = {
+      kind: 'lambda',
+      params: ['__row'],
+      body: { kind: 'ref', name: 'state' },
+    }
+    const fn = await evalExprAsync(lambdaNode, resolver, { state: 'always-wins' }) as (args: MaisieRecord) => Promise<MaisieValue>
+    const result = await fn({ name: 'front', state: 'on' })
+    // state in outer env should NOT be shadowed by the row's state
+    expect(result).toBe('always-wins')
+  })
+
+  it('single-param predicate works with std.filter pipe', async () => {
+    // filter: (sw) => sw.state == "on"  — single-param, binds whole record as sw
+    const lambdaNode: ExprNode = {
+      kind: 'lambda',
+      params: ['sw'],
+      body: {
+        kind: 'apply', fn: 'eq',
+        args: [
+          { kind: 'apply', fn: 'get', args: [{ kind: 'ref', name: 'sw' }, { kind: 'literal', value: 'state' }] },
+          { kind: 'literal', value: 'on' },
+        ],
+      },
+    }
+    const node: ExprNode = {
+      kind: 'pipe',
+      value: { kind: 'literal', value: switches as never },
+      steps: [{ kind: 'apply', fn: 'std.filter', args: [lambdaNode] }],
+    }
+    const result = await evalExprAsync(node, resolver, {}, STD_LIB) as MaisieCollection
+    expect(result).toHaveLength(2)
+    expect(result.every(r => r.state === 'on')).toBe(true)
+  })
+
+  it('row-scope predicate works with std.filter pipe', async () => {
+    // filter: (__row) => state == "on"  — bare `state` resolves from row
+    const lambdaNode: ExprNode = {
+      kind: 'lambda',
+      params: ['__row'],
+      body: {
+        kind: 'apply', fn: 'eq',
+        args: [{ kind: 'ref', name: 'state' }, { kind: 'literal', value: 'on' }],
+      },
+    }
+    const node: ExprNode = {
+      kind: 'pipe',
+      value: { kind: 'literal', value: switches as never },
+      steps: [{ kind: 'apply', fn: 'std.filter', args: [lambdaNode] }],
+    }
+    const result = await evalExprAsync(node, resolver, {}, STD_LIB) as MaisieCollection
+    expect(result).toHaveLength(2)
+    expect(result.every(r => r.state === 'on')).toBe(true)
   })
 })
 

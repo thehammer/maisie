@@ -6,6 +6,7 @@ config({ path: join(import.meta.dir, "../../..", ".env") });
 
 import { createMqttClient } from "./services/mqtt";
 import { initDb } from "./services/db";
+import { loadDerivedEntities } from "./services/entity-loader";
 import { createApi } from "./api/index";
 import type { Services } from "./api/types";
 import { createUniFiClientFromEnv } from "./skills/network/unifi-client";
@@ -28,6 +29,7 @@ import { createCalibreClientFromEnv } from "./skills/calibre/calibre-client";
 import { createAiClientFromEnv } from "./services/ai";
 import { createCalibreExecFromEnv } from "./services/calibre-exec";
 import { initNightly } from "./skills/maintenance/nightly-runner";
+import { initDockerUpgrades } from "./skills/maintenance/docker-upgrades";
 import { createPs4ClientFromEnv } from "./skills/gaming/ps4-client";
 import { syncPs4Apps } from "./skills/gaming/ps4-sync";
 import { initYouTubeCleanup } from "./skills/google/youtube-cleanup";
@@ -42,6 +44,7 @@ import { createAgent } from "./agent/index";
 import { discoverPlugins } from "./services/plugin-registry";
 import type { MaisiePlugin } from "@maisie/shared";
 import corePlugin, { setPlugins as setCorePlugins, setCore as setCoreInstance } from "@maisie/plugin-core";
+import { initBleSkill } from "./skills/ble/index";
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const DATA_DIR = join(import.meta.dir, "../../..", "data");
@@ -66,6 +69,9 @@ async function main() {
   // Initialize database
   const db = initDb();
   console.log("  ✓ Database initialized");
+
+  // Load persisted derived entities into the registry
+  await loadDerivedEntities(db);
 
   // Connect to MQTT broker
   const mqtt = await createMqttClient();
@@ -97,6 +103,8 @@ async function main() {
     transmission: null,
     readarr: null,
     audiobookshelf: null,
+    bleRegistry: null,
+    bleBridge: null,
   };
 
   // --- Initial connections ---
@@ -596,6 +604,12 @@ async function main() {
     scheduleUnifiReconnect(UNIFI_BACKOFF_MIN);
   }
 
+  // BLE skill — device registry + MQTT bridge (listens for gateway events)
+  const ble = initBleSkill(db);
+  services.bleRegistry = ble.registry;
+  services.bleBridge = ble.bridge;
+  console.log("  ✓ BLE skill initialized");
+
   // Discover plugins
   const rootDir = join(import.meta.dir, "../../..");
   let loadedPlugins: MaisiePlugin[] = [];
@@ -732,6 +746,16 @@ async function main() {
   // EPG guide service (fetches TV schedule from SiliconDust API)
   initEpgService();
 
+  // Trigger synthetic-hdhr lineup rebuild so that library + camera channels are
+  // always up-to-date after a maisie restart (synthetic-hdhr may have started
+  // before maisie and its initial buildLineup() would have fetched an empty list).
+  const SYNTHETIC_HDHR_URL = process.env.SYNTHETIC_HDHR_URL || "http://synthetic-hdhr:5004";
+  fetch(`${SYNTHETIC_HDHR_URL}/api/rebuild`, { method: "POST" })
+    .then((r) => r.ok
+      ? console.log("  ✓ synthetic-hdhr lineup rebuilt")
+      : console.warn("  ⚠ synthetic-hdhr lineup rebuild failed:", r.status))
+    .catch((err) => console.warn("  ⚠ synthetic-hdhr lineup rebuild failed:", err));
+
   // Nightly maintenance runner
   const nightlyMoviePaths = (process.env.PLEX_MOVIES_PATH || "").split(",").map(s => s.trim()).filter(Boolean);
   const nightlyTvPaths = (process.env.PLEX_TV_PATH || "").split(",").map(s => s.trim()).filter(Boolean);
@@ -752,6 +776,8 @@ async function main() {
   } else {
     console.log("  ⚠ Nightly runner not configured (set PLEX_MOVIES_PATH and/or PLEX_TV_PATH in .env)");
   }
+
+  initDockerUpgrades({ db });
 
   // Heartbeat every 30s
   setInterval(() => {

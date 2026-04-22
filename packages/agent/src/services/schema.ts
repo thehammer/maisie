@@ -173,8 +173,28 @@ export const bleDevices = sqliteTable("ble_devices", {
   services: text("services").default("[]"), // JSON array of GATT service UUIDs
   capabilities: text("capabilities").default("{}"), // JSON: Record<string, string[]>
   gatewayNode: text("gateway_node").default("tokyo"),
+  /** JSON: Record<nodeId, avgRssi> — RSSI seen from each gateway node */
+  nodeRssi: text("node_rssi").default("{}"),
+  /** Room name inferred from strongest-RSSI gateway node */
+  estimatedRoom: text("estimated_room"),
   firstSeen: text("first_seen").notNull(),
   lastSeen: text("last_seen").notNull(),
+});
+
+/**
+ * BLE gateway nodes — one row per scanner node (Mac, Pi, etc.)
+ * Room and optional XY coordinates for trilateration.
+ */
+export const bleGatewayNodes = sqliteTable("ble_gateway_nodes", {
+  nodeId: text("node_id").primaryKey(),
+  room: text("room"),
+  floor: integer("floor").default(0),
+  /** Optional normalized XY position (0-1) for floor-plan trilateration */
+  x: real("x"),
+  y: real("y"),
+  active: integer("active", { mode: "boolean" }).default(true),
+  lastSeen: text("last_seen"),
+  notes: text("notes"),
 });
 
 // BLE auto-claim rules
@@ -206,6 +226,34 @@ export const cardTemplates = sqliteTable('card_templates', {
   /** JSON-encoded CardConfig fields: ops, rendererConfigs, visibleFields, sections, title. */
   config: text('config').notNull().default('{}'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+})
+
+export const dockerServices = sqliteTable("docker_services", {
+  service: text("service").primaryKey(),
+  image: text("image").notNull(),
+  currentDigest: text("current_digest"),
+  lastChecked: text("last_checked"),
+  lastUpdated: text("last_updated"),
+  autoUpdate: integer("auto_update", { mode: "boolean" }).notNull().default(true),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+});
+
+export const dockerUpgradeHistory = sqliteTable("docker_upgrade_history", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  service: text("service").notNull(),
+  image: text("image").notNull(),
+  status: text("status").notNull(), // "updated" | "current" | "failed" | "skipped"
+  errorMessage: text("error_message"),
+  checkedAt: text("checked_at").notNull(),
+});
+
+// Derived (user-defined) entity definitions
+export const derivedEntities = sqliteTable('derived_entities', {
+  name: text('name').primaryKey(),
+  description: text('description'),
+  fields: text('fields', { mode: 'json' }).$type<Record<string, unknown>>().notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 })
 
 // Plugin configuration overrides (env vars, enabled/disabled)

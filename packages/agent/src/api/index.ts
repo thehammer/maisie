@@ -22,6 +22,9 @@ import { createPersonasRouter } from "./personas";
 import { createLayoutRouter } from "./layout";
 import { createPluginActionRouter } from "./plugin-actions";
 import { createBleRouter } from "./ble";
+import { createEntityRouter } from "@maisie/plugin-core/src/entity-routes";
+import { createDerivedEntityStore } from "@maisie/plugin-core/src/derived-entity-store";
+import { entityRegistry } from "@maisie/plugin-core";
 import type { Agent } from "../agent/index";
 import type { MaisiePlugin } from "@maisie/shared";
 
@@ -31,6 +34,14 @@ export function createApi(services: Services, agent?: Agent, plugins: MaisiePlug
   const app = new Hono();
 
   app.use("/*", cors());
+
+  // Entity CRUD + field resolution API (Phase 2b)
+  const derivedStore = createDerivedEntityStore(services.db as any)
+  // Load persisted entities at API creation time (synchronous registry, async store).
+  // Boot loading is done in entity-loader.ts before createApi is called;
+  // this provides a store reference for the router to persist/delete entities.
+  const entityRouter = createEntityRouter(derivedStore, {})
+  app.route("/api", entityRouter);
 
   app.route("/api", createHealthRouter(services));
   app.route("/api", createDevicesRouter(services));
