@@ -73,7 +73,28 @@ export async function evalExprAsync(
     case 'ref': {
       // Local env takes priority over the resolver.
       if (node.name in env) return env[node.name]
-      // Delegate to the resolver for entity addresses.
+      // Dotted ref: if the root segment is in env (lambda param, let binding,
+      // row-scope field), drill into it via field access. This handles cases
+      // like `e.section` in `(e) => e.section == "x"` where `e` is the lambda
+      // param and `section` is a field on the row record.
+      const dot = node.name.indexOf('.')
+      if (dot > 0) {
+        const root = node.name.slice(0, dot)
+        if (root in env) {
+          let val: MaisieValue = env[root]
+          const parts = node.name.slice(dot + 1).split('.')
+          for (const part of parts) {
+            if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+              val = (val as MaisieRecord)[part] ?? null
+            } else {
+              val = null
+              break
+            }
+          }
+          return val
+        }
+      }
+      // Fall through: delegate to the resolver for entity addresses.
       return resolver.resolve(node.name)
     }
 

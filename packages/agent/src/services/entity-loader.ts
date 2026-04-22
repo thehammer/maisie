@@ -28,6 +28,9 @@ export async function loadDerivedEntities(db: unknown): Promise<void> {
     if (loaded > 0 || failed > 0) {
       console.log(`  ✓ Loaded ${loaded} derived entity${loaded !== 1 ? 's' : ''}${failed > 0 ? ` (${failed} failed)` : ''}`)
     }
+    // Rebuild the dependency graph after all entities are loaded so that
+    // ordering issues (derived loaded before its base) are resolved.
+    entityRegistry.rebuildGraph()
   } catch (err) {
     console.warn(`[entity-loader] failed to load derived entities: ${err}`)
   }

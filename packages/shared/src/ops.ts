@@ -327,8 +327,27 @@ export function evalExpr(
       return node.value
 
     case 'ref': {
-      if (!(node.name in env)) throw new Error(`Unbound reference: "${node.name}"`)
-      return env[node.name]
+      if (node.name in env) return env[node.name]
+      // Dotted ref: if the root segment is in env, drill into it. Same rule
+      // as evalExprAsync — enables `e.section` where `e` is a lambda param.
+      const dot = node.name.indexOf('.')
+      if (dot > 0) {
+        const root = node.name.slice(0, dot)
+        if (root in env) {
+          let val: MaisieValue = env[root]
+          const parts = node.name.slice(dot + 1).split('.')
+          for (const part of parts) {
+            if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+              val = (val as MaisieRecord)[part] ?? null
+            } else {
+              val = null
+              break
+            }
+          }
+          return val
+        }
+      }
+      throw new Error(`Unbound reference: "${node.name}"`)
     }
 
     case 'lambda':

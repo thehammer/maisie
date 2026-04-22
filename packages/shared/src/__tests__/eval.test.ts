@@ -589,6 +589,34 @@ describe('evalExprAsync — predicate scope / single-param lambda', () => {
     expect(result).toHaveLength(2)
     expect(result.every(r => r.state === 'on')).toBe(true)
   })
+
+  it('dotted ref drills into lambda param (e.section pattern)', async () => {
+    // Regression for bug: `catalog.items | filter: (e) => e.section == "x"`
+    // was throwing "Unresolved address: e.section" because the whole dotted
+    // name was being looked up as an env key rather than drilling into `e`.
+    const items: MaisieCollection = [
+      { name: 'a', section: 'system' },
+      { name: 'b', section: 'smarthome' },
+      { name: 'c', section: 'system' },
+    ]
+    // (e) => e.section == "system"
+    const lambdaNode: ExprNode = {
+      kind: 'lambda',
+      params: ['e'],
+      body: {
+        kind: 'apply', fn: 'eq',
+        args: [{ kind: 'ref', name: 'e.section' }, { kind: 'literal', value: 'system' }],
+      },
+    }
+    const node: ExprNode = {
+      kind: 'pipe',
+      value: { kind: 'literal', value: items as never },
+      steps: [{ kind: 'apply', fn: 'std.filter', args: [lambdaNode] }],
+    }
+    const result = await evalExprAsync(node, resolver, {}, STD_LIB) as MaisieCollection
+    expect(result).toHaveLength(2)
+    expect(result.every(r => r.section === 'system')).toBe(true)
+  })
 })
 
 // ── Error propagation ────────────────────────────────────────────────────────

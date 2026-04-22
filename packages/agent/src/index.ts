@@ -44,7 +44,8 @@ import { createAgent } from "./agent/index";
 import { discoverPlugins } from "./services/plugin-registry";
 import type { MaisiePlugin } from "@maisie/shared";
 import corePlugin, { setPlugins as setCorePlugins, setCore as setCoreInstance } from "@maisie/plugin-core";
-import { initBleSkill } from "./skills/ble/index";
+import { initBleSkill } from "./skills/ble/index"
+import { startEntityEventBridge } from "./services/entity-events";
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const DATA_DIR = join(import.meta.dir, "../../..", "data");
@@ -729,6 +730,11 @@ async function main() {
     })
     agent.start()
   }
+
+  // Entity event bridge — translates plugin MQTT events into derived-entity
+  // invalidation notices so dashboard components re-fetch when base data changes.
+  startEntityEventBridge()
+  console.log("  ✓ Entity event bridge started")
 
   // Start HTTP API
   const port = Number(process.env.API_PORT) || 3001;

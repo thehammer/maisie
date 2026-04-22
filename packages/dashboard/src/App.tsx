@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect, lazy, Suspense } from "react";
+import { notifyEntityInvalidated } from "./lib/entity-events";
 import type { Device, NasHealth, PlexStatus, HdhrStatus, CalibreStatus } from "@maisie/shared";
 import { useApi } from "./hooks/useApi";
 import { useMqtt } from "./hooks/useMqtt";
@@ -94,6 +95,8 @@ const MQTT_TOPICS = [
   "home/smarthome/state",
   "home/printer/status",
   "home/system/nightly/status",
+  // Entity invalidation events from the agent's entity event bridge
+  "home/entity/+/invalidated",
 ];
 
 function useHashRoute() {
@@ -144,6 +147,14 @@ export function App() {
   // Handle live MQTT messages — refresh relevant data immediately
   const handleMqttMessage = useCallback(
     (topic: string, _payload: Record<string, unknown>) => {
+      // Entity invalidation: home/entity/{name}/invalidated
+      // Dispatch to the entity event bus so useEntitySubscription hooks fire.
+      const entityMatch = topic.match(/^home\/entity\/(.+)\/invalidated$/);
+      if (entityMatch) {
+        notifyEntityInvalidated(entityMatch[1]);
+        return;
+      }
+
       switch (topic) {
         case "home/network/devices/new":
         case "home/network/devices/missing":

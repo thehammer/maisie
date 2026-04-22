@@ -1,5 +1,6 @@
 import type { EntityDef, MaisiePlugin, PluginAction, ActionTier } from '@maisie/shared'
 import { validateEntityDef, inferTier, STD_LIB } from '@maisie/shared'
+import { entityDependencyGraph } from './entity-dependency-graph'
 
 /**
  * The EntityRegistry holds all entities in the system — base entities
@@ -51,10 +52,14 @@ export class EntityRegistry {
     }
 
     this.entities.set(entity.name, entity)
+    // Update dependency graph after inserting (so the entity itself is in knownNames)
+    const knownNames = new Set(this.entities.keys())
+    entityDependencyGraph.register(entity, knownNames)
   }
 
   /** Unregister an entity (used for derived entity CRUD). */
   unregister(name: string): boolean {
+    entityDependencyGraph.unregister(name)
     return this.entities.delete(name)
   }
 
@@ -92,8 +97,23 @@ export class EntityRegistry {
     })
   }
 
+  /**
+   * Rebuild the dependency graph from scratch. Called after all entities are
+   * loaded at boot to ensure ordering issues don't leave the graph incomplete.
+   * Derived entities registered before the base entities they reference won't
+   * have their deps tracked until this runs.
+   */
+  rebuildGraph(): void {
+    entityDependencyGraph.clear()
+    const knownNames = new Set(this.entities.keys())
+    for (const entity of this.entities.values()) {
+      entityDependencyGraph.register(entity, knownNames)
+    }
+  }
+
   /** Clear all entities (for testing). */
   clear(): void {
+    entityDependencyGraph.clear()
     this.entities.clear()
   }
 }

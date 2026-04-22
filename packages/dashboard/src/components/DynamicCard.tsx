@@ -10,7 +10,9 @@
  * maisieType annotations on each field.
  */
 
+import { useEffect } from "react";
 import { useApi } from "../hooks/useApi";
+import { useEntitySubscription } from "../hooks/useEntitySubscription";
 import { FieldRenderer, inferRendererConfig } from "../lib/renderers/FieldRenderer";
 import { applyPipeline } from "../lib/pipeline";
 import { CardRefreshContext } from "../lib/CardRefreshContext";
@@ -45,6 +47,8 @@ interface DynamicCardProps {
   visibleFields?: string[];
   /** Override the card title (from card configurator). */
   titleOverride?: string;
+  /** Collection display layout chosen by the wizard. */
+  displayStyle?: 'table' | 'card-list' | 'simple-list';
   /**
    * Direct endpoint URL — bypasses pluginName/actionName URL derivation.
    * Used by static descriptors for hand-written cards.
@@ -95,6 +99,7 @@ export function DynamicCard({
   dataError,
   onRefresh,
   sections,
+  displayStyle,
 }: DynamicCardProps) {
   const derivedUrl = endpoint || `/api/${descriptor.pluginName}${deriveApiPath(descriptor.actionName)}`;
   // Skip fetch if external data is provided (from shared useApi in App.tsx)
@@ -104,6 +109,15 @@ export function DynamicCard({
   const loading = skipFetch ? (dataLoading ?? false) : internal.loading;
   const error = skipFetch ? dataError : internal.error;
   const refresh = onRefresh ?? internal.refresh;
+
+  // Subscribe to entity invalidation events. When the entity's backing data
+  // changes (a plugin event fires on MQTT), the dependency graph publishes
+  // home/entity/{id}/invalidated and we re-fetch immediately.
+  // descriptor.id is the entity name (e.g. "exterior-lights").
+  const tick = useEntitySubscription(descriptor.id);
+  useEffect(() => {
+    if (tick > 0) refresh();
+  }, [tick]);
 
   // Apply the op pipeline to transform collection data before rendering
   const transformed = applyPipeline(data as never, ops);
@@ -138,27 +152,63 @@ export function DynamicCard({
       />
     );
   } else if (Array.isArray(transformed)) {
-    const hasImage = shownFields.some((f) => f.maisieType === "image");
-    const useListLayout = hasImage || shownFields.length <= 4;
-    content = useListLayout ? (
-      <DynamicListItems
-        title={title}
-        items={transformed as Record<string, unknown>[]}
-        fields={shownFields}
-        rendererConfigs={rendererConfigs}
-        loading={loading}
-        error={errorMsg}
-      />
-    ) : (
-      <DynamicList
-        title={title}
-        items={transformed as Record<string, unknown>[]}
-        fields={shownFields}
-        rendererConfigs={rendererConfigs}
-        loading={loading}
-        error={errorMsg}
-      />
-    );
+    const items = transformed as Record<string, unknown>[];
+    if (displayStyle === 'simple-list') {
+      content = (
+        <DynamicSimpleList
+          title={title}
+          items={items}
+          fields={shownFields}
+          loading={loading}
+          error={errorMsg}
+        />
+      );
+    } else if (displayStyle === 'table') {
+      content = (
+        <DynamicList
+          title={title}
+          items={items}
+          fields={shownFields}
+          rendererConfigs={rendererConfigs}
+          loading={loading}
+          error={errorMsg}
+        />
+      );
+    } else if (displayStyle === 'card-list') {
+      content = (
+        <DynamicListItems
+          title={title}
+          items={items}
+          fields={shownFields}
+          rendererConfigs={rendererConfigs}
+          loading={loading}
+          error={errorMsg}
+        />
+      );
+    } else {
+      // Auto heuristic
+      const hasImage = shownFields.some((f) => f.maisieType === "image");
+      const useListLayout = hasImage || shownFields.length <= 4;
+      content = useListLayout ? (
+        <DynamicListItems
+          title={title}
+          items={items}
+          fields={shownFields}
+          rendererConfigs={rendererConfigs}
+          loading={loading}
+          error={errorMsg}
+        />
+      ) : (
+        <DynamicList
+          title={title}
+          items={items}
+          fields={shownFields}
+          rendererConfigs={rendererConfigs}
+          loading={loading}
+          error={errorMsg}
+        />
+      );
+    }
   } else {
     content = (
       <DynamicRecord
@@ -210,6 +260,44 @@ function DynamicRecord({ title, data, fields, rendererConfigs, loading, error }:
             );
           })}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── DynamicSimpleList ─────────────────────────────────────────────────────────
+// Minimal list: one item per row, showing only the first title-like field.
+
+interface DynamicSimpleListProps {
+  title: string;
+  items: Record<string, unknown>[] | null;
+  fields: CardDescriptor["outputFields"];
+  loading?: boolean;
+  error?: string | null;
+}
+
+function DynamicSimpleList({ title, items, fields, loading, error }: DynamicSimpleListProps) {
+  // Find the first string/title field (non-image, non-status)
+  const titleField = fields.find(
+    (f) => f.maisieType === "string" || f.maisieType === null || f.type === "string",
+  ) ?? fields[0];
+
+  return (
+    <div className="resource-card">
+      <h3 className="card-title">{title}</h3>
+      {loading && <div className="resource-loading">Loading…</div>}
+      {error && <div className="resource-error">{error}</div>}
+      {items && !loading && items.length === 0 && (
+        <div className="empty-state">No items</div>
+      )}
+      {items && !loading && (
+        <ul className="simple-list">
+          {items.map((item, i) => (
+            <li key={String(item.id ?? i)} className="simple-list-item">
+              {titleField ? String(item[titleField.key] ?? "") : String(i + 1)}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
