@@ -16,8 +16,12 @@ import {
 } from '@codemirror/view'
 import { defaultKeymap, historyKeymap, history } from '@codemirror/commands'
 import { bracketMatching } from '@codemirror/language'
+import { autocompletion } from '@codemirror/autocomplete'
+import { linter, lintGutter } from '@codemirror/lint'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { mel } from '../lib/editor/mel-stream-language'
+import { melCompletions, refreshCompletionCatalog } from '../lib/editor/mel-completion'
+import { melLinter } from '../lib/editor/mel-linter'
 
 const API = import.meta.env.VITE_API_URL || ''
 
@@ -64,6 +68,9 @@ export function EntityEditor() {
         keymap.of([...defaultKeymap, ...historyKeymap]),
         oneDark,
         mel(),
+        autocompletion({ override: [melCompletions] }),
+        lintGutter(),
+        linter(melLinter, { delay: 500 }),
       ],
     })
 
@@ -109,6 +116,7 @@ export function EntityEditor() {
       const data = await res.json() as { name?: string; error?: string }
       if (res.ok) {
         setSaveStatus(`Saved: ${data.name}`)
+        refreshCompletionCatalog()
       } else {
         setSaveStatus(`Error: ${data.error ?? 'unknown'}`)
       }

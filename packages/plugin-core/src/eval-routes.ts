@@ -15,7 +15,7 @@
 
 import { Hono } from 'hono'
 import type { ExprNode } from '@maisie/shared'
-import { parse, evalExprAsync } from '@maisie/shared'
+import { parse, evalExprAsync, ParseError } from '@maisie/shared'
 import { createAddressResolver } from './address-resolver'
 import type { ActionContext } from './address-resolver'
 
@@ -69,7 +69,52 @@ export function createEvalRouter(actionContext: ActionContext) {
     return c.json({ value, type: describeValue(value) })
   })
 
+  // ── POST /eval/validate ────────────────────────────────────────────────────
+  // Parse-only — no evaluation. Returns { valid, errors[] } for inline linting.
+  router.post('/eval/validate', async (c) => {
+    let body: { source?: string }
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ valid: false, errors: [{ line: 0, col: 0, message: 'invalid JSON body' }] })
+    }
+
+    if (!body.source || body.source.trim().length === 0) {
+      return c.json({ valid: false, errors: [{ line: 0, col: 0, message: 'empty source' }] })
+    }
+
+    try {
+      parse(body.source)
+      return c.json({ valid: true, errors: [] })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      // ParseError carries a character-offset `pos` — convert to 1-based line/col.
+      if (err instanceof ParseError) {
+        const { line, col } = posToLineCol(body.source, err.pos)
+        return c.json({ valid: false, errors: [{ line, col, message: msg }] })
+      }
+      // Unknown error shape — report at position 0 (start of document)
+      return c.json({ valid: false, errors: [{ line: 1, col: 1, message: msg }] })
+    }
+  })
+
   return router
+}
+
+/** Convert a 0-based character offset to 1-based line/col. */
+function posToLineCol(src: string, pos: number): { line: number; col: number } {
+  let line = 1
+  let col = 1
+  const end = Math.min(pos, src.length)
+  for (let i = 0; i < end; i++) {
+    if (src[i] === '\n') {
+      line++
+      col = 1
+    } else {
+      col++
+    }
+  }
+  return { line, col }
 }
 
 function describeValue(v: unknown): string {
