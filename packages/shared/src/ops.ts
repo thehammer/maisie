@@ -261,6 +261,40 @@ export const PRIMITIVES: Record<string, Primitive> = {
    *  Treats null as empty collection — used as initial accumulator in reduce-derived fns. */
   append: (coll, item) => [...((coll as MaisieCollection) ?? []), item as MaisieRecord],
 
+  /** take(collection, n) — keep only the first n elements. */
+  take: (coll, n) => ((coll as MaisieCollection) ?? []).slice(0, Number(n)),
+
+  /** sortBy(collection, field, dir) — sort by field value. dir is 'asc' | 'desc'. */
+  sortBy: (coll, field, dir) => {
+    const rows = (coll as MaisieCollection) ?? []
+    const f = field as string
+    const direction = (dir as string) ?? 'asc'
+    return [...rows].sort((a, b) => {
+      const av = a[f], bv = b[f]
+      if (av === bv) return 0
+      const cmp = (av == null || bv == null) ? (av == null ? 1 : -1)
+        : av < bv ? -1 : 1
+      return direction === 'desc' ? -cmp : cmp
+    })
+  },
+
+  /** groupBy(collection, field) — group by field value. Returns a collection of
+   *  { [field]: key, items: collection } records. */
+  groupBy: (coll, field) => {
+    const rows = (coll as MaisieCollection) ?? []
+    const f = field as string
+    const groups = new Map<string, MaisieCollection>()
+    for (const row of rows) {
+      const key = String(row[f] ?? '')
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(row)
+    }
+    return Array.from(groups.entries()).map(([key, items]) => ({
+      [f]: key,
+      items: items as unknown as MaisieValue,
+    }))
+  },
+
   // ── Record ───────────────────────────────────────────────────────────────────
   /** get(record, field) — field access. Returns null if record is null. */
   get: (record, field) => record == null ? null : (record as MaisieRecord)[field as string] ?? null,

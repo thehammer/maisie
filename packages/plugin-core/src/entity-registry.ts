@@ -201,7 +201,7 @@ export const entityRegistry = new EntityRegistry()
  * so they always resolve to 'inform'.
  */
 const KNOWN_PRIMITIVES = new Set([
-  'reduce', 'sort', 'append',
+  'reduce', 'sort', 'append', 'take', 'sortBy', 'groupBy',
   'get', 'set', 'merge',
   'eq', 'neq', 'lt', 'lte', 'gt', 'gte', 'contains', 'startsWith',
   'add', 'sub', 'mul', 'div', 'mod',

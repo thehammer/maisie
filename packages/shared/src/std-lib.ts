@@ -327,6 +327,49 @@ export const DEF_UNIQUE: FunctionDef = {
   },
 }
 
+/** limit(collection, n) — keep only the first N elements. */
+export const DEF_LIMIT: FunctionDef = {
+  id: 'std.limit', name: 'limit',
+  description: 'Keep only the first N elements',
+  params: ['collection', 'n'],
+  inputSchema: 'collection', outputSchema: 'collection',
+  body: {
+    kind: 'apply', fn: 'take', args: [
+      { kind: 'ref', name: 'collection' },
+      { kind: 'ref', name: 'n' },
+    ],
+  },
+}
+
+/** sort(collection, field, dir) — sort by field value, dir is 'asc' or 'desc'. */
+export const DEF_SORT: FunctionDef = {
+  id: 'std.sort', name: 'sort',
+  description: 'Sort elements by a field value',
+  params: ['collection', 'field', 'dir'],
+  inputSchema: 'collection', outputSchema: 'collection',
+  body: {
+    kind: 'apply', fn: 'sortBy', args: [
+      { kind: 'ref', name: 'collection' },
+      { kind: 'ref', name: 'field' },
+      { kind: 'ref', name: 'dir' },
+    ],
+  },
+}
+
+/** group(collection, field) — group by field value. */
+export const DEF_GROUP: FunctionDef = {
+  id: 'std.group', name: 'group',
+  description: 'Group elements by a field value',
+  params: ['collection', 'field'],
+  inputSchema: 'collection', outputSchema: 'collection',
+  body: {
+    kind: 'apply', fn: 'groupBy', args: [
+      { kind: 'ref', name: 'collection' },
+      { kind: 'ref', name: 'field' },
+    ],
+  },
+}
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 /**
@@ -336,6 +379,9 @@ export const DEF_UNIQUE: FunctionDef = {
 export const STD_LIB: Record<string, FunctionDef> = {
   [DEF_FILTER.id]: DEF_FILTER,
   [DEF_MAP.id]:    DEF_MAP,
+  [DEF_LIMIT.id]:  DEF_LIMIT,
+  [DEF_SORT.id]:   DEF_SORT,
+  [DEF_GROUP.id]:  DEF_GROUP,
   [DEF_PLUCK.id]:  DEF_PLUCK,
   [DEF_COUNT.id]:  DEF_COUNT,
   [DEF_SUM.id]:    DEF_SUM,
