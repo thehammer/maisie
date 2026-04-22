@@ -42,20 +42,34 @@ export function createEvalRouter(actionContext: ActionContext) {
       }
 
       // If source defines an entity, preview it by evaluating each data field
-      // and returning a record of results. Function fields are listed as
-      // callable placeholders. Save the entity via POST /api/entities.
+      // in declaration order. Each resolved field is added to a `self` record
+      // so later fields can reference it (e.g., `total: self.items | count`).
+      // Function fields are shown as placeholders — they're not invokable
+      // from an unsaved preview. Save via POST /api/entities to get a real
+      // function field with cycle detection and tier inference.
       if ('kind' in parsed && parsed.kind === 'entity') {
         const preview: Record<string, unknown> = {}
+        const selfRecord: Record<string, unknown> = {}
         for (const field of parsed.fields) {
           if (field.kind === 'data' && field.expression) {
             try {
-              preview[field.name] = await evalExprAsync(field.expression, resolver)
+              const value = await evalExprAsync(
+                field.expression,
+                resolver,
+                { self: selfRecord as never },
+              )
+              preview[field.name] = value
+              selfRecord[field.name] = value
             } catch (err) {
               preview[field.name] = `<error: ${err instanceof Error ? err.message : String(err)}>`
             }
           } else if (field.kind === 'function') {
             const paramList = field.params.map((p) => p.name).join(', ')
             preview[field.name] = `<function(${paramList})>`
+            // Provide a placeholder in self so function-field references don't
+            // crash the preview. Calling it returns an error string.
+            selfRecord[field.name] = (() =>
+              `<function "${field.name}" — save the entity to invoke>`) as never
           }
         }
         return c.json({
