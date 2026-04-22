@@ -14,9 +14,15 @@
  *
  * The two layers share the same MaisieValue type system, so a function produced by
  * compileOp() and one produced by evalExpr() are interchangeable at runtime.
+ *
+ * Standard library (STD_LIB, STD_LIB_ENTRIES, callStd, DEF_*) lives in std-lib.ts
+ * and is re-exported here for backward compatibility.
  */
 
 import type { MaisieSchemaType } from './field'
+import { STD_LIB } from './std-lib'
+// Note: std-lib.ts imports evalExpr from this file; the circular reference is safe
+// because evalExpr is only used inside callStd's function body (runtime, not init time).
 
 // ── Runtime value types ───────────────────────────────────────────────────────
 
@@ -53,7 +59,31 @@ export type ApplyNode = { kind: 'apply'; fn: string; args: ExprNode[] }
  */
 export type LambdaNode = { kind: 'lambda'; params: string[]; body: ExprNode }
 
-export type ExprNode = LiteralNode | RefNode | ApplyNode | LambdaNode
+/**
+ * A let-binding form. Evaluates each binding in order (each binding's value
+ * is available to subsequent bindings and the body). Produces the body value.
+ */
+export type LetNode = {
+  kind: 'let'
+  bindings: { name: string; value: ExprNode }[]
+  body: ExprNode
+}
+
+/**
+ * A pipe form. Evaluates value, then threads the result through each step.
+ * Each step is an ExprNode representing an operation without the piped value —
+ * the PipeNode evaluator prepends the current value as the first argument.
+ *
+ * Steps are typically ApplyNodes (e.g. std.filter with just the predicate arg).
+ * If a step evaluates to a function, that function is called with the piped value.
+ */
+export type PipeNode = {
+  kind: 'pipe'
+  value: ExprNode
+  steps: ExprNode[]
+}
+
+export type ExprNode = LiteralNode | RefNode | ApplyNode | LambdaNode | LetNode | PipeNode
 
 // ── Function definition (serialized, storable) ────────────────────────────────
 
@@ -200,15 +230,18 @@ type Primitive = (...args: MaisieValue[]) => MaisieValue
  *               concat, len, str
  *   Control:    if, identity, call
  *   Binding:    literal, ref  (handled directly in evalExpr, listed here for docs)
+ *
+ * Exported so the async evaluator (eval.ts) can reuse the same primitive set.
  */
-const PRIMITIVES: Record<string, Primitive> = {
+export const PRIMITIVES: Record<string, Primitive> = {
   // ── Collection ──────────────────────────────────────────────────────────────
   /**
    * reduce(collection, lambda, initial)
    * The universal collection combinator. lambda receives {acc, item}.
+   * Treats null as empty collection (same convention as append).
    */
   reduce: (coll, reducer, init) => {
-    const rows = coll as MaisieCollection
+    const rows = (coll as MaisieCollection) ?? []
     const fn = reducer as MaisieFunction
     return rows.reduce<MaisieValue>((acc, item) => fn({ acc, item }), init)
   },
@@ -229,8 +262,8 @@ const PRIMITIVES: Record<string, Primitive> = {
   append: (coll, item) => [...((coll as MaisieCollection) ?? []), item as MaisieRecord],
 
   // ── Record ───────────────────────────────────────────────────────────────────
-  /** get(record, field) — field access. */
-  get: (record, field) => (record as MaisieRecord)[field as string] ?? null,
+  /** get(record, field) — field access. Returns null if record is null. */
+  get: (record, field) => record == null ? null : (record as MaisieRecord)[field as string] ?? null,
 
   /** set(record, field, value) — returns new record with field set. */
   set: (record, field, value) => ({
@@ -326,154 +359,58 @@ export function evalExpr(
       }
       throw new Error(`Unknown function: "${node.fn}"`)
     }
+
+    case 'let': {
+      // Evaluate bindings in order, each extending the env for subsequent ones.
+      let letEnv = { ...env }
+      for (const binding of node.bindings) {
+        letEnv = { ...letEnv, [binding.name]: evalExpr(binding.value, letEnv, defs) }
+      }
+      return evalExpr(node.body, letEnv, defs)
+    }
+
+    case 'pipe': {
+      // Evaluate the initial value, then thread through each step.
+      let current = evalExpr(node.value, env, defs)
+      for (const step of node.steps) {
+        if (step.kind === 'apply') {
+          // Prepend the piped value as the first argument.
+          const pipeEnv = { ...env, __pipe_value: current }
+          const injectedStep: ApplyNode = {
+            kind: 'apply',
+            fn: step.fn,
+            args: [{ kind: 'ref', name: '__pipe_value' }, ...step.args],
+          }
+          current = evalExpr(injectedStep, pipeEnv, defs)
+        } else {
+          // Evaluate the step to get a function, then call it with the value.
+          const fn = evalExpr(step, env, defs) as MaisieFunction
+          current = fn({ __value: current })
+        }
+      }
+      return current
+    }
   }
 }
 
 // ── Standard library ─────────────────────────────────────────────────────────
 //
-// Derived ops defined as FunctionDefs referencing the primitives above.
-// These are the named operations the card configurator and users work with.
+// Re-exported from std-lib.ts for backward compatibility.
+// The canonical definitions and new functions (any, all, first, last, unique)
+// live in std-lib.ts.
 
-/** filter(collection, pred) — keep elements where pred(item) is truthy. */
-const DEF_FILTER: FunctionDef = {
-  id: 'std.filter', name: 'filter',
-  description: 'Keep elements where the predicate is true',
-  params: ['collection', 'pred'],
-  inputSchema: 'collection', outputSchema: 'collection',
-  body: {
-    kind: 'apply', fn: 'reduce', args: [
-      { kind: 'ref', name: 'collection' },
-      {
-        kind: 'lambda', params: ['acc', 'item'],
-        body: {
-          kind: 'apply', fn: 'if', args: [
-            { kind: 'apply', fn: 'call', args: [{ kind: 'ref', name: 'pred' }, { kind: 'ref', name: 'item' }] },
-            { kind: 'apply', fn: 'append', args: [{ kind: 'ref', name: 'acc' }, { kind: 'ref', name: 'item' }] },
-            { kind: 'ref', name: 'acc' },
-          ],
-        },
-      },
-      { kind: 'literal', value: null },  // init: [] handled as null → cast in reduce
-    ],
-  },
-}
-
-/** map(collection, fn) — transform each element. */
-const DEF_MAP: FunctionDef = {
-  id: 'std.map', name: 'map',
-  description: 'Transform each element with a function',
-  params: ['collection', 'fn'],
-  inputSchema: 'collection', outputSchema: 'collection',
-  body: {
-    kind: 'apply', fn: 'reduce', args: [
-      { kind: 'ref', name: 'collection' },
-      {
-        kind: 'lambda', params: ['acc', 'item'],
-        body: {
-          kind: 'apply', fn: 'append', args: [
-            { kind: 'ref', name: 'acc' },
-            { kind: 'apply', fn: 'call', args: [{ kind: 'ref', name: 'fn' }, { kind: 'ref', name: 'item' }] },
-          ],
-        },
-      },
-      { kind: 'literal', value: null },
-    ],
-  },
-}
-
-/** pluck(collection, field) — extract a single field from each element. */
-const DEF_PLUCK: FunctionDef = {
-  id: 'std.pluck', name: 'pluck',
-  description: 'Extract one field from each element',
-  params: ['collection', 'field'],
-  inputSchema: 'collection', outputSchema: 'collection',
-  body: {
-    kind: 'apply', fn: 'reduce', args: [
-      { kind: 'ref', name: 'collection' },
-      {
-        kind: 'lambda', params: ['acc', 'item'],
-        body: {
-          kind: 'apply', fn: 'append', args: [
-            { kind: 'ref', name: 'acc' },
-            { kind: 'apply', fn: 'get', args: [{ kind: 'ref', name: 'item' }, { kind: 'ref', name: 'field' }] },
-          ],
-        },
-      },
-      { kind: 'literal', value: null },
-    ],
-  },
-}
-
-/** count(collection) — number of elements. */
-const DEF_COUNT: FunctionDef = {
-  id: 'std.count', name: 'count',
-  description: 'Count elements',
-  params: ['collection'],
-  inputSchema: 'collection', outputSchema: 'scalar',
-  body: {
-    kind: 'apply', fn: 'reduce', args: [
-      { kind: 'ref', name: 'collection' },
-      {
-        kind: 'lambda', params: ['acc', 'item'],
-        body: { kind: 'apply', fn: 'add', args: [{ kind: 'ref', name: 'acc' }, { kind: 'literal', value: 1 }] },
-      },
-      { kind: 'literal', value: 0 },
-    ],
-  },
-}
-
-/** sum(collection, field) — sum a numeric field across all elements. */
-const DEF_SUM: FunctionDef = {
-  id: 'std.sum', name: 'sum',
-  description: 'Sum a numeric field',
-  params: ['collection', 'field'],
-  inputSchema: 'collection', outputSchema: 'scalar',
-  body: {
-    kind: 'apply', fn: 'reduce', args: [
-      { kind: 'ref', name: 'collection' },
-      {
-        kind: 'lambda', params: ['acc', 'item'],
-        body: {
-          kind: 'apply', fn: 'add', args: [
-            { kind: 'ref', name: 'acc' },
-            { kind: 'apply', fn: 'get', args: [{ kind: 'ref', name: 'item' }, { kind: 'ref', name: 'field' }] },
-          ],
-        },
-      },
-      { kind: 'literal', value: 0 },
-    ],
-  },
-}
-
-/**
- * The standard library registry.
- * Keys are FunctionDef ids. evalExpr resolves apply nodes against this map
- * after exhausting the primitives registry.
- */
-export const STD_LIB: Record<string, FunctionDef> = {
-  [DEF_FILTER.id]: DEF_FILTER,
-  [DEF_MAP.id]:    DEF_MAP,
-  [DEF_PLUCK.id]:  DEF_PLUCK,
-  [DEF_COUNT.id]:  DEF_COUNT,
-  [DEF_SUM.id]:    DEF_SUM,
-}
-
-/** All standard library FunctionDefs as an array (for catalog/UI listing). */
-export const STD_LIB_ENTRIES: FunctionDef[] = Object.values(STD_LIB)
-
-// ── Convenience: call a named std function directly ───────────────────────────
-
-/**
- * Call a standard library function by id with named args.
- * Useful from TypeScript without constructing ExprNodes manually.
- *
- * @example
- * const filtered = callStd('std.filter', { collection: rows, pred: (args) => (args as MaisieRecord).levelPercent < 20 })
- */
-export function callStd(id: string, args: MaisieRecord): MaisieValue {
-  const def = STD_LIB[id]
-  if (!def) throw new Error(`Unknown std function: "${id}"`)
-  const env: Record<string, MaisieValue> = {}
-  for (const param of def.params) env[param] = args[param] ?? null
-  return evalExpr(def.body, env, STD_LIB)
-}
+export {
+  DEF_FILTER,
+  DEF_MAP,
+  DEF_PLUCK,
+  DEF_COUNT,
+  DEF_SUM,
+  DEF_ANY,
+  DEF_ALL,
+  DEF_FIRST,
+  DEF_LAST,
+  DEF_UNIQUE,
+  STD_LIB,
+  STD_LIB_ENTRIES,
+  callStd,
+} from './std-lib'

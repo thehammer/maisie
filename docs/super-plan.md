@@ -1,6 +1,6 @@
 # Maisie Universal Interface — Master Plan
 
-*Last updated: 2026-04-03*
+*Last updated: 2026-04-15*
 
 ---
 
@@ -20,7 +20,7 @@ The system is being designed with two constraints that matter for the long term:
 
 ## What We Have Today
 
-The codebase is a working Bun monorepo. The current architecture is a transitional state: the production system uses a "skills" architecture (flat files under `packages/agent/src/skills/`) while the plugin model described in `docs/architecture.md` is the target. Both exist in the repo right now.
+The codebase is a working Bun monorepo. Phases 1 and 2 are complete — the protocol is specified in `docs/protocol.md` and the universal resource model, semantic type vocabulary, and plugin protocol v0.1 are all implemented. The "skills" architecture that existed before has been superseded; all integrations are now MaisiePlugins. Phase 3 (integration gaps) and Phase 4 (three surface layers) are in progress.
 
 ### Running Services (Production — Tokyo, 192.168.1.10)
 
@@ -42,11 +42,13 @@ packages/plugin-calibre/
 packages/plugin-core/
 packages/plugin-google/
 packages/plugin-home-assistant/
+packages/plugin-hp-printer/      ← NEW: EWS monitoring, supply levels, discovery
 packages/plugin-plex/
 packages/plugin-radarr/
 packages/plugin-sonarr/
 packages/plugin-synology/
 packages/plugin-unifi/
+packages/ble-gateway/             ← IN PROGRESS: Python BLE daemon (SleepNumber, Govee); not yet a MaisiePlugin
 ```
 
 ### The PluginAction Model (Implemented)
@@ -80,18 +82,22 @@ Five reference documents in `docs/api-catalog/` map every external API available
 
 These catalogs are the inputs to Phase 1.
 
-### Dashboard (Partially Built)
+### Dashboard (Substantially Built)
 
-The React SPA in `packages/dashboard/` has working pages for TV, Media, Cameras, Network, and NAS. It has a `DraggableDashboardGrid` and `WidgetSlot` system started. Current components are hand-coded — not generated from a config schema.
+The React SPA in `packages/dashboard/` has working pages for TV, Media, Cameras, Network, NAS, and Personas. The card system is config-driven: `DynamicCard` renders from `CardDescriptor` schemas with semantic field types, a write path (toggle + action renderers), per-card configurator, compound card layout, and a card template library. Layout is persisted to SQLite via `useLayout`. Existing hand-coded cards have been migrated to `DynamicCard` or wrapped with static descriptors.
 
-### What's Missing
+Library channels (Plex content as HDHR channels with deterministic schedules) are production-ready in `packages/agent/src/skills/media/library-channels.ts`.
 
-- No universal resource model (how a "thing" is addressed across plugins)
-- No semantic type vocabulary beyond Zod primitives
-- No pipeline composition layer
-- No config-driven UI (all React is hand-written)
-- Incomplete plugin coverage — the catalog gap analyses identify dozens of API surfaces not yet wired up
-- No open-source package extraction plan
+Audiobookshelf is integrated as a connected service.
+
+### What's Still Missing
+
+- Pipeline composition layer (specified in protocol.md, not yet implemented)
+- REPL panel (in-dashboard or CLI)
+- `EntityStateStore` / Zustand for entity-address-driven re-renders
+- Full runtime layout editor (drag/drop works; config editing via sidebar not complete)
+- Incomplete plugin coverage — Phase 3 integration gaps (see below) still largely open
+- Open-source package extraction (`@universal-interface/*`)
 
 ---
 
@@ -171,16 +177,16 @@ These terms are used consistently throughout this document and the codebase:
 
 ```
 Phase 0: API Catalog          [COMPLETE]
-Phase 1: Taxonomy & Protocol  [NEXT]
-Phase 2: Core Framework       [DEPENDS ON PHASE 1]
-Phase 3: Integration Gaps     [PARALLEL WITH PHASE 2]
-Phase 4: Three Surface Layers [DEPENDS ON PHASE 2]
-  4a: API surface
-  4b: Agent surface
-  4c: REPL
-  4d: UX component spec
-  4e: React implementation
-  4f: iOS/Swift (future)
+Phase 1: Taxonomy & Protocol  [COMPLETE — docs/protocol.md, April 2026]
+Phase 2: Core Framework       [COMPLETE — resource model, semantic types, plugin protocol v0.1]
+Phase 3: Integration Gaps     [IN PROGRESS — webhooks done; UniFi/HA/Bambu gaps remain]
+Phase 4: Three Surface Layers [IN PROGRESS]
+  4a: API surface              [partial — plugin action router, no address resolver yet]
+  4b: Agent surface            [partial — tool registry wired; generic address tools not built]
+  4c: REPL                     [NOT STARTED]
+  4d: UX component spec        [partial — DynamicCard + CardDescriptor implemented; full JSON spec not extracted]
+  4e: React implementation     [IN PROGRESS — DynamicCard, write path, card configurator done]
+  4f: iOS/Swift (future)       [NOT STARTED]
 ```
 
 ---
@@ -196,6 +202,8 @@ These catalogs are the raw inputs to Phase 1. They answer the question: what are
 ---
 
 ## Phase 1: Taxonomy and Protocol Design
+
+**Status: Complete.** `docs/protocol.md` written April 2026 (314 lines). Covers resource model, semantic type vocabulary, capability model, verb conventions, pipeline operator set, and safety tiers.
 
 **Goal:** Derive a universal resource model from the catalog. Produce a protocol specification that the Phase 2 implementation can be built against.
 
@@ -367,6 +375,8 @@ The domain-agnostic packages know nothing about home automation, network devices
 
 ## Phase 2: Core Framework Implementation
 
+**Status: Complete.** Universal resource model implemented, semantic type vocabulary in `packages/shared/`, all plugins migrated to protocol v0.1 conventions. The `packages/plugin-core/` registry validates capabilities at boot. Pipeline engine is specified but not yet implemented (see Phase 4).
+
 **Goal:** Build the runtime infrastructure that the Phase 1 protocol specifies. This is the chassis all future plugins and surface layers depend on.
 
 **Input:** `docs/protocol.md`
@@ -456,6 +466,8 @@ packages/
 
 ## Phase 3: Fill Integration Gaps
 
+**Status: In Progress.** Webhook receivers for Plex/Sonarr/Radarr done; RTSP URLs for UniFi Protect done. Most API-surface gaps remain open.
+
 **Goal:** Use the catalog gap analyses to extend existing plugins to cover their full API surface. Run this in parallel with Phase 2.
 
 **Input:** The five API catalog documents, each of which includes a gap analysis section.
@@ -464,82 +476,95 @@ packages/
 
 ### UniFi (plugin-unifi)
 
-| Gap | Work |
-|-----|------|
-| WebSocket listener | Real-time client presence events — eliminate polling |
-| WLAN toggle | Enable/disable SSIDs by name or ID |
-| Protect WebSocket | Real-time motion/doorbell/smart detect events |
-| RTSP URLs | Expose per-channel RTSP addresses from Protect |
-| Device control | Port override, PoE control, locate |
-| Client statistics | TX/RX rates, signal history per client |
+| Gap | Status | Work |
+|-----|--------|------|
+| WebSocket listener | ❌ | Real-time client presence events — eliminate polling |
+| WLAN toggle | ❌ | Enable/disable SSIDs by name or ID |
+| Protect WebSocket | ❌ | Real-time motion/doorbell/smart detect events |
+| RTSP URLs | ✅ done | Per-channel RTSP addresses from Protect |
+| Device control | ❌ | Port override, PoE control, locate |
+| Client statistics | ❌ | TX/RX rates, signal history per client |
 
 Note: UniFi API calls must never use `Promise.all` — the UDM controller becomes unresponsive under parallel requests. All calls remain sequential.
 
 ### Synology (plugin-synology)
 
-| Gap | Work |
-|-----|------|
-| Docker management | Container list, start/stop, logs |
-| Fan and temperature | Thermal monitoring via DSM API |
-| File operations | Browse, upload, download, delete |
-| Backup status | Hyper Backup job status |
-| SNMP polling | Bandwidth counters per interface |
-| Scheduled task status | Task list, last run result |
+| Gap | Status | Work |
+|-----|--------|------|
+| Docker management | ❌ | Container list, start/stop, logs |
+| Fan and temperature | ❌ | Thermal monitoring via DSM API |
+| File operations | ❌ | Browse, upload, download, delete |
+| Backup status | ❌ | Hyper Backup job status |
+| SNMP polling | ❌ | Bandwidth counters per interface |
+| Scheduled task status | ❌ | Task list, last run result |
 
 Note: Always use HTTPS port 5001. HTTP port 5000 hangs indefinitely.
 
 ### Home Assistant (plugin-home-assistant)
 
-| Gap | Work |
-|-----|------|
-| Climate | Thermostat get/set, current temp, mode |
-| Sensors | All sensor domains: temperature, humidity, motion, door |
-| Locks | Lock/unlock, status |
-| Covers | Garage doors, blinds — open/close/position |
-| Presence | Person entities, zone tracking |
-| Generic service call | Passthrough for any HA service |
-| WebSocket push | Subscribe to state changes via WS |
-| media_player | Play/pause/volume for HA-controlled players |
+| Gap | Status | Work |
+|-----|--------|------|
+| Climate | ❌ | Thermostat get/set, current temp, mode |
+| Sensors | ❌ | All sensor domains: temperature, humidity, motion, door |
+| Locks | ❌ | Lock/unlock, status |
+| Covers | ❌ | Garage doors, blinds — open/close/position |
+| Presence | ❌ | Person entities, zone tracking |
+| Generic service call | ✅ done | `invoke_service` action — passthrough for any HA service |
+| WebSocket push | ❌ | Subscribe to state changes via WS |
+| media_player | ❌ | Play/pause/volume for HA-controlled players |
 
 ### Plex (plugin-plex)
 
-| Gap | Work |
-|-----|------|
-| Watch history | Per-user history, timestamps |
-| On Deck | In-progress content by user |
-| Webhook receiver | Inbound play/stop/scrobble events |
-| Remote control | Play, pause, seek, stop on a specific player |
-| Collection management | List, create, edit collections |
-| Playlist operations | Create, edit playlists |
+| Gap | Status | Work |
+|-----|--------|------|
+| Watch history | ❌ | Per-user history, timestamps |
+| On Deck | ❌ | In-progress content by user |
+| Webhook receiver | ✅ done | Inbound play/stop/scrobble events wired to MQTT |
+| Remote control | ❌ | Play, pause, seek, stop on a specific player |
+| Collection management | ❌ | List, create, edit collections |
+| Playlist operations | ❌ | Create, edit playlists |
 
 ### Sonarr / Radarr
 
-| Gap | Work |
-|-----|------|
-| Wanted/Missing | Episodes or movies not yet available |
-| Command execution | Queue downloads, refresh series/movies |
-| Webhook receivers | Inbound grab/import/rename events |
-| Queue management | View and clear the download queue |
-| Calendar | Upcoming expected releases |
+| Gap | Status | Work |
+|-----|--------|------|
+| Wanted/Missing | ❌ | Episodes or movies not yet available |
+| Command execution | ❌ | Queue downloads, refresh series/movies |
+| Webhook receivers | ✅ done | Inbound grab/import/rename events wired to MQTT |
+| Queue management | ❌ | View and clear the download queue |
+| Calendar | ❌ | Upcoming expected releases |
 
 ### Bambu (plugin-bambu)
 
-| Gap | Work |
-|-----|------|
-| AMS tray details | Filament type, color, remaining % per tray |
-| HMS alerts | Hardware/maintenance alert codes |
-| Camera stream | RTSP from printer camera (via go2rtc) |
-| Fan speeds | Cooling fan status |
-| Print history | Completed job log |
+| Gap | Status | Work |
+|-----|--------|------|
+| AMS tray details | ❌ | Filament type, color, remaining % per tray |
+| HMS alerts | ❌ | Hardware/maintenance alert codes |
+| Camera stream | ❌ | RTSP from printer camera (via go2rtc) |
+| Fan speeds | ❌ | Cooling fan status |
+| Print history | ❌ | Completed job log |
 
 ### New Plugins
 
-**Transmission** — already connected in the house, no plugin yet:
+**HP Printer** — ✅ done (`packages/plugin-hp-printer/`):
+- EWS monitoring (supply levels, status)
+- Network discovery
+- Wired into Plugins UI
+
+**Audiobookshelf** — ✅ done:
+- Integrated as a connected service (audiobook library)
+
+**BLE Gateway** — 🚧 in progress (`packages/ble-gateway/`):
+- Python daemon (`gateway.py`) bridges BLE devices to MQTT
+- Handles SleepNumber, Govee, and generic BLE protocols
+- Not yet a MaisiePlugin — TypeScript plugin wrapper needed
+
+**Transmission** — ❌ not started, already connected in the house:
 - Torrent list with status, progress, speed
 - Add/remove/start/stop torrent
 - Free space on download dir
 
-**Readarr** — already connected:
+**Readarr** — ❌ not started, already connected:
 - Book library, wanted list, search
 - Download queue
 - Author management
@@ -547,6 +572,27 @@ Note: Always use HTTPS port 5001. HTTP port 5000 hangs indefinitely.
 ---
 
 ## Phase 4: Three Surface Layers
+
+**Status: In Progress.** The card/UI layer (4e) is well along. API and agent surfaces are partially wired. REPL not started.
+
+**Completed:**
+- `DynamicCard` renders from `CardDescriptor` schemas with semantic field types
+- Write path: toggle and action renderers POST mutations, optimistic updates
+- Per-card configurator sidebar
+- Card template library (save/browse/apply)
+- Compound card layout (sections, multi-row)
+- Schema-level type inference (scalar → renderer type)
+- Maisie function library (ops, renderers, pipeline expressions)
+- Dashboard layout persisted to SQLite; `useLayout` hook
+- All existing hand-coded cards wrapped or migrated to `DynamicCard`
+
+**Still needed:**
+- Pipeline execution engine (specified, not built)
+- `EntityStateStore` for entity-address-driven subscriptions
+- Address resolver (`GET /api/address/{plugin}/{type}/{id}/{field}`)
+- REPL panel (dashboard + CLI)
+- Full runtime layout editor (drag/drop exists; sidebar config not complete)
+- Auto-generated OpenAPI spec from registry
 
 Phase 4 delivers the three complete surfaces — API, Agent, and UI — built on the protocol and framework from Phases 1–2.
 
