@@ -283,12 +283,158 @@ describe('catalog bridge: getCardCatalog reads from entityRegistry', () => {
 
     for (const desc of catalog) {
       expect(typeof desc.id).toBe('string')
-      expect(typeof desc.pluginName).toBe('string')
+      // pluginName is optional — undefined for derived entities, string for plugin entities
+      expect(desc.pluginName === undefined || typeof desc.pluginName === 'string').toBe(true)
       expect(typeof desc.actionName).toBe('string')
       expect(typeof desc.label).toBe('string')
       expect(typeof desc.section).toBe('string')
       expect(['scalar', 'record', 'collection', 'json']).toContain(desc.schemaType)
       expect(Array.isArray(desc.outputFields)).toBe(true)
     }
+  })
+})
+
+describe('catalog bridge: derived entities appear in getCardCatalog', () => {
+  const { getCardCatalog, setPlugins, setDb } = require('../actions')
+  const { Database } = require('bun:sqlite')
+  const { drizzle } = require('drizzle-orm/bun-sqlite')
+
+  const noopCtx = { log: () => {}, emit: () => {} }
+
+  function makeTestDb() {
+    const sqlite = new Database(':memory:')
+    sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS persona_configs (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        role TEXT NOT NULL,
+        avatar TEXT,
+        default_tier TEXT NOT NULL DEFAULT 'advise',
+        event_subscriptions TEXT NOT NULL DEFAULT '[]',
+        tool_scopes TEXT NOT NULL DEFAULT '[]',
+        system_prompt TEXT NOT NULL,
+        is_custom INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS dashboard_layouts (
+        id TEXT PRIMARY KEY,
+        page TEXT NOT NULL UNIQUE,
+        widgets TEXT NOT NULL DEFAULT '[]',
+        updated_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS plugin_configs (
+        id TEXT PRIMARY KEY,
+        package_name TEXT NOT NULL UNIQUE,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        env_overrides TEXT NOT NULL DEFAULT '{}',
+        updated_at INTEGER NOT NULL
+      );
+    `)
+    const { personaConfigs, dashboardLayouts, pluginConfigs } = require(
+      '../../../../packages/agent/src/services/schema',
+    )
+    return drizzle(sqlite, { schema: { personaConfigs, dashboardLayouts, pluginConfigs } })
+  }
+
+  beforeEach(() => {
+    const db = makeTestDb()
+    setDb(db)
+    setPlugins([])  // no plugin entities in these tests
+  })
+
+  afterEach(() => {
+    entityRegistry.clear()
+  })
+
+  it('derived entity with a data field appears in getCardCatalog', async () => {
+    // Register a derived entity directly into the registry
+    entityRegistry.register({
+      name: 'my-switches',
+      description: 'My custom switches view',
+      source: 'derived',
+      section: 'smarthome',
+      fields: {
+        items: {
+          kind: 'data',
+          type: 'collection',
+          expression: { kind: 'ref', name: 'catalog' },  // dummy expression
+        },
+      },
+    })
+
+    const catalog = await getCardCatalog.execute({}, noopCtx)
+    const entry = catalog.find((d: any) => d.id === 'my-switches')
+    expect(entry).toBeDefined()
+    expect(entry.pluginName).toBeUndefined()
+    expect(entry.actionName).toBe('items')
+    expect(entry.label).toBe('My custom switches view')
+    expect(entry.section).toBe('smarthome')
+    expect(entry.schemaType).toBe('collection')
+    expect(Array.isArray(entry.outputFields)).toBe(true)
+  })
+
+  it('derived entity with a record data field gets schemaType record', async () => {
+    entityRegistry.register({
+      name: 'home-summary',
+      description: 'Home summary',
+      source: 'derived',
+      section: 'system',
+      fields: {
+        summary: {
+          kind: 'data',
+          type: 'record',
+          expression: { kind: 'ref', name: 'catalog' },
+        },
+      },
+    })
+
+    const catalog = await getCardCatalog.execute({}, noopCtx)
+    const entry = catalog.find((d: any) => d.id === 'home-summary')
+    expect(entry).toBeDefined()
+    expect(entry.schemaType).toBe('record')
+  })
+
+  it('derived entity with only function fields is excluded from catalog', async () => {
+    entityRegistry.register({
+      name: 'action-only',
+      description: 'No data fields',
+      source: 'derived',
+      section: 'smarthome',
+      fields: {
+        toggle: {
+          kind: 'function',
+          params: [],
+          returnType: 'boolean',
+          tier: 'act',
+          expression: { kind: 'ref', name: 'catalog' },
+        },
+      },
+    })
+
+    const catalog = await getCardCatalog.execute({}, noopCtx)
+    const entry = catalog.find((d: any) => d.id === 'action-only')
+    expect(entry).toBeUndefined()
+  })
+
+  it('derived entity falls back to entity name when description is absent', async () => {
+    entityRegistry.register({
+      name: 'no-desc-entity',
+      source: 'derived',
+      section: 'entities',
+      fields: {
+        data: {
+          kind: 'data',
+          type: 'record',
+          expression: { kind: 'ref', name: 'catalog' },
+        },
+      },
+    })
+
+    const catalog = await getCardCatalog.execute({}, noopCtx)
+    const entry = catalog.find((d: any) => d.id === 'no-desc-entity')
+    expect(entry).toBeDefined()
+    expect(entry.label).toBe('no-desc-entity')
+    expect(entry.section).toBe('entities')
   })
 })

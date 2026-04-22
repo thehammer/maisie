@@ -21,8 +21,8 @@ import type { MaisieFieldType, OpConfig, CardRendererConfig, SectionConfig } fro
 // Mirrors plugin-core's CardDescriptor — defined locally since the dashboard
 // only depends on @maisie/shared, not @maisie/plugin-core.
 export interface CardDescriptor {
-  id: string;           // "{pluginName}.{actionName}"
-  pluginName: string;
+  id: string;           // "{pluginName}.{actionName}" for plugin entities; entity name for derived
+  pluginName?: string;  // undefined for derived entities
   actionName: string;
   label: string;
   section: string;
@@ -107,11 +107,22 @@ export function DynamicCard({
   displayStyle,
   functionFields,
 }: DynamicCardProps) {
-  const derivedUrl = endpoint || `/api/${descriptor.pluginName}${deriveApiPath(descriptor.actionName)}`;
+  // Derived entities (pluginName is undefined) fetch from /api/entities/{id}/{field}
+  // which returns {value: ...}. Plugin entities use the plugin's own action endpoint.
+  const isDerived = descriptor.pluginName === undefined;
+  const derivedUrl = endpoint
+    || (isDerived
+      ? `/api/entities/${descriptor.id}/${descriptor.actionName}`
+      : `/api/${descriptor.pluginName}${deriveApiPath(descriptor.actionName)}`);
+
   // Skip fetch if external data is provided (from shared useApi in App.tsx)
   const skipFetch = externalData !== undefined;
   const internal = useApi<unknown>(skipFetch ? null : derivedUrl, pollInterval);
-  const data = skipFetch ? externalData : internal.data;
+  // Derived entity response is wrapped in {value: ...} — unwrap before passing to renderers.
+  const rawInternal = skipFetch ? externalData : internal.data;
+  const data = (isDerived && !skipFetch && rawInternal !== null && typeof rawInternal === 'object' && 'value' in (rawInternal as object))
+    ? (rawInternal as { value: unknown }).value
+    : rawInternal;
   const loading = skipFetch ? (dataLoading ?? false) : internal.loading;
   const error = skipFetch ? dataError : internal.error;
   const refresh = onRefresh ?? internal.refresh;

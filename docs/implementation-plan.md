@@ -351,6 +351,20 @@ See syntax highlighting. Get autocomplete for `home-assistant.` (lists HA entiti
 
 **Estimated scope:** 3–4 sessions.
 
+### Phase 7 — What shipped
+
+- Function field rendering in `DynamicCard` (button invocation via `/api/entities/{name}/{field}`)
+- Wizard function field discovery and display in Step 1
+- Derived entities in `getCardCatalog` — appear in Step 1 catalog browser
+- `DynamicCard` routes derived entity fetches to `/api/entities/{id}/{field}` and unwraps `{value}`
+- Wizard Step 2 skipped for derived entities (pipeline baked into entity expression)
+- `CardDescriptor.pluginName` made optional to distinguish derived vs plugin entities
+
+### Phase 7 — Remaining work (follow-up)
+
+- **Step 3 recursive tree editor**: For each field in a record/collection response, allow selecting a component and configuring nested sub-fields. This was deferred from Phase 7 because it is a substantial standalone piece of work. Currently Step 3 shows flat field selection and renderer overrides; the recursive config (e.g. per-column renderers for a table within a derived entity's collection field) requires a deeper wizard redesign.
+- **Derived entity output field introspection**: Currently `outputFields` is always empty for derived entities in the catalog. A follow-up could evaluate the entity's expression against a sample to infer the field shape at wizard time, populating `outputFields` so Step 3 can offer per-field renderer config.
+
 ---
 
 ## Backward Compatibility

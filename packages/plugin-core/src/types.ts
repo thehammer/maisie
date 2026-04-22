@@ -1,6 +1,6 @@
 export interface CardDescriptor {
-  id: string           // "{pluginName}.{actionName}"
-  pluginName: string
+  id: string           // "{pluginName}.{actionName}" for plugin entities; entity name for derived
+  pluginName?: string  // undefined for derived entities
   actionName: string
   label: string
   section: string
@@ -47,6 +47,8 @@ export interface CardConfig {
   rendererConfigs?: import('@maisie/shared').CardRendererConfig
   /** Compound card — sections that each render a field from the response. */
   sections?: import('@maisie/shared').SectionConfig[]
+  /** Collection display layout chosen by the wizard. */
+  displayStyle?: 'table' | 'card-list' | 'simple-list'
 }
 
 export interface PersonaConfig {

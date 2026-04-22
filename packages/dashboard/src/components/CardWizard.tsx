@@ -144,6 +144,9 @@ export function CardWizard({ open, onClose, onAdd }: CardWizardProps) {
 
   const isCollection = state.descriptor?.schemaType === "collection";
   const totalSteps = isCollection ? 3 : 3;
+  // Derived entities have pluginName === undefined. Their pipeline is baked into the
+  // entity expression, so Step 2 (Transform) is irrelevant and should be skipped.
+  const isDerived = state.descriptor?.pluginName === undefined;
 
   function goToStep(s: 1 | 2 | 3) {
     setState((prev) => ({ ...prev, step: s }));
@@ -191,8 +194,9 @@ export function CardWizard({ open, onClose, onAdd }: CardWizardProps) {
                 sections={sections}
                 selected={state.descriptor}
                 selectedEntity={state.selectedEntity}
+                isDerived={isDerived}
                 onSelect={(d) => setState((p) => ({ ...p, descriptor: d, selectedEntity: null, ops: [], displayStyle: undefined, visibleFields: [], rendererConfigs: {}, functionFields: [] }))}
-                onNext={() => goToStep(2)}
+                onNext={() => goToStep(isDerived ? 3 : 2)}
               />
             )}
             {state.step === 2 && state.descriptor && (
@@ -218,7 +222,7 @@ export function CardWizard({ open, onClose, onAdd }: CardWizardProps) {
                 onRendererConfigChange={(rc) => setState((p) => ({ ...p, rendererConfigs: rc }))}
                 onFunctionFieldsChange={(ff) => setState((p) => ({ ...p, functionFields: ff }))}
                 onTitleChange={(t) => setState((p) => ({ ...p, title: t }))}
-                onBack={() => goToStep(isCollection ? 2 : 2)}
+                onBack={() => goToStep(isDerived ? 1 : 2)}
                 onAdd={handleAdd}
               />
             )}
@@ -257,11 +261,13 @@ interface Step1Props {
   sections: Map<string, CardDescriptor[]>;
   selected: CardDescriptor | null;
   selectedEntity: EntityDef | null;
+  /** True when the selected descriptor is a derived entity (no pluginName). Step 2 will be skipped. */
+  isDerived: boolean;
   onSelect: (d: CardDescriptor) => void;
   onNext: () => void;
 }
 
-function Step1Source({ sections, selected, selectedEntity, onSelect, onNext }: Step1Props) {
+function Step1Source({ sections, selected, selectedEntity, isDerived, onSelect, onNext }: Step1Props) {
   // Collect function fields from the fetched EntityDef
   const functionFields = selectedEntity
     ? Object.entries(selectedEntity.fields)
@@ -329,6 +335,11 @@ function Step1Source({ sections, selected, selectedEntity, onSelect, onNext }: S
               </div>
             </div>
           )}
+        </div>
+      )}
+      {selected && isDerived && (
+        <div className="wizard-step-note" style={{ marginTop: '0.5rem' }}>
+          Derived entity — Transform step skipped (pipeline is baked into the entity expression).
         </div>
       )}
       <div className="wizard-step-footer">

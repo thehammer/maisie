@@ -75,7 +75,7 @@ const cardFieldSchema = z.object({
 
 const cardDescriptorSchema = z.object({
   id: z.string(),
-  pluginName: z.string(),
+  pluginName: z.string().optional(),  // undefined for derived entities
   actionName: z.string(),
   label: z.string(),
   section: z.string(),
@@ -569,28 +569,55 @@ export const getCardCatalog = defineAction({
     const descriptors: CardDescriptor[] = []
 
     for (const entity of entityRegistry.list()) {
-      if (entity.source !== 'plugin') continue  // Phase 2b will add derived entities to the catalog differently
+      if (entity.source === 'plugin') {
+        const field = entity.fields.result
+        const actionName = field?.actionName
+        if (!actionName || !entity.pluginName) continue
 
-      const field = entity.fields.result
-      const actionName = field?.actionName
-      if (!actionName || !entity.pluginName) continue
+        const registered = registry.getAction(entity.pluginName, actionName)
+        if (!registered) continue
 
-      const registered = registry.getAction(entity.pluginName, actionName)
-      if (!registered) continue
+        const action = registered.action
+        if (action.ui === false) continue
 
-      const action = registered.action
-      if (action.ui === false) continue
+        const { schemaType, fields } = introspectSchema(action.output)
+        descriptors.push({
+          id: entity.name,
+          pluginName: entity.pluginName,
+          actionName,
+          label: action.ui.label,
+          section: action.ui.section,
+          schemaType,
+          outputFields: fields,
+        })
+      } else if (entity.source === 'derived') {
+        // Find the primary data field (first data-kind field)
+        const primaryEntry = Object.entries(entity.fields).find(([, f]) => f.kind === 'data')
+        if (!primaryEntry) continue  // derived entity with only function fields — skip for now
 
-      const { schemaType, fields } = introspectSchema(action.output)
-      descriptors.push({
-        id: entity.name,
-        pluginName: entity.pluginName,
-        actionName,
-        label: action.ui.label,
-        section: action.ui.section,
-        schemaType,
-        outputFields: fields,
-      })
+        const [primaryFieldName, primaryField] = primaryEntry
+        if (primaryField.kind !== 'data') continue  // type narrowing
+
+        // Map the field's type to a schemaType
+        let schemaType: 'scalar' | 'record' | 'collection' | 'json'
+        if (primaryField.type === 'collection') {
+          schemaType = 'collection'
+        } else if (primaryField.type === 'record') {
+          schemaType = 'record'
+        } else {
+          schemaType = 'scalar'
+        }
+
+        descriptors.push({
+          id: entity.name,
+          pluginName: undefined,
+          actionName: primaryFieldName,
+          label: entity.description ?? entity.name,
+          section: entity.section ?? 'entities',
+          schemaType,
+          outputFields: [],  // enriched at render time from live evaluation
+        })
+      }
     }
 
     return descriptors
