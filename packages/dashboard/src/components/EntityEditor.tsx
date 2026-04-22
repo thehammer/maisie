@@ -25,11 +25,22 @@ import { melLinter } from '../lib/editor/mel-linter'
 
 const API = import.meta.env.VITE_API_URL || ''
 
-const STARTER_SOURCE = `# MEL — Maisie Expression Language
-# Try editing and clicking Run, or write a define block and Save it.
-# Example: list catalog entries in the "system" section:
+const STARTER_SOURCE = `# MEL — Maisie Expression Language.
+# This is a complete entity. Click Run to preview each field's value,
+# or Save to register it in the catalog.
 
-catalog.items | filter: (e) => e.section == "system"
+define system-entities {
+  description: "All entities in the system section of the catalog."
+
+  items: collection =
+    catalog.items | filter: (e) => e.section == "system"
+
+  names: collection =
+    self.items | pluck: name
+
+  total: number =
+    self.items | count
+}
 `
 
 const STARTER_ENTITY = `define exterior-lights {

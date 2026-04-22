@@ -41,15 +41,27 @@ export function createEvalRouter(actionContext: ActionContext) {
         return c.json({ error: `parse error: ${err instanceof Error ? err.message : String(err)}` }, 400)
       }
 
-      // If source defines an entity, redirect caller to the entity API.
+      // If source defines an entity, preview it by evaluating each data field
+      // and returning a record of results. Function fields are listed as
+      // callable placeholders. Save the entity via POST /api/entities.
       if ('kind' in parsed && parsed.kind === 'entity') {
-        return c.json(
-          {
-            error:
-              'source defines an entity — use POST /api/entities to save it, not /api/eval',
-          },
-          400,
-        )
+        const preview: Record<string, unknown> = {}
+        for (const field of parsed.fields) {
+          if (field.kind === 'data' && field.expression) {
+            try {
+              preview[field.name] = await evalExprAsync(field.expression, resolver)
+            } catch (err) {
+              preview[field.name] = `<error: ${err instanceof Error ? err.message : String(err)}>`
+            }
+          } else if (field.kind === 'function') {
+            const paramList = field.params.map((p) => p.name).join(', ')
+            preview[field.name] = `<function(${paramList})>`
+          }
+        }
+        return c.json({
+          value: preview,
+          type: `entity "${parsed.name}"`,
+        })
       }
 
       expr = parsed as ExprNode
