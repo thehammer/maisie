@@ -12,6 +12,9 @@ export interface CardConfig {
   ops?: import("@maisie/shared").OpConfig[];
   rendererConfigs?: import("@maisie/shared").CardRendererConfig;
   sections?: import("@maisie/shared").SectionConfig[];
+  displayStyle?: 'table' | 'card-list' | 'simple-list';
+  /** Function fields to render as action buttons on the card. */
+  functionFields?: Array<{ name: string; label?: string }>;
 }
 
 interface LayoutState {

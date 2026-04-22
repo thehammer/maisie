@@ -359,6 +359,7 @@ export function App() {
       displayStyle: card.displayStyle,
       visibleFields: card.visibleFields,
       rendererConfigs: card.rendererConfigs,
+      functionFields: card.functionFields,
     } as Partial<import("./hooks/useLayout").CardConfig>);
   }
 
@@ -529,6 +530,7 @@ export function App() {
             visibleFields={widget.visibleFields}
             titleOverride={widget.title}
             displayStyle={widget.displayStyle}
+            functionFields={widget.functionFields}
           />
         );
         return null;

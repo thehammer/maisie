@@ -10,7 +10,7 @@
  * maisieType annotations on each field.
  */
 
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useApi } from "../hooks/useApi";
 import { useEntitySubscription } from "../hooks/useEntitySubscription";
 import { FieldRenderer, inferRendererConfig } from "../lib/renderers/FieldRenderer";
@@ -69,6 +69,11 @@ interface DynamicCardProps {
    * like NasCard, PlexCard, MediaCard.
    */
   sections?: SectionConfig[];
+  /**
+   * Function fields to render as action buttons. Each entry is POSTed to
+   * /api/entities/{descriptor.id}/{name} when clicked.
+   */
+  functionFields?: Array<{ name: string; label?: string }>;
 }
 
 // Mirrors deriveHttpPath() in plugin-core/registry.ts — strips verb prefix,
@@ -100,6 +105,7 @@ export function DynamicCard({
   onRefresh,
   sections,
   displayStyle,
+  functionFields,
 }: DynamicCardProps) {
   const derivedUrl = endpoint || `/api/${descriptor.pluginName}${deriveApiPath(descriptor.actionName)}`;
   // Skip fetch if external data is provided (from shared useApi in App.tsx)
@@ -218,6 +224,9 @@ export function DynamicCard({
         rendererConfigs={rendererConfigs}
         loading={loading}
         error={errorMsg}
+        entityName={descriptor.id}
+        functionFields={functionFields}
+        onRefresh={refresh}
       />
     );
   }
@@ -238,9 +247,15 @@ interface DynamicRecordProps {
   rendererConfigs: CardRendererConfig;
   loading?: boolean;
   error?: string | null;
+  /** Entity name — used to build POST /api/entities/{entityName}/{field} URLs. */
+  entityName?: string;
+  /** Function fields to render as action buttons below the data fields. */
+  functionFields?: Array<{ name: string; label?: string }>;
+  /** Refresh callback — called after a function field invocation. */
+  onRefresh?: () => void;
 }
 
-function DynamicRecord({ title, data, fields, rendererConfigs, loading, error }: DynamicRecordProps) {
+function DynamicRecord({ title, data, fields, rendererConfigs, loading, error, entityName, functionFields, onRefresh }: DynamicRecordProps) {
   return (
     <div className="resource-card">
       <h3 className="card-title">{title}</h3>
@@ -261,7 +276,71 @@ function DynamicRecord({ title, data, fields, rendererConfigs, loading, error }:
           })}
         </div>
       )}
+      {functionFields && functionFields.length > 0 && entityName && (
+        <div className="resource-function-fields">
+          {functionFields.map((ff) => (
+            <FunctionFieldButton
+              key={ff.name}
+              entityName={entityName}
+              fieldName={ff.name}
+              label={ff.label ?? ff.name}
+              onSuccess={onRefresh}
+            />
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+// ── FunctionFieldButton ───────────────────────────────────────────────────────
+
+interface FunctionFieldButtonProps {
+  entityName: string;
+  fieldName: string;
+  label: string;
+  onSuccess?: () => void;
+}
+
+function FunctionFieldButton({ entityName, fieldName, label, onSuccess }: FunctionFieldButtonProps) {
+  const [pending, setPending] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  const handleClick = useCallback(async () => {
+    if (pending) return;
+    setPending(true);
+    setResult(null);
+    try {
+      const res = await fetch(`/api/entities/${entityName}/${fieldName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.error) {
+        setResult(`Error: ${data.error}`);
+      } else {
+        setResult('Done');
+        onSuccess?.();
+      }
+    } catch (err) {
+      setResult(`Error: ${err}`);
+    }
+    setPending(false);
+    setTimeout(() => setResult(null), 5000);
+  }, [entityName, fieldName, pending, onSuccess]);
+
+  return (
+    <span className="resource-action-wrapper">
+      <button
+        className="resource-action"
+        onClick={handleClick}
+        disabled={pending}
+      >
+        {pending ? 'Running…' : label}
+      </button>
+      {result && <span className="resource-action-result">{result}</span>}
+    </span>
   );
 }
 
