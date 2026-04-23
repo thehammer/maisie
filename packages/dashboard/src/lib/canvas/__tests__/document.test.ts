@@ -5,6 +5,10 @@ import {
   removePlacement,
   movePlacement,
   getPlacement,
+  addWire,
+  removeWire,
+  getWire,
+  hasWire,
   type CanvasDocument,
 } from '../document'
 
@@ -146,5 +150,115 @@ describe('getPlacement', () => {
   it('returns undefined for an unknown id', () => {
     const doc = emptyDocument()
     expect(getPlacement(doc, 'missing')).toBeUndefined()
+  })
+})
+
+// ── Wire helpers ──────────────────────────────────────────────────────────────
+
+describe('addWire', () => {
+  it('adds a wire with a generated id', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 100, y: 0 } })
+    const [src, tgt] = doc.placements
+    const next = addWire(doc, {
+      source: { placementId: src.id },
+      target: { placementId: tgt.id },
+    })
+    expect(next.wires).toHaveLength(1)
+    const w = next.wires[0]
+    expect(w.id).toBeTruthy()
+    expect(w.source.placementId).toBe(src.id)
+    expect(w.target.placementId).toBe(tgt.id)
+  })
+
+  it('generates unique ids for successive wires', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 100, y: 0 } })
+    const [src, tgt] = doc.placements
+    const wireSpec = { source: { placementId: src.id }, target: { placementId: tgt.id } }
+    doc = addWire(doc, wireSpec)
+    doc = addWire(doc, { source: { placementId: src.id, field: 'other' }, target: { placementId: tgt.id } })
+    expect(doc.wires[0].id).not.toBe(doc.wires[1].id)
+  })
+
+  it('does not mutate the original document', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 100, y: 0 } })
+    const [src, tgt] = doc.placements
+    const next = addWire(doc, { source: { placementId: src.id }, target: { placementId: tgt.id } })
+    expect(doc.wires).toHaveLength(0)
+    expect(next.wires).toHaveLength(1)
+  })
+})
+
+describe('removeWire', () => {
+  it('removes a wire by id', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 100, y: 0 } })
+    const [src, tgt] = doc.placements
+    doc = addWire(doc, { source: { placementId: src.id }, target: { placementId: tgt.id } })
+    doc = addWire(doc, { source: { placementId: src.id, field: 'extra' }, target: { placementId: tgt.id } })
+    const [w1, w2] = doc.wires
+    const next = removeWire(doc, w1.id)
+    expect(next.wires).toHaveLength(1)
+    expect(next.wires[0].id).toBe(w2.id)
+  })
+
+  it('is a no-op for an unknown wire id', () => {
+    const doc = emptyDocument()
+    const next = removeWire(doc, 'nonexistent')
+    expect(next.wires).toHaveLength(0)
+  })
+})
+
+describe('getWire', () => {
+  it('returns the wire with the matching id', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 100, y: 0 } })
+    const [src, tgt] = doc.placements
+    doc = addWire(doc, { source: { placementId: src.id }, target: { placementId: tgt.id } })
+    const [w] = doc.wires
+    expect(getWire(doc, w.id)).toBeDefined()
+    expect(getWire(doc, w.id)!.id).toBe(w.id)
+  })
+
+  it('returns undefined for an unknown wire id', () => {
+    expect(getWire(emptyDocument(), 'missing')).toBeUndefined()
+  })
+})
+
+describe('hasWire', () => {
+  it('returns true when a matching wire exists', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 100, y: 0 } })
+    const [src, tgt] = doc.placements
+    doc = addWire(doc, { source: { placementId: src.id }, target: { placementId: tgt.id } })
+    expect(hasWire(doc, { placementId: src.id }, { placementId: tgt.id })).toBe(true)
+  })
+
+  it('returns false when no matching wire exists', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 100, y: 0 } })
+    const [src, tgt] = doc.placements
+    expect(hasWire(doc, { placementId: src.id }, { placementId: tgt.id })).toBe(false)
+  })
+
+  it('distinguishes wires by field and slot', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 100, y: 0 } })
+    const [src, tgt] = doc.placements
+    doc = addWire(doc, { source: { placementId: src.id, field: 'items' }, target: { placementId: tgt.id, slot: 'input' } })
+    // Same placements, different field — should be false
+    expect(hasWire(doc, { placementId: src.id, field: 'other' }, { placementId: tgt.id, slot: 'input' })).toBe(false)
+    // Exact match — should be true
+    expect(hasWire(doc, { placementId: src.id, field: 'items' }, { placementId: tgt.id, slot: 'input' })).toBe(true)
   })
 })

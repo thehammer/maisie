@@ -1,4 +1,4 @@
-import { useDraggable } from '@dnd-kit/core'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import type { Placement as PlacementType } from '../../lib/canvas/document'
 
@@ -6,9 +6,13 @@ interface PlacementProps {
   placement: PlacementType
   selected: boolean
   onSelect: () => void
+  /** Ref callback for the output port element (entities). */
+  outputPortRef?: (el: HTMLElement | null) => void
+  /** Ref callback for the input port element (components). */
+  inputPortRef?: (el: HTMLElement | null) => void
 }
 
-export function Placement({ placement, selected, onSelect }: PlacementProps) {
+export function Placement({ placement, selected, onSelect, outputPortRef, inputPortRef }: PlacementProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: placement.id,
     data: { source: 'canvas', placementId: placement.id },
@@ -34,8 +38,69 @@ export function Placement({ placement, selected, onSelect }: PlacementProps) {
       {...attributes}
       {...listeners}
     >
+      {/* Output port — entities produce output on the right */}
+      {placement.kind === 'entity' && (
+        <OutputPort placementId={placement.id} portRef={outputPortRef} />
+      )}
+      {/* Input port — components consume input on the left */}
+      {placement.kind === 'component' && (
+        <InputPort placementId={placement.id} portRef={inputPortRef} />
+      )}
       <div className="canvas-placement-kind">{placement.kind}</div>
       <div className="canvas-placement-name">{placement.targetName}</div>
     </div>
+  )
+}
+
+interface OutputPortProps {
+  placementId: string
+  portRef?: (el: HTMLElement | null) => void
+}
+
+function OutputPort({ placementId, portRef }: OutputPortProps) {
+  const portId = `port:${placementId}:output`
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: portId,
+    data: { source: 'port', placementId, role: 'output' },
+  })
+
+  const combinedRef = (el: HTMLDivElement | null) => {
+    setNodeRef(el)
+    portRef?.(el)
+  }
+
+  return (
+    <div
+      ref={combinedRef}
+      className={`canvas-port canvas-port-output ${isDragging ? 'dragging' : ''}`}
+      onMouseDown={(e) => e.stopPropagation()}
+      {...attributes}
+      {...listeners}
+    />
+  )
+}
+
+interface InputPortProps {
+  placementId: string
+  portRef?: (el: HTMLElement | null) => void
+}
+
+function InputPort({ placementId, portRef }: InputPortProps) {
+  const portId = `port:${placementId}:input`
+  const { setNodeRef, isOver } = useDroppable({
+    id: portId,
+    data: { target: 'port', placementId, role: 'input' },
+  })
+
+  const combinedRef = (el: HTMLDivElement | null) => {
+    setNodeRef(el)
+    portRef?.(el)
+  }
+
+  return (
+    <div
+      ref={combinedRef}
+      className={`canvas-port canvas-port-input ${isOver ? 'drop-target' : ''}`}
+    />
   )
 }

@@ -2,10 +2,13 @@ import { useState, useCallback } from 'react'
 import {
   type CanvasDocument,
   type Placement,
+  type Wire,
   emptyDocument,
   addPlacement,
   removePlacement,
   movePlacement,
+  addWire,
+  removeWire,
 } from '../lib/canvas/document'
 
 export interface UseCanvasDocument {
@@ -13,6 +16,8 @@ export interface UseCanvasDocument {
   addPlacement: (placement: Omit<Placement, 'id'>) => void
   removePlacement: (id: string) => void
   movePlacement: (id: string, position: { x: number; y: number }) => void
+  addWire: (wire: Omit<Wire, 'id'>) => void
+  removeWire: (id: string) => void
   selectedId: string | null
   setSelectedId: (id: string | null) => void
 }
@@ -29,6 +34,11 @@ export function useCanvasDocument(): UseCanvasDocument {
       setSelectedId((curr) => (curr === id ? null : curr))
     }, []),
     movePlacement: useCallback((id, pos) => setDoc((d) => movePlacement(d, id, pos)), []),
+    addWire: useCallback((wire) => setDoc((d) => addWire(d, wire)), []),
+    removeWire: useCallback((id) => {
+      setDoc((d) => removeWire(d, id))
+      setSelectedId((curr) => (curr === id ? null : curr))
+    }, []),
     selectedId,
     setSelectedId,
   }

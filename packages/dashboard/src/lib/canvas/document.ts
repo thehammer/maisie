@@ -57,6 +57,41 @@ export function getPlacement(doc: CanvasDocument, id: string): Placement | undef
   return doc.placements.find(p => p.id === id)
 }
 
+export function addWire(doc: CanvasDocument, wire: Omit<Wire, 'id'>): CanvasDocument {
+  return {
+    ...doc,
+    wires: [...doc.wires, { ...wire, id: generateId('w') }],
+  }
+}
+
+export function removeWire(doc: CanvasDocument, id: string): CanvasDocument {
+  return {
+    ...doc,
+    wires: doc.wires.filter((w) => w.id !== id),
+  }
+}
+
+export function getWire(doc: CanvasDocument, id: string): Wire | undefined {
+  return doc.wires.find((w) => w.id === id)
+}
+
+/**
+ * Check if a wire connecting the given endpoints would be a duplicate.
+ */
+export function hasWire(
+  doc: CanvasDocument,
+  source: Wire['source'],
+  target: Wire['target'],
+): boolean {
+  return doc.wires.some(
+    (w) =>
+      w.source.placementId === source.placementId &&
+      w.source.field === source.field &&
+      w.target.placementId === target.placementId &&
+      w.target.slot === target.slot,
+  )
+}
+
 function generateId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
