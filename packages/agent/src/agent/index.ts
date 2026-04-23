@@ -29,7 +29,7 @@ export function createAgent(config: AgentConfig) {
     componentStore: createDerivedComponentStore(config.db),
   }
 
-  const toolRegistry = createToolRegistry(config.plugins, authoringDeps)
+  const toolRegistry = createToolRegistry(config.plugins, authoringDeps, memory)
   const eventRouter = createEventRouter(config.plugins)
   const personaRouter = createPersonaRouter(config.plugins)
 

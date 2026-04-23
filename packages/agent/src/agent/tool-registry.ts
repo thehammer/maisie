@@ -4,8 +4,13 @@ import { z } from 'zod'
 import { createGenericTools } from './generic-tools'
 import { createAuthoringTools } from './authoring-tools'
 import type { AuthoringToolDeps } from './authoring-tools'
+import type { MemoryStore } from './memory'
 
-export function createToolRegistry(plugins: MaisiePlugin[], authoringDeps?: AuthoringToolDeps) {
+export function createToolRegistry(
+  plugins: MaisiePlugin[],
+  authoringDeps?: AuthoringToolDeps,
+  memoryStore?: MemoryStore,
+) {
   // Collect all actions with ai config from all plugins
   const allActions = plugins.flatMap(plugin =>
     plugin.actions
@@ -57,12 +62,23 @@ export function createToolRegistry(plugins: MaisiePlugin[], authoringDeps?: Auth
     )
 
     // Build a minimal ActionContext for the resolver if none provided.
-    const ctx: ActionContext = actionContext ?? {
+    const baseCtx: ActionContext = actionContext ?? {
       plugin: 'agent',
       requestId: crypto.randomUUID(),
       log: (level, msg) => console.log(`[agent:generic]`, msg),
       emit: () => {},
     }
+
+    // Inject memory operations into the context so the address resolver can
+    // dispatch memory sentinels (__memory_*). Cast to allow extra keys.
+    const ctx = memoryStore
+      ? Object.assign({}, baseCtx, {
+          __memory_loadConversations: () => memoryStore.loadConversations(),
+          __memory_loadNotes: () => memoryStore.loadNotes(),
+          __memory_loadFacts: () => memoryStore.loadFacts(),
+          __memory_appendNote: (content: string, tags: string[]) => memoryStore.appendNote(content, tags),
+        }) as unknown as ActionContext
+      : baseCtx
 
     const genericTools = createGenericTools(ctx, permittedTier)
 

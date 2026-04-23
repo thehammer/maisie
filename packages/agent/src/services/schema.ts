@@ -141,6 +141,14 @@ export const agentPreferences = sqliteTable('agent_preferences', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 })
 
+// User-authored notes — lightweight memory entries with optional tags
+export const memoryNotes = sqliteTable('memory_notes', {
+  id: text('id').primaryKey(),
+  content: text('content').notNull(),
+  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull(),
+  tags: text('tags').notNull().default('[]'),  // JSON string array
+})
+
 // User-defined or overridden personas (supplements built-in personas from plugins)
 export const personaConfigs = sqliteTable('persona_configs', {
   id: text('id').primaryKey(),

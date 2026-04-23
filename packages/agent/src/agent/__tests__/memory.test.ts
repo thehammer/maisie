@@ -32,6 +32,12 @@ function makeDb() {
       value TEXT NOT NULL,
       updated_at INTEGER NOT NULL
     );
+    CREATE TABLE memory_notes (
+      id TEXT PRIMARY KEY,
+      content TEXT NOT NULL,
+      timestamp INTEGER NOT NULL,
+      tags TEXT NOT NULL DEFAULT '[]'
+    );
   `)
   return drizzle(sqlite, { schema })
 }
@@ -134,5 +140,80 @@ describe('MemoryStore', () => {
 
     const all = await store.getPreferences()
     expect(Object.keys(all)).toHaveLength(2)
+  })
+
+  // ── Notes (entity-facing) ───────────────────────────────────────────────────
+
+  test('appendNote inserts and returns a record', async () => {
+    const note = await store.appendNote('Plumber came and fixed the leak', ['maintenance', 'plumber'])
+
+    expect(typeof note.id).toBe('string')
+    expect(note.content).toBe('Plumber came and fixed the leak')
+    expect(note.tags).toBe('["maintenance","plumber"]')  // stored as JSON string
+    expect(typeof note.timestamp).toBe('string') // ISO string
+  })
+
+  test('appendNote with no tags defaults to empty array', async () => {
+    const note = await store.appendNote('Quick note with no tags')
+    expect(note.tags).toBe('[]')
+  })
+
+  test('loadNotes returns all inserted notes as MaisieRecords', async () => {
+    await store.appendNote('First note', ['tag-a'])
+    await store.appendNote('Second note', ['tag-b'])
+
+    const notes = await store.loadNotes()
+    expect(notes).toHaveLength(2)
+
+    const contents = notes.map((n) => n.content)
+    expect(contents).toContain('First note')
+    expect(contents).toContain('Second note')
+
+    // Shape check
+    expect(typeof notes[0].id).toBe('string')
+    expect(typeof notes[0].timestamp).toBe('string')
+  })
+
+  test('loadNotes returns empty array when no notes exist', async () => {
+    const notes = await store.loadNotes()
+    expect(notes).toHaveLength(0)
+  })
+
+  // ── Conversations (entity-facing) ────────────────────────────────────────────
+
+  test('loadConversations returns episodes as MaisieRecords', async () => {
+    await store.logEpisode({
+      id: 'ep-conv-1',
+      timestamp: new Date('2025-01-01T10:00:00Z'),
+      trigger: 'user_message',
+      persona: 'maisie',
+      summary: 'User asked about the network',
+      toolsUsed: ['get_devices'],
+      outcome: 'informed',
+    })
+
+    const conversations = await store.loadConversations()
+    expect(conversations).toHaveLength(1)
+    expect(conversations[0].id).toBe('ep-conv-1')
+    expect(conversations[0].trigger).toBe('user_message')
+    expect(conversations[0].persona).toBe('maisie')
+    expect(conversations[0].toolsUsed).toBe('["get_devices"]')  // stored as JSON string
+    expect(typeof conversations[0].timestamp).toBe('string') // ISO string
+  })
+
+  test('loadConversations returns empty array when none exist', async () => {
+    const conversations = await store.loadConversations()
+    expect(conversations).toHaveLength(0)
+  })
+
+  // ── Facts (entity-facing) ────────────────────────────────────────────────────
+
+  test('loadFacts returns all facts as a record', async () => {
+    await store.setFact('wan.provider', 'Comcast')
+    await store.setFact('device.count', 66)
+
+    const facts = await store.loadFacts()
+    expect(facts['wan.provider']).toBe('Comcast')
+    expect(facts['device.count']).toBe(66)
   })
 })

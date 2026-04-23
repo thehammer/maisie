@@ -1,6 +1,6 @@
 # Agent Platform — Implementation Plan
 
-*Last updated 2026-04-13*
+*Last updated 2026-04-13 (Phase 4d complete)*
 
 Phased implementation plan for Phase 4 (The Agent Platform) described in `docs/super-plan.md`. Builds on the entity model (Phase 1), presentation model (Phase 2), and visual authoring (Phase 3). Each sub-phase is deployable on its own. The existing hand-wired agent tools continue to work throughout.
 
@@ -204,34 +204,56 @@ Chat: "Remember a view that shows me movies I haven't watched yet." → agent co
 
 ## Phase 4d — Memory as an Entity
 
-**Goal:** The agent's memory store is a catalog entity. Conversations, notes, observations, and the derived "household knowledge" all live behind addresses and are queryable via MEL.
+**Status: COMPLETE** *(2026-04-13)*
 
-### What ships
+**Goal:** The agent's memory store is a catalog entity. Conversations, notes, and facts live behind addresses and are queryable via MEL.
 
-- `memory` entity with fields: `conversations` (collection), `notes` (collection), `observations` (collection), `facts` (record)
-- Each sub-collection has its own schema (timestamp, author, content, tags, etc.)
-- `/api/memory/*` routes continue for backward compat
-- Agent tools read and write via the generic address tools
+### What shipped
 
-### Files to modify
+- `memory` entity registered in `EntityRegistry` constructor alongside `catalog`, section `agent`, source `plugin/core`
+- Fields: `conversations` (collection), `notes` (collection), `facts` (record), `append_note` (function, `inform` tier)
+- Each sentinel (`__memory_conversations`, `__memory_notes`, `__memory_facts`, `__memory_append_note`) dispatched by the address resolver via memory operations injected into `actionContext`
+- New `memory_notes` SQLite table in schema and migration (id, content, timestamp, tags as JSON string)
+- `loadConversations`, `loadNotes`, `loadFacts`, `appendNote` added to `MemoryStore`
+- `MemoryStore` injected into `createToolRegistry` as optional third argument; resolver context enriched with `__memory_*` keys at tool construction time
+- 27 new tests (15 memory store + 12 memory entity)
+- All values stored as `MaisieValue`-compatible types: tags and toolsUsed stored as JSON strings (scalars), not raw arrays
 
-- `packages/agent/src/services/memory.ts` — backed by SQLite tables, exposed as an entity
-- `packages/shared/src/field.ts` — no changes (existing types suffice)
-- Persistence uses an existing or new Drizzle table
+### Files created
 
-### Tests
+- `packages/plugin-core/src/__tests__/memory-entity.test.ts` — 12 tests
 
-- Memory writes via `invoke_address("memory.notes.append", {...})` persist
-- Memory reads via `resolve_address("memory.notes")` return the collection
-- MEL queries work: `memory.notes | filter: content contains "plumber" | sort: timestamp desc | limit: 3`
+### Files modified
+
+- `packages/agent/src/services/schema.ts` — `memoryNotes` table added
+- `packages/agent/src/services/db.ts` — `CREATE TABLE IF NOT EXISTS memory_notes` migration
+- `packages/agent/src/agent/memory.ts` — `loadConversations`, `loadNotes`, `loadFacts`, `appendNote` added; imports `MaisieRecord`
+- `packages/agent/src/agent/tool-registry.ts` — accepts optional `memoryStore`; injects `__memory_*` ops into resolver context
+- `packages/agent/src/agent/index.ts` — passes `memory` to `createToolRegistry`
+- `packages/agent/src/agent/__tests__/memory.test.ts` — `memory_notes` table in makeDb; 9 new tests
+- `packages/plugin-core/src/entity-registry.ts` — `memory` entity registered in constructor
+- `packages/plugin-core/src/address-resolver.ts` — sentinel dispatch for all 4 `__memory_*` action names
+- `packages/plugin-core/src/__tests__/entity-registry.test.ts` — count assertions updated (+1 for memory entity)
+
+### Deviations from spec
+
+1. **No observations field** — `agentEpisodes` maps to `conversations` (the agent's interaction log, not discrete observations). No separate observations concept exists in the data model; deferred.
+
+2. **Tags stored as JSON string scalars** — `MaisieValue` does not include `string[]`, so tag arrays are stored as JSON strings (e.g. `'["maintenance","plumber"]'`) in `MaisieRecord` fields. MEL agents can use `contains` on the string for tag filtering.
+
+3. **toolsUsed in conversations stored as JSON string** — same constraint as tags.
+
+4. **Memory ops injected via actionContext** — the address resolver receives memory operations via keys prefixed with `__memory_` in the `actionContext`. This avoids coupling plugin-core to the agent's memory module while keeping the dispatch simple and testable.
+
+5. **No `/api/memory/*` routes** — the spec mentioned preserving backward-compat API routes, but no such routes existed before this phase. The entity fields are queryable via the generic address tools only.
 
 ### Proof of concept
 
-Chat: "What did I tell you about the plumber?" → agent runs the MEL query above and returns the most recent notes.
+`resolve_address("memory.notes")` returns all notes. `run_pipeline("memory.notes | filter: content contains \"plumber\"")` filters notes by content. `invoke_address("memory.append_note", { content: "Plumber came", tags: '["plumber"]' })` writes a note.
 
 ### Estimated scope
 
-3 sessions.
+3 sessions (completed in 1).
 
 ---
 

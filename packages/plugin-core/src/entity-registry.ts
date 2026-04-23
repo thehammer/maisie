@@ -29,6 +29,44 @@ export class EntityRegistry {
       },
     }
     this.entities.set('catalog', catalogEntity)
+
+    // Register the synthetic memory entity. Its fields dispatch via sentinels
+    // that the address resolver intercepts and routes to the memory store.
+    const memoryEntity: EntityDef = {
+      name: 'memory',
+      description: "The agent's memory: conversations, notes, and facts",
+      source: 'plugin',
+      pluginName: 'core',
+      section: 'agent',
+      fields: {
+        conversations: {
+          kind: 'data',
+          type: 'collection',
+          actionName: '__memory_conversations',
+        },
+        notes: {
+          kind: 'data',
+          type: 'collection',
+          actionName: '__memory_notes',
+        },
+        facts: {
+          kind: 'data',
+          type: 'record',
+          actionName: '__memory_facts',
+        },
+        append_note: {
+          kind: 'function',
+          params: [
+            { name: 'content', type: 'string' },
+            { name: 'tags', type: 'collection' },
+          ],
+          returnType: 'record',
+          actionName: '__memory_append_note',
+          tier: 'inform',
+        },
+      },
+    }
+    this.entities.set('memory', memoryEntity)
   }
 
   /** Register an entity. Throws if validation fails. */

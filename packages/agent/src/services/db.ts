@@ -292,6 +292,13 @@ function migrate(sqlite: Database) {
       config TEXT NOT NULL DEFAULT '{}',
       created_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS memory_notes (
+      id TEXT PRIMARY KEY,
+      content TEXT NOT NULL,
+      timestamp INTEGER NOT NULL,
+      tags TEXT NOT NULL DEFAULT '[]'
+    );
   `);
 
   // Column migrations — ALTER TABLE ADD COLUMN for columns added after initial release

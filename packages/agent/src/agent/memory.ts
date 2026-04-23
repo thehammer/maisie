@@ -1,6 +1,7 @@
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import { eq, desc } from 'drizzle-orm'
-import { agentEpisodes, agentFacts, agentPreferences } from '../services/schema'
+import { agentEpisodes, agentFacts, agentPreferences, memoryNotes } from '../services/schema'
+import type { MaisieRecord } from '@maisie/shared'
 
 export interface Episode {
   id: string
@@ -106,7 +107,79 @@ export function createMemoryStore(db: BunSQLiteDatabase<any>) {
     return Object.fromEntries(rows.map((r: typeof agentPreferences.$inferSelect) => [r.key, JSON.parse(r.value)]))
   }
 
-  return { logEpisode, getRecentEpisodes, setFact, getFact, getAllFacts, setPreference, getPreferences }
+  // ── Entity-facing operations ─────────────────────────────────────────────────
+
+  /**
+   * Load conversations (agent episodes) as MaisieRecord collection.
+   * Returns the 100 most recent episodes as flat records for MEL queries.
+   */
+  async function loadConversations(): Promise<MaisieRecord[]> {
+    const rows = await db.select().from(agentEpisodes)
+      .orderBy(desc(agentEpisodes.timestamp))
+      .limit(100)
+
+    return rows.map((row: typeof agentEpisodes.$inferSelect) => ({
+      id: row.id,
+      timestamp: (row.timestamp as Date).toISOString(),
+      trigger: row.trigger,
+      persona: row.persona,
+      summary: row.summary,
+      toolsUsed: row.toolsUsed ?? '[]',   // kept as JSON string for MEL scalar access
+      outcome: row.outcome,
+      userApproved: row.userApproved ?? null,
+    }))
+  }
+
+  /**
+   * Load all memory notes as MaisieRecord collection.
+   */
+  async function loadNotes(): Promise<MaisieRecord[]> {
+    const rows = await db.select().from(memoryNotes)
+      .orderBy(desc(memoryNotes.timestamp))
+
+    return rows.map((row: typeof memoryNotes.$inferSelect) => ({
+      id: row.id,
+      content: row.content,
+      timestamp: (row.timestamp as Date).toISOString(),
+      tags: row.tags,    // JSON string — e.g. '["maintenance","plumber"]'
+    }))
+  }
+
+  /**
+   * Append a note to memory. Returns the inserted record.
+   */
+  async function appendNote(content: string, tags: string[] = []): Promise<MaisieRecord> {
+    const id = crypto.randomUUID()
+    const timestamp = new Date()
+    await db.insert(memoryNotes).values({
+      id,
+      content,
+      timestamp,
+      tags: JSON.stringify(tags),
+    })
+    return { id, content, timestamp: timestamp.toISOString(), tags: JSON.stringify(tags) }
+  }
+
+  /**
+   * Load all facts as a MaisieRecord (key → value map).
+   */
+  async function loadFacts(): Promise<MaisieRecord> {
+    return getAllFacts() as Promise<MaisieRecord>
+  }
+
+  return {
+    logEpisode,
+    getRecentEpisodes,
+    setFact,
+    getFact,
+    getAllFacts,
+    setPreference,
+    getPreferences,
+    loadConversations,
+    loadNotes,
+    appendNote,
+    loadFacts,
+  }
 }
 
 export type MemoryStore = ReturnType<typeof createMemoryStore>

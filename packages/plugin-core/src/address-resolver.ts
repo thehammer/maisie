@@ -160,6 +160,42 @@ export function createAddressResolver(actionContext: ActionContext): AddressReso
       return entityRegistry.list().map(entityToDescriptor) as MaisieValue
     }
 
+    // Memory sentinels — dispatched to memory operations provided in actionContext.
+    if (actionName === '__memory_conversations') {
+      const fn = actionContext['__memory_loadConversations']
+      if (typeof fn !== 'function') {
+        throw new Error('Memory operations not available in this context (missing __memory_loadConversations)')
+      }
+      return (fn as () => Promise<MaisieValue>)()
+    }
+    if (actionName === '__memory_notes') {
+      const fn = actionContext['__memory_loadNotes']
+      if (typeof fn !== 'function') {
+        throw new Error('Memory operations not available in this context (missing __memory_loadNotes)')
+      }
+      return (fn as () => Promise<MaisieValue>)()
+    }
+    if (actionName === '__memory_facts') {
+      const fn = actionContext['__memory_loadFacts']
+      if (typeof fn !== 'function') {
+        throw new Error('Memory operations not available in this context (missing __memory_loadFacts)')
+      }
+      return (fn as () => Promise<MaisieValue>)()
+    }
+    if (actionName === '__memory_append_note') {
+      const fn = actionContext['__memory_appendNote']
+      if (typeof fn !== 'function') {
+        throw new Error('Memory operations not available in this context (missing __memory_appendNote)')
+      }
+      const content = String(input.content ?? '')
+      // tags may arrive as a JSON string (e.g. '["a","b"]') or omitted
+      const rawTags = input.tags
+      const tags: string[] = typeof rawTags === 'string'
+        ? (JSON.parse(rawTags) as string[])
+        : []
+      return (fn as (content: string, tags: string[]) => Promise<MaisieValue>)(content, tags)
+    }
+
     const registered = registry.getAction(pluginName, actionName)
     if (!registered) {
       throw new Error(`Plugin action not found: ${pluginName}.${actionName}`)
