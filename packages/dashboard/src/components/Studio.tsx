@@ -59,7 +59,7 @@ interface EvalResult {
   error?: string
 }
 
-export function EntityEditor() {
+export function Studio() {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const [result, setResult] = useState<EvalResult | null>(null)
@@ -185,7 +185,7 @@ export function EntityEditor() {
   return (
     <div className="entity-editor">
       <div className="entity-editor-header">
-        <h2>Entity Editor</h2>
+        <h2>Studio</h2>
         <div className="entity-editor-actions">
           <button onClick={loadStarterEntity} className="edit-layout-btn">
             Load example

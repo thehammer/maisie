@@ -1,19 +1,19 @@
-import { EntityEditor } from '../components/EntityEditor'
+import { Studio } from '../components/Studio'
 
 interface Props {
   onBack: () => void
 }
 
-export function EntityEditorPage({ onBack }: Props) {
+export function StudioPage({ onBack }: Props) {
   return (
-    <div className="dashboard entity-editor-page">
+    <div className="dashboard studio-page">
       <div className="dashboard-header">
         <button onClick={onBack} className="edit-layout-btn">
           &larr; Back
         </button>
-        <h1>Entity Editor</h1>
+        <h1>Studio</h1>
       </div>
-      <EntityEditor />
+      <Studio />
     </div>
   )
 }

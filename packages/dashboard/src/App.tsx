@@ -20,7 +20,7 @@ const TvPage = lazy(() => import("./pages/TvPage").then((m) => ({ default: m.TvP
 const ChatPage = lazy(() => import("./pages/ChatPage").then((m) => ({ default: m.ChatPage })));
 const PluginsPage = lazy(() => import("./pages/PluginsPage").then((m) => ({ default: m.PluginsPage })));
 const PersonasPage = lazy(() => import("./pages/PersonasPage").then((m) => ({ default: m.PersonasPage })));
-const EntityEditorPage = lazy(() => import("./pages/EntityEditorPage").then((m) => ({ default: m.EntityEditorPage })));
+const StudioPage = lazy(() => import("./pages/StudioPage").then((m) => ({ default: m.StudioPage })));
 import { ChatPanel } from "./components/ChatPanel";
 import { NotificationsFeed } from "./components/NotificationsFeed";
 import { AgentStatus } from "./components/AgentStatus";
@@ -281,11 +281,11 @@ export function App() {
     );
   }
 
-  if (page === "entities") {
+  if (page === "studio") {
     return (
       <div className="dashboard">
         <Suspense fallback={pageFallback}>
-          <EntityEditorPage onBack={() => navigate("dashboard")} />
+          <StudioPage onBack={() => navigate("dashboard")} />
         </Suspense>
         {chatOverlay}
       </div>
@@ -558,7 +558,7 @@ export function App() {
             <a href="#chat" className="nav-link">Chat</a>
             <a href="#plugins" className="nav-link">Plugins</a>
             <a href="#personas" className="nav-link">Personas</a>
-            <a href="#entities" className="nav-link">Entities</a>
+            <a href="#studio" className="nav-link">Studio</a>
           </nav>
         </div>
         <div className="status">
