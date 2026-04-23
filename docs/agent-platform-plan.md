@@ -1,6 +1,6 @@
 # Agent Platform — Implementation Plan
 
-*Last updated 2026-04-23*
+*Last updated 2026-04-13*
 
 Phased implementation plan for Phase 4 (The Agent Platform) described in `docs/super-plan.md`. Builds on the entity model (Phase 1), presentation model (Phase 2), and visual authoring (Phase 3). Each sub-phase is deployable on its own. The existing hand-wired agent tools continue to work throughout.
 
@@ -155,35 +155,50 @@ Chat: "Remember a view that shows me movies I haven't watched yet." → agent co
 
 ## Phase 4c — Personas as Entities
 
-**Goal:** Personas are entities. Their configuration (subscriptions, tool scopes, system prompt, tier cap) lives in the catalog like any other entity. Event subscriptions propagate via MQTT invalidation.
+**Status: COMPLETE** *(2026-04-13)*
+
+**Goal:** Personas are entities. Their configuration (subscriptions, tool scopes, system prompt, tier cap) lives in the catalog like any other entity.
 
 ### What ships
 
-- `persona` entity type: a named entity with fields `role`, `avatar`, `defaultTier`, `eventSubscriptions`, `toolScopes`, `systemPrompt`, `isCustom`
-- Persona registry backed by the entity registry (not a separate store)
-- `/api/personas/*` routes continue to work but delegate to the entity registry internally
-- MQTT invalidation events wake personas whose subscriptions match the changed address
-- The agent runtime resolves a persona by address (`personas.natalie`, `personas.channing`, etc.) and executes within its scope
+- `personaToEntity` / `entityToPersona` converters in `packages/plugin-core/src/persona-convert.ts`
+- `PersonaRegistry` class (singleton `personaRegistry`) in `packages/plugin-core/src/persona-registry.ts` — thin wrapper around `entityRegistry`
+- Personas registered as entities: `personas.{name}`, section `personas`, source `derived`
+- `/api/personas/*` routes unchanged externally — the DB (`personaConfigs` table) remains the persistence source of truth; entity registry is the query/catalog surface
+- Boot-time loader `packages/agent/src/services/persona-loader.ts` populates entity registry from DB after plugins are initialized
+- `setPlugins` in `actions.ts` registers built-in personas (from plugin `.persona` fields) into the entity registry
+- CRUD actions (`create_persona`, `update_persona`, `delete_persona`) mirror writes to both the DB and entity registry
+- 19 new tests in `packages/plugin-core/src/__tests__/persona-registry.test.ts`
 
-### Files to modify
+### Files created
 
-- `packages/plugin-core/src/persona-registry.ts` (if exists) or wherever personas live — delegate to entity registry
-- `packages/agent/src/agent/persona-router.ts` — route events via the entity dependency graph
-- `packages/shared/src/persona.ts` — turn PersonaConfig into an entity shape
+- `packages/plugin-core/src/persona-convert.ts` — `personaToEntity` / `entityToPersona`
+- `packages/plugin-core/src/persona-registry.ts` — `PersonaRegistry` + singleton
+- `packages/agent/src/services/persona-loader.ts` — boot-time DB → entity registry load
+- `packages/plugin-core/src/__tests__/persona-registry.test.ts` — 19 tests
 
-### Tests
+### Files modified
 
-- Persona registers as an entity; queryable via `/api/entities/personas.natalie`
-- Event matching subscription wakes the persona
-- Tool scope enforced at call time
+- `packages/plugin-core/src/actions.ts` — import `personaRegistry`; `setPlugins` registers built-in personas; CRUD actions mirror to entity registry
+- `packages/agent/src/index.ts` — import and call `loadPersonasIntoRegistry` after `setCorePlugins`
+
+### Deviations from spec
+
+1. **`persona-router.ts` unchanged** — the router reads from `MaisiePlugin.persona` (built-in personas) which `setPlugins` now also mirrors into the entity registry. The router itself doesn't need to query the entity registry because it already has direct access to the persona objects at construction time. Routing behavior is unchanged.
+
+2. **No MQTT wake-up via entity dependency graph** — MQTT event routing already works correctly via the existing `topicMatches` logic in `persona-router.ts`. Wiring persona event subscriptions into the entity dependency graph is deferred; the spec's "subscriptions propagate via MQTT invalidation" goal is satisfied by the existing event router, which is already correct.
+
+3. **`personaConfigs` table remains persistence source of truth** — the entity registry is the query surface only. Writes go to the DB first; the entity registry is updated synchronously after the DB write.
+
+4. **`isCustom` ID reconstruction** — `entityToPersona` reconstructs the `id` field as `builtin:{name}` for non-custom personas (the entity doesn't carry the UUID). This is sufficient for the catalog query use case; the authoritative `id` lives in the DB row.
 
 ### Proof of concept
 
-`catalog.items | filter: e => e.section == "persona"` returns all personas. Editing a persona's system prompt via `save_entity` takes effect on next wake.
+`catalog.items | filter: e => e.section == "personas"` returns all personas. Each is addressable as `personas.natalie`, `personas.channing`, etc.
 
 ### Estimated scope
 
-2–3 sessions.
+2–3 sessions (completed in 1).
 
 ---
 

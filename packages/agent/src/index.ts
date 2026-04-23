@@ -8,6 +8,7 @@ import { createMqttClient } from "./services/mqtt";
 import { initDb } from "./services/db";
 import { loadDerivedEntities } from "./services/entity-loader";
 import { loadDerivedComponents } from "./services/component-loader";
+import { loadPersonasIntoRegistry } from "./services/persona-loader";
 import { createApi } from "./api/index";
 import type { Services } from "./api/types";
 import { createUniFiClientFromEnv } from "./skills/network/unifi-client";
@@ -686,6 +687,11 @@ async function main() {
   setCorePlugins(allPlugins);
   loadedPlugins = allPlugins;
   console.log("  ✓ Core plugin initialized");
+
+  // Phase 4c: load DB-persisted personas into the entity registry.
+  // Built-ins are already registered by setCorePlugins → setPlugins above.
+  // DB rows override built-ins with the same name (custom or seeded built-ins).
+  await loadPersonasIntoRegistry(db);
 
   // Initialize all discovered plugins — calls each plugin's init() so their
   // internal clients (getClients()) are populated before the API starts.

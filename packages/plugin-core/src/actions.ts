@@ -8,6 +8,7 @@ import type { LayoutService } from './layout-service'
 import { entityRegistry } from './entity-registry'
 import { registry } from './registry'
 import { componentRegistry } from './component-registry'
+import { personaRegistry } from './persona-registry'
 
 // ----------------------------------------------------------------
 // Module-level state — injected by plugin init()
@@ -30,6 +31,12 @@ export function setPlugins(plugins: MaisiePlugin[]) {
   // were loaded via the real boot path or injected directly in tests.
   for (const plugin of plugins) {
     registry.register(plugin, () => {})
+  }
+  // Phase 4c: register built-in personas into the entity registry so they are
+  // queryable via the catalog (e.g. personas.natalie, personas.channing).
+  // DB-persisted personas are loaded separately via loadPersonasIntoRegistry().
+  for (const persona of builtInPersonas()) {
+    personaRegistry.register(persona)
   }
 }
 
@@ -426,7 +433,7 @@ export const createPersona = defineAction({
       updatedAt: now,
     })
 
-    return {
+    const result: PersonaConfig = {
       id,
       name: input.name,
       role: input.role,
@@ -437,6 +444,11 @@ export const createPersona = defineAction({
       systemPrompt: input.systemPrompt,
       isCustom: true,
     }
+
+    // Phase 4c: mirror into entity registry so the persona is queryable via catalog.
+    personaRegistry.register(result)
+
+    return result
   },
 })
 
@@ -508,7 +520,7 @@ export const updatePersona = defineAction({
 
     if (!fresh) throw new Error('Update failed — record not found after write')
 
-    return {
+    const updated: PersonaConfig = {
       id: fresh.id,
       name: fresh.name,
       role: fresh.role,
@@ -519,6 +531,11 @@ export const updatePersona = defineAction({
       systemPrompt: fresh.systemPrompt,
       isCustom: Boolean(fresh.isCustom),
     }
+
+    // Phase 4c: mirror into entity registry so the catalog reflects the update.
+    personaRegistry.register(updated)
+
+    return updated
   },
 })
 
@@ -550,6 +567,8 @@ export const deletePersona = defineAction({
     if (!existing.isCustom) throw new Error('cannot delete built-in persona')
 
     await db.delete(personaConfigs).where(eq(personaConfigs.name, input.name))
+    // Phase 4c: remove from entity registry.
+    personaRegistry.unregister(input.name)
     return { success: true }
   },
 })
