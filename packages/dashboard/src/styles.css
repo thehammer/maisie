@@ -6160,3 +6160,54 @@ body {
 }
 .canvas-preview-fab button:hover { opacity: 0.9; }
 
+
+/* ── Chain suggestion popover ────────────────────────────────────────────────── */
+.chain-suggestion-popover {
+  position: absolute;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  z-index: 100;
+  max-width: 360px;
+}
+.chain-suggestion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.chain-suggestion-title { font-weight: 600; font-size: 0.85rem; }
+.chain-suggestion-dismiss {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0 2px;
+  line-height: 1;
+}
+.chain-suggestion-dismiss:hover { color: var(--text); }
+.chain-suggestion-desc { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; }
+.chain-suggestion-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.chain-suggestion-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.chain-suggestion-chain { display: flex; gap: 4px; align-items: center; font-family: monospace; font-size: 0.85rem; flex-wrap: wrap; }
+.chain-suggestion-step-group { display: flex; align-items: center; gap: 4px; }
+.chain-suggestion-step { background: var(--bg); padding: 2px 6px; border-radius: 3px; }
+.chain-suggestion-arrow { color: var(--text-muted); }
+.chain-suggestion-output-type { color: var(--text-muted); font-size: 0.75rem; margin-left: 4px; }
+.chain-suggestion-apply {
+  margin-top: 0;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.chain-suggestion-apply:hover { opacity: 0.85; }

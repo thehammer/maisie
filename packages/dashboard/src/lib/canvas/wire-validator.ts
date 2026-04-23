@@ -5,6 +5,7 @@
 
 import type { TypeExpr, MatchResult } from '@maisie/shared'
 import { satisfies } from '@maisie/shared'
+import { findBridgingChains, type BridgingChain } from './chain-search'
 
 export type WireStatus = 'compatible' | 'ambiguous' | 'incompatible' | 'unknown'
 
@@ -13,6 +14,8 @@ export interface WireValidation {
   result?: MatchResult
   /** Human-readable summary. */
   message?: string
+  /** Suggested function chains that bridge the source → target type mismatch. */
+  suggestedChains?: BridgingChain[]
 }
 
 /**
@@ -20,7 +23,7 @@ export interface WireValidation {
  *
  * Returns:
  *   - 'compatible' when source type satisfies target type
- *   - 'incompatible' when satisfies() returns errors
+ *   - 'incompatible' when satisfies() returns errors; includes suggestedChains
  *   - 'unknown' when one or both types can't be resolved (the user sees a gray wire)
  *
  * Ambiguity detection is deferred to Phase 3d; for 3b any satisfies.ok case
@@ -41,5 +44,11 @@ export function validateWire(
     .slice(0, 3)
     .map((e) => e.message)
     .join('; ')
-  return { status: 'incompatible', result, message: summary }
+  const suggestedChains = findBridgingChains(sourceType, targetType)
+  return {
+    status: 'incompatible',
+    result,
+    message: summary,
+    suggestedChains: suggestedChains.length > 0 ? suggestedChains : undefined,
+  }
 }

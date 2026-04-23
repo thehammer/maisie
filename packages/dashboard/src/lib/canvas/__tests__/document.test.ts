@@ -12,8 +12,11 @@ import {
   setWireTransform,
   getWireTransform,
   updatePlacementConfig,
+  applyChain,
   type CanvasDocument,
 } from '../document'
+import type { BridgingChain } from '../chain-search'
+import { getFunctionDescriptor } from '@maisie/shared'
 
 describe('emptyDocument', () => {
   it('produces a valid document with no placements or wires', () => {
@@ -449,5 +452,179 @@ describe('updatePlacementConfig', () => {
     const [p1, p2] = doc.placements
     const next = updatePlacementConfig(doc, p1.id, { n: 5 })
     expect(next.placements.find((p) => p.id === p2.id)!.config).toBeUndefined()
+  })
+})
+
+// ── applyChain ────────────────────────────────────────────────────────────────
+
+function makeCountChain(): BridgingChain {
+  const desc = getFunctionDescriptor('std.count')!
+  return {
+    steps: [{ functionId: 'std.count', descriptor: desc }],
+    outputType: { kind: 'scalar', type: 'number' },
+  }
+}
+
+function makePluckFirstChain(): BridgingChain {
+  const pluck = getFunctionDescriptor('std.pluck')!
+  const first = getFunctionDescriptor('std.first')!
+  return {
+    steps: [
+      { functionId: 'std.pluck', descriptor: pluck, suggestedParams: {} },
+      { functionId: 'std.first', descriptor: first },
+    ],
+    outputType: { kind: 'any' },
+  }
+}
+
+describe('applyChain', () => {
+  it('returns doc unchanged for unknown wireId', () => {
+    const doc = emptyDocument()
+    const result = applyChain(doc, makeCountChain(), 'nonexistent-wire')
+    expect(result).toBe(doc)
+  })
+
+  it('removes the original wire', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 100 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 400, y: 100 } })
+    const [src, tgt] = doc.placements
+    doc = addWire(doc, { source: { placementId: src.id }, target: { placementId: tgt.id } })
+    const wire = doc.wires[0]
+
+    const result = applyChain(doc, makeCountChain(), wire.id)
+    expect(result.wires.find((w) => w.id === wire.id)).toBeUndefined()
+  })
+
+  it('inserts one function placement for a 1-step chain', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 100 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 400, y: 100 } })
+    const [src, tgt] = doc.placements
+    doc = addWire(doc, { source: { placementId: src.id }, target: { placementId: tgt.id } })
+    const wire = doc.wires[0]
+
+    const result = applyChain(doc, makeCountChain(), wire.id)
+
+    // Original 2 placements + 1 new function = 3
+    expect(result.placements).toHaveLength(3)
+    const fnPlacement = result.placements.find((p) => p.kind === 'function')
+    expect(fnPlacement).toBeDefined()
+    expect(fnPlacement!.targetName).toBe('std.count')
+  })
+
+  it('creates correct wire chain for 1-step: source → fn → target', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 100 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 400, y: 100 } })
+    const [src, tgt] = doc.placements
+    doc = addWire(doc, { source: { placementId: src.id }, target: { placementId: tgt.id } })
+    const wire = doc.wires[0]
+
+    const result = applyChain(doc, makeCountChain(), wire.id)
+
+    // Should have exactly 2 new wires: src→fn, fn→tgt
+    expect(result.wires).toHaveLength(2)
+    const fnPlacement = result.placements.find((p) => p.kind === 'function')!
+    const wireA = result.wires.find((w) => w.source.placementId === src.id)
+    const wireB = result.wires.find((w) => w.target.placementId === tgt.id)
+    expect(wireA).toBeDefined()
+    expect(wireA!.target.placementId).toBe(fnPlacement.id)
+    expect(wireB).toBeDefined()
+    expect(wireB!.source.placementId).toBe(fnPlacement.id)
+  })
+
+  it('inserts two function placements for a 2-step chain', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 600, y: 0 } })
+    const [src, tgt] = doc.placements
+    doc = addWire(doc, { source: { placementId: src.id }, target: { placementId: tgt.id } })
+    const wire = doc.wires[0]
+
+    const result = applyChain(doc, makePluckFirstChain(), wire.id)
+
+    // 2 original + 2 fn placements = 4
+    expect(result.placements).toHaveLength(4)
+    const fnPlacements = result.placements.filter((p) => p.kind === 'function')
+    expect(fnPlacements).toHaveLength(2)
+    expect(fnPlacements[0].targetName).toBe('std.pluck')
+    expect(fnPlacements[1].targetName).toBe('std.first')
+  })
+
+  it('creates correct wire chain for 2-step: source → fn1 → fn2 → target', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 600, y: 0 } })
+    const [src, tgt] = doc.placements
+    doc = addWire(doc, { source: { placementId: src.id }, target: { placementId: tgt.id } })
+    const wire = doc.wires[0]
+
+    const result = applyChain(doc, makePluckFirstChain(), wire.id)
+
+    // 3 wires: src→fn1, fn1→fn2, fn2→tgt
+    expect(result.wires).toHaveLength(3)
+    const fnPlacements = result.placements.filter((p) => p.kind === 'function')
+    const [fn1, fn2] = fnPlacements
+
+    const wireA = result.wires.find((w) => w.source.placementId === src.id)
+    const wireB = result.wires.find((w) => w.source.placementId === fn1.id)
+    const wireC = result.wires.find((w) => w.target.placementId === tgt.id)
+    expect(wireA?.target.placementId).toBe(fn1.id)
+    expect(wireB?.target.placementId).toBe(fn2.id)
+    expect(wireC?.source.placementId).toBe(fn2.id)
+  })
+
+  it('positions function placements between source and target', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 300, y: 0 } })
+    const [src, tgt] = doc.placements
+    doc = addWire(doc, { source: { placementId: src.id }, target: { placementId: tgt.id } })
+    const wire = doc.wires[0]
+
+    const result = applyChain(doc, makeCountChain(), wire.id)
+    const fn = result.placements.find((p) => p.kind === 'function')!
+
+    // For a 1-step chain, the function is placed at the midpoint (t = 1/2)
+    expect(fn.position.x).toBeCloseTo(150, 0)
+    expect(fn.position.y).toBeCloseTo(0, 0)
+  })
+
+  it('applies suggestedParams to function placement config', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 300, y: 0 } })
+    const [src, tgt] = doc.placements
+    doc = addWire(doc, { source: { placementId: src.id }, target: { placementId: tgt.id } })
+    const wire = doc.wires[0]
+
+    const chain: BridgingChain = {
+      steps: [{
+        functionId: 'std.limit',
+        descriptor: getFunctionDescriptor('std.limit')!,
+        suggestedParams: { n: 10 },
+      }],
+      outputType: { kind: 'collection', element: { kind: 'any' } },
+    }
+
+    const result = applyChain(doc, chain, wire.id)
+    const fn = result.placements.find((p) => p.kind === 'function')!
+    expect(fn.config).toEqual({ n: 10 })
+  })
+
+  it('does not mutate the original document', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 300, y: 0 } })
+    const [src, tgt] = doc.placements
+    doc = addWire(doc, { source: { placementId: src.id }, target: { placementId: tgt.id } })
+    const wire = doc.wires[0]
+    const originalPlacementCount = doc.placements.length
+    const originalWireCount = doc.wires.length
+
+    applyChain(doc, makeCountChain(), wire.id)
+    expect(doc.placements).toHaveLength(originalPlacementCount)
+    expect(doc.wires).toHaveLength(originalWireCount)
   })
 })

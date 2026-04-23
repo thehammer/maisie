@@ -16,6 +16,7 @@ import {
 
 export interface UseCanvasDocument {
   doc: CanvasDocument
+  setDoc: (doc: CanvasDocument) => void
   addPlacement: (placement: Omit<Placement, 'id'>) => void
   removePlacement: (id: string) => void
   movePlacement: (id: string, position: { x: number; y: number }) => void
@@ -33,6 +34,7 @@ export function useCanvasDocument(): UseCanvasDocument {
 
   return {
     doc,
+    setDoc,
     addPlacement: useCallback((p) => setDoc((d) => addPlacement(d, p)), []),
     removePlacement: useCallback((id) => {
       setDoc((d) => removePlacement(d, id))

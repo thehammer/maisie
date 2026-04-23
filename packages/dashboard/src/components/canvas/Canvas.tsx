@@ -7,14 +7,16 @@ import { Placement } from './Placement'
 import { Inspector } from './Inspector'
 import { Wire } from './Wire'
 import { Preview } from './Preview'
+import { ChainSuggestionPopover } from './ChainSuggestionPopover'
 import { useCanvasDocument } from '../../hooks/useCanvasDocument'
-import { hasWire } from '../../lib/canvas/document'
+import { hasWire, applyChain } from '../../lib/canvas/document'
 import { validateWire, type WireStatus } from '../../lib/canvas/wire-validator'
 import { resolveEntityPorts, resolveComponentPorts, resolveFunctionPorts, type PlacementPorts } from '../../lib/canvas/type-resolver'
 import { canEmitComponent, canEmitEntity, emitComponent, emitEntity } from '../../lib/canvas/emit'
 import { resolveComponent, refreshComponents } from '../../lib/components/resolver'
 import { refreshCompletionCatalog } from '../../lib/editor/mel-completion'
 import type { Placement as PlacementType } from '../../lib/canvas/document'
+import type { BridgingChain } from '../../lib/canvas/chain-search'
 import type { MaisieValue, TypeExpr, ComponentDef } from '@maisie/shared'
 
 // Pending wire during drag
@@ -36,6 +38,13 @@ export function Canvas() {
   const [placementPorts, setPlacementPorts] = useState<Map<string, PlacementPorts>>(new Map())
   const [previewOpen, setPreviewOpen] = useState(false)
   const [saveStatus, setSaveStatus] = useState<string | null>(null)
+
+  // Chain suggestion popover state
+  const [chainSuggestion, setChainSuggestion] = useState<{
+    wireId: string
+    chains: BridgingChain[]
+    anchorPos: { x: number; y: number }
+  } | null>(null)
 
   // Compute emit availability from the current doc
   const componentCheck = canEmitComponent(canvas.doc)
@@ -336,6 +345,22 @@ export function Canvas() {
     return placementPorts.get(placementId)?.input
   }, [placementPorts])
 
+  // Apply a bridging chain — replace the incompatible wire with function placements + wires
+  const handleApplyChain = useCallback((chain: BridgingChain) => {
+    if (!chainSuggestion) return
+    const newDoc = applyChain(canvas.doc, chain, chainSuggestion.wireId)
+    canvas.setDoc(newDoc)
+    setChainSuggestion(null)
+  }, [chainSuggestion, canvas])
+
+  // Show chain suggestion popover when a wire is selected and has suggestions
+  const handleWireClick = useCallback((wireId: string, pos: { x: number; y: number }, chains: BridgingChain[]) => {
+    canvas.setSelectedId(wireId)
+    if (chains.length > 0) {
+      setChainSuggestion({ wireId, chains, anchorPos: pos })
+    }
+  }, [canvas])
+
   return (
     <DndContext onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEnd}>
       <div className="canvas-layout-outer">
@@ -363,6 +388,10 @@ export function Canvas() {
               registerPort={registerPort}
               updatePortPositions={updatePortPositions}
               onKeyDown={handleKeyDown}
+              chainSuggestion={chainSuggestion}
+              onWireClick={handleWireClick}
+              onApplyChain={handleApplyChain}
+              onDismissChain={() => setChainSuggestion(null)}
             />
             <FunctionPalette
               highlightInputTarget={fnInputHighlight}
@@ -440,6 +469,10 @@ interface SurfaceProps {
   registerPort: (key: string, el: HTMLElement | null) => void
   updatePortPositions: () => void
   onKeyDown: (e: React.KeyboardEvent) => void
+  chainSuggestion: { wireId: string; chains: BridgingChain[]; anchorPos: { x: number; y: number } } | null
+  onWireClick: (wireId: string, pos: { x: number; y: number }, chains: BridgingChain[]) => void
+  onApplyChain: (chain: BridgingChain) => void
+  onDismissChain: () => void
 }
 
 function CanvasSurface({
@@ -451,6 +484,10 @@ function CanvasSurface({
   registerPort,
   updatePortPositions,
   onKeyDown,
+  chainSuggestion,
+  onWireClick,
+  onApplyChain,
+  onDismissChain,
 }: SurfaceProps) {
   const { setNodeRef, isOver } = useDroppable({ id: 'canvas-surface' })
 
@@ -484,6 +521,8 @@ function CanvasSurface({
           const to = portPositions.get(toKey)
           if (!from || !to) return null
           const validation = wireValidations.get(wire.id) ?? { status: 'unknown' as WireStatus }
+          const chains = validation.suggestedChains ?? []
+          const midPos = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 }
           return (
             <Wire
               key={wire.id}
@@ -493,7 +532,7 @@ function CanvasSurface({
               selected={canvas.selectedId === wire.id}
               message={validation.message}
               transform={wire.transform}
-              onClick={() => canvas.setSelectedId(wire.id)}
+              onClick={() => onWireClick(wire.id, midPos, chains)}
             />
           )
         })}
@@ -519,6 +558,16 @@ function CanvasSurface({
           registerPort={registerPort}
         />
       ))}
+
+      {/* Chain suggestion popover — shown when an incompatible wire is clicked and chains exist */}
+      {chainSuggestion && (
+        <ChainSuggestionPopover
+          chains={chainSuggestion.chains}
+          anchorPos={chainSuggestion.anchorPos}
+          onApply={onApplyChain}
+          onDismiss={onDismissChain}
+        />
+      )}
     </div>
   )
 }

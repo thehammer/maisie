@@ -482,18 +482,37 @@ The first round of canvas work proved the model but revealed a gap: most plugin 
 
 **Scope:** 1 session (estimated 2).
 
-### 3j — Auto-suggest transform chains
+### 3j — Auto-suggest transform chains ✓ COMPLETE 2026-04-13
 
 **Goal:** When direct compatibility fails, the system proposes function chains that bridge the source to the target.
 
 **What ships:**
 - `findBridgingChains(sourceType, targetType, maxDepth = 3)` — BFS over function signatures, returns candidate chains of function calls that compose to bridge the two types
-- Popover on hover over a "yellow" wire or incompatible drop: shows the suggested chain with a "Apply" button
+- Popover on clicking an incompatible (red) wire: shows suggested chains with an Apply button
 - One-click apply inserts the function placements and wires into the canvas
-- Multiple suggestions sorted by chain length; user picks
-- Cache chain searches keyed by source+target type pair
+- Multiple suggestions sorted by chain length; user picks (up to 5 shown)
+- Deduplication via visited-set on head-type fingerprint prevents BFS explosion
 
-**Scope:** 2–3 sessions (search algorithm + UX).
+**Files changed:**
+- `packages/dashboard/src/lib/canvas/chain-search.ts` — `findBridgingChains`, `inferFunctionOutput`, `ChainStep`, `BridgingChain`
+- `packages/dashboard/src/lib/canvas/wire-validator.ts` — `WireValidation.suggestedChains` field; calls `findBridgingChains` on incompatible wires
+- `packages/dashboard/src/lib/canvas/document.ts` — `applyChain` function; inserts fn placements + wires, positions evenly between source and target
+- `packages/dashboard/src/components/canvas/ChainSuggestionPopover.tsx` — popover component
+- `packages/dashboard/src/components/canvas/Canvas.tsx` — chain suggestion state, wire click handler, popover integration
+- `packages/dashboard/src/hooks/useCanvasDocument.ts` — exposed `setDoc` for bulk document replacement
+- `packages/dashboard/src/styles.css` — `.chain-suggestion-*` styles
+
+**Tests added:**
+- `packages/dashboard/src/lib/canvas/__tests__/chain-search.test.ts` — 18 tests (BFS algorithm, single/multi-step chains, no-chain, maxDepth, dedup, inferFunctionOutput)
+- `packages/dashboard/src/lib/canvas/__tests__/document.test.ts` — 11 new `applyChain` tests (wire replacement, placement insertion, chain topology, position interpolation, config, immutability)
+
+**Deviations / notes:**
+- Trigger is clicking an incompatible wire (not hover) — click is more intentional and avoids noisy popovers during navigation
+- Cache not implemented — BFS is fast enough (< 1 ms for depth 3 over 13 functions); add if profiling shows need
+- `inferFunctionOutput` uses an explicit `PASSTHROUGH_FN_IDS` set (filter/sort/limit/unique) to distinguish element-preserving ops from element-transforming ops (pluck/map/group); avoids wrong type inference at search time
+- popover anchors to the wire midpoint in canvas-relative coordinates
+
+**Scope:** 1 session (estimated 2–3).
 
 ### 3k — Views as first-class catalog entries
 
