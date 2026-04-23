@@ -92,12 +92,15 @@ Audiobookshelf is integrated as a connected service.
 
 ### What's Still Missing
 
-- Pipeline composition layer (specified in protocol.md, not yet implemented)
-- REPL panel (in-dashboard or CLI)
-- `EntityStateStore` / Zustand for entity-address-driven re-renders
-- Full runtime layout editor (drag/drop works; config editing via sidebar not complete)
 - Incomplete plugin coverage — Phase 3 integration gaps (see below) still largely open
+- Agent's generic address-based tools (`resolve_address`, `invoke_address`, `run_pipeline`) not wired
+- Full runtime layout editor (drag/drop works; sidebar config editing not complete)
+- Component model implementation (spec in `docs/components.md`; zero code)
+- Derived component syntax + layout primitive library (part of component model)
+- Rich multi-field base entity synthesis (plugin actions today map 1:1 to single-field entities)
 - Open-source package extraction (`@universal-interface/*`)
+- CLI REPL (dashboard editor covers most REPL needs; CLI is future)
+- iOS/Swift renderer (4f)
 
 ---
 
@@ -160,16 +163,20 @@ These terms are used consistently throughout this document and the codebase:
 |------|-----------|
 | **Plugin** | A Maisie integration (unifi, synology, home-assistant, plex, etc.) |
 | **Action** | A single capability exposed by a plugin — one definition, three surfaces |
-| **Resource** | A typed, addressable thing exposed by a plugin (a device, a media item, a book, a network client) |
-| **Entity** | An addressable data point or action target on a resource (a field, a state, a command) |
+| **Entity** | The fundamental unit of the system (base or derived) — a named record of data fields and function fields with typed interfaces. See `docs/model.md`. |
+| **Derived Entity** | A user-authored entity whose fields are MEL expressions composing over other entities |
+| **MEL** | Maisie Expression Language — the surface syntax for defining derived entities. See `docs/grammar.md`. |
 | **Capability** | A named group of required actions that a plugin contracts to implement |
-| **Card** | A tile/panel on the dashboard grid |
+| **Card** | A tile/panel on the dashboard grid; binds an entity to a component |
 | **Page** | A full-screen view (Media, TV, Cameras...) |
 | **Modal** | An overlay dialog |
 | **Section** | A labeled group within a card or page |
 | **Row / Column** | Layout containers |
-| **Component** | A leaf UI element (button, toggle, value display, chart, etc.) |
+| **Component** | A typed, first-class renderer. Base components are primitives (text, image, badge); layout primitives structure composition (stack, overlay, scroll); derived components are user-authored compositions. See `docs/components.md`. |
+| **Derived Component** | A user-authored component with a structural input contract and a render tree composing other components |
 | **Pipeline** | A composable chain of operators applied to a typed stream of entities |
+| **Address** | The dotted path that identifies any entity, field, function, or component in the catalog |
+| **Catalog** | The homogeneous registry of all entities and components — browsable, filterable, itself queryable as an entity |
 
 ---
 
@@ -189,7 +196,16 @@ Phase 4: Three Surface Layers [IN PROGRESS]
   4f: iOS/Swift (future)       [NOT STARTED]
 ```
 
-**Entity model (added 2026-04-22)** — see `docs/model.md`, `docs/grammar.md`, `docs/implementation-plan.md`. 7 phases shipped, 689 tests. Key capabilities:
+**Component model (specified 2026-04-23, implementation pending)** — see `docs/components.md`. Parallel to the entity model for presentation. Key ideas:
+- Base components (text, image, badge, toggle, button, gauge, ...) + layout primitives (stack, row, grid, overlay, scroll, card)
+- Derived components are user-authored compositions with a structural input contract and a render tree
+- Components are first-class values — can be named, stored in the catalog, passed as props, computed from expressions
+- Generic containers via component-typed props (one `Strip` handles movies, books, photos, anything)
+- Structural validation at authoring and render time with pointed error messages
+- Defaults and a `DefaultTile` fallback renderer that auto-renders from record fields
+- Shares the type vocabulary, address scheme, and reactivity with the entity model
+
+**Entity model (added 2026-04-22)** — see `docs/model.md`, `docs/grammar.md`, `docs/implementation-plan.md`. 7 phases shipped, 693 tests. Key capabilities:
 - Entities as the unified unit (base + derived share the same shape)
 - MEL (Maisie Expression Language) — formal grammar, parser, pretty-printer
 - Async expression evaluator with address resolution
