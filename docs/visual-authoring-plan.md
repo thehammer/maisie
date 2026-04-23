@@ -380,7 +380,7 @@ Sub-phases 3a–3e shipped on 2026-04-23.
 
 The first round of canvas work proved the model but revealed a gap: most plugin entities are typed as loose `record` or `collection`, while components demand specific shapes. Direct structural matches are rare in practice. The pragmatic bridging pattern is `entity → function(s) → component` — transforms reshape the data at each boundary. These sub-phases make that pattern first-class.
 
-### 3g — Richer plugin entity types
+### 3g — Richer plugin entity types ✓ COMPLETE 2026-04-13
 
 **Goal:** Plugin entities carry deep TypeExpr outputs derived from their Zod schemas, not coarse `'record'` / `'collection'` strings.
 
@@ -388,16 +388,28 @@ The first round of canvas work proved the model but revealed a gap: most plugin 
 - `zodToTypeExpr(schema)` — converts a Zod object/array/scalar schema to a `TypeExpr`, preserving `MaisieFieldType` annotations from `field()` (so semantic types like `url`, `timestamp`, `percentage` propagate)
 - `synthesizeEntityFromAction` uses the converter to produce a proper typed output
 - `EntityDef.DataFieldDef.type` accepts `TypeExpr` (alongside the existing string form for backward compatibility)
-- Type resolver in canvas (`resolveEntityPorts`) uses the richer type instead of inferring from a string
+- `dataFieldTypeExpr(type)` helper — normalises string or TypeExpr to TypeExpr; exported from `@maisie/shared`
+- Type resolver in canvas (`resolveEntityPorts`) uses `dataFieldTypeExpr` instead of the old string-switch
 
-**Proof of concept:** `plex.list_recently_added.result` resolves to `collection<record<{ title: string, year: number, addedAt: timestamp, ... }>>` — the actual output shape, not just `collection`.
+**Files changed:**
+- `packages/shared/src/zod-to-type-expr.ts` — converter (new)
+- `packages/shared/src/field.ts` — fixed `getMaisieType` for Zod v4 (description is an own getter, not in `_def`)
+- `packages/shared/src/entity.ts` — `DataFieldDef.type` broadened; `dataFieldTypeExpr` added
+- `packages/shared/src/index.ts` — exports `zod-to-type-expr`
+- `packages/plugin-core/src/entity-registry.ts` — uses `zodToTypeExpr(action.output)` in synthesis
+- `packages/dashboard/src/lib/canvas/type-resolver.ts` — uses `dataFieldTypeExpr` for both string and TypeExpr field types
 
-**Files:**
-- `packages/shared/src/zod-to-type-expr.ts` — converter
-- `packages/plugin-core/src/entity-registry.ts` — use the converter in synthesis
-- `packages/dashboard/src/lib/canvas/type-resolver.ts` — consume richer types
+**Deviations / edge cases:**
+- Zod v4 stores `description` as an own getter property on the schema instance, not in `_def.description` — `getMaisieType` fixed to check both paths
+- Some test fixtures pass a bare `{ parse: () => ({}) }` as `any` in place of a real Zod schema; `zodToTypeExpr` now guards against non-Zod objects at the top
+- `ZodLiteral` in Zod v4 stores values in `_def.values[]` (array), not `_def.value` — handled
+- The spec called for a debug log on unknown kinds; removed since it fires on the mock schemas above and adds noise with no benefit
 
-**Scope:** 2–3 sessions.
+**Tests added:**
+- `packages/shared/src/__tests__/zod-to-type-expr.test.ts` — 36 unit tests (scalars, annotated, record, optional, nullable, collection, union, any, depth guard)
+- `packages/plugin-core/src/__tests__/zod-type-expr-integration.test.ts` — 8 end-to-end tests (entity synthesis → satisfies)
+
+**Scope:** 1 session (estimated 2–3).
 
 ### 3h — Function placements on canvas
 

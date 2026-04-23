@@ -87,8 +87,8 @@ describe('EntityRegistry', () => {
     const entity = makeValidPluginEntity()
     registry.register(entity)
 
-    // +1 for the synthetic catalog entity always registered at construction
-    expect(registry.list()).toHaveLength(2)
+    // +2 for the synthetic catalog and memory entities always registered at construction
+    expect(registry.list()).toHaveLength(3)
     expect(registry.get('test-plugin.list_devices')).toEqual(entity)
   })
 
@@ -102,8 +102,8 @@ describe('EntityRegistry', () => {
     const removed = registry.unregister('test-plugin.list_devices')
 
     expect(removed).toBe(true)
-    // Only the synthetic catalog entity remains
-    expect(registry.list()).toHaveLength(1)
+    // Only the synthetic catalog and memory entities remain
+    expect(registry.list()).toHaveLength(2)
     expect(registry.get('test-plugin.list_devices')).toBeUndefined()
   })
 
@@ -191,7 +191,11 @@ describe('synthesizeEntityFromAction', () => {
     expect(resultField.kind).toBe('data')
     if (resultField.kind === 'data') {
       expect(resultField.actionName).toBe('list_devices')
-      expect(resultField.type).toBe('record')
+      // Phase 3g: type is now a TypeExpr derived from the action's Zod output schema
+      // list_devices returns z.array(z.object({...})) → collection<record>
+      expect(typeof resultField.type).toBe('object')
+      const t = resultField.type as { kind: string }
+      expect(t.kind).toBe('collection')
     }
   })
 

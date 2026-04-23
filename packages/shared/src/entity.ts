@@ -1,4 +1,5 @@
 import type { MaisieFieldType } from './field'
+import type { TypeExpr } from './component'
 import type { ExprNode } from './ops'
 
 /**
@@ -20,8 +21,8 @@ export type FieldDef = DataFieldDef | FunctionFieldDef
 
 export interface DataFieldDef {
   kind: 'data'
-  /** Semantic type, or 'record' / 'collection' for composite shapes. */
-  type: MaisieFieldType | 'record' | 'collection'
+  /** Either a coarse string label (legacy) or a full TypeExpr for structural matching. */
+  type: MaisieFieldType | 'record' | 'collection' | TypeExpr
   /** MEL expression defining this field (derived entities only). */
   expression?: ExprNode
   /** Plugin action name this field wraps (plugin entities only). */
@@ -38,6 +39,19 @@ export interface FunctionFieldDef {
   actionName?: string
   /** Safety tier for agent invocation. */
   tier: 'inform' | 'advise' | 'act'
+}
+
+/**
+ * Convert a DataFieldDef's type to a TypeExpr. String forms are converted
+ * with a best-effort fallback; TypeExpr values pass through unchanged.
+ */
+export function dataFieldTypeExpr(type: DataFieldDef['type']): TypeExpr {
+  if (typeof type === 'string') {
+    if (type === 'record') return { kind: 'record', fields: {} }
+    if (type === 'collection') return { kind: 'collection', element: { kind: 'any' } }
+    return { kind: 'scalar', type: type as MaisieFieldType }
+  }
+  return type
 }
 
 /**

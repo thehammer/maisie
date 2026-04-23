@@ -63,9 +63,16 @@ export function field<T extends z.ZodTypeAny>(schema: T, type: MaisieFieldType):
 /**
  * Read the Maisie semantic type from a Zod schema, if one was attached.
  * Returns null if no semantic type was annotated.
+ *
+ * Checks both schema.description (Zod v4 getter) and schema._def.description
+ * (Zod v3 / legacy path) for compatibility.
  */
 export function getMaisieType(schema: z.ZodTypeAny): MaisieFieldType | null {
-  const desc = (schema._def as { description?: string }).description
+  // Zod v4: description is an own getter property on the schema instance.
+  // _def may be undefined for some schema kinds, so guard before accessing it.
+  const desc =
+    (schema as unknown as { description?: string }).description ??
+    (schema._def as { description?: string } | undefined)?.description
   if (desc?.startsWith('maisie:')) return desc.slice(7) as MaisieFieldType
   return null
 }

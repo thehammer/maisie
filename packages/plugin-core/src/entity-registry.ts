@@ -1,5 +1,5 @@
 import type { EntityDef, MaisiePlugin, PluginAction, ActionTier } from '@maisie/shared'
-import { validateEntityDef, inferTier, STD_LIB } from '@maisie/shared'
+import { validateEntityDef, inferTier, STD_LIB, zodToTypeExpr } from '@maisie/shared'
 import { entityDependencyGraph } from './entity-dependency-graph'
 
 /**
@@ -196,13 +196,12 @@ export function synthesizeEntityFromAction(
       tier,
     }
   } else {
-    // Determine shape from output schema; for Phase 2a just tag as 'record'
-    // (the CardDescriptor introspection in getCardCatalog provides the
-    // detailed field list independently). Shape is a loose approximation;
-    // refinement comes when output-schema introspection lands in the registry.
+    // Derive the output TypeExpr from the action's Zod output schema.
+    // This replaces the coarse 'record' string with a full structural type
+    // that downstream consumers (canvas type resolver, contract matcher) can use.
     fields.result = {
       kind: 'data',
-      type: 'record',
+      type: zodToTypeExpr(action.output),
       actionName: action.name,
     }
   }

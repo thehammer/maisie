@@ -6,7 +6,8 @@
  */
 
 import type { TypeExpr, ComponentDef } from '@maisie/shared'
-import type { EntityDef } from '@maisie/shared'
+import type { EntityDef, DataFieldDef } from '@maisie/shared'
+import { dataFieldTypeExpr } from '@maisie/shared'
 
 export interface PlacementPorts {
   /** Output type — the type this placement produces. Undefined if not applicable. */
@@ -61,6 +62,9 @@ export async function resolveComponentPorts(componentName: string): Promise<Plac
  * Derive an output TypeExpr from an entity's fields.
  * Strategy: if there's a single data field named 'result', use its type.
  * Otherwise construct a record type from all data fields.
+ *
+ * Uses dataFieldTypeExpr() to handle both legacy string types and richer
+ * TypeExpr values that come from zodToTypeExpr (Phase 3g).
  */
 function inferEntityOutput(entity: EntityDef): TypeExpr | undefined {
   const dataFields = Object.entries(entity.fields).filter(([, f]) => f.kind === 'data')
@@ -68,23 +72,14 @@ function inferEntityOutput(entity: EntityDef): TypeExpr | undefined {
 
   // 1:1 plugin bridge — single 'result' field
   if (dataFields.length === 1 && dataFields[0][0] === 'result') {
-    const field = dataFields[0][1] as { kind: 'data'; type: string }
-    return fieldTypeToTypeExpr(field.type)
+    const f = dataFields[0][1] as DataFieldDef
+    return dataFieldTypeExpr(f.type)
   }
 
   // Multi-field entity — record shape
   const fields: Record<string, TypeExpr> = {}
   for (const [name, f] of dataFields) {
-    const field = f as { kind: 'data'; type: string }
-    const t = fieldTypeToTypeExpr(field.type)
-    if (t) fields[name] = t
+    fields[name] = dataFieldTypeExpr((f as DataFieldDef).type)
   }
   return { kind: 'record', fields }
-}
-
-function fieldTypeToTypeExpr(type: string): TypeExpr | undefined {
-  if (type === 'collection') return { kind: 'collection', element: { kind: 'any' } }
-  if (type === 'record') return { kind: 'record', fields: {} }
-  // Assume scalar — cast to the scalar type union
-  return { kind: 'scalar', type: type as import('@maisie/shared').MaisieFieldType }
 }
