@@ -22,6 +22,8 @@ import { oneDark } from '@codemirror/theme-one-dark'
 import { mel } from '../lib/editor/mel-stream-language'
 import { melCompletions, refreshCompletionCatalog } from '../lib/editor/mel-completion'
 import { melLinter } from '../lib/editor/mel-linter'
+import { parse } from '@maisie/shared'
+import { refreshComponents } from '../lib/components/resolver'
 
 const API = import.meta.env.VITE_API_URL || ''
 
@@ -118,16 +120,45 @@ export function EntityEditor() {
   const handleSave = async () => {
     setSaving(true)
     setSaveStatus(null)
+    const source = getSource()
+
+    // Detect entity vs component from the source by parsing it. Source that
+    // defines a component (has a render: field) goes to /api/components;
+    // entities go to /api/entities. Parse errors surface as save errors.
+    let endpoint = `${API}/api/entities`
+    let kindLabel = 'entity'
     try {
-      const res = await fetch(`${API}/api/entities`, {
+      const parsed = parse(source)
+      if (parsed && typeof parsed === 'object' && 'kind' in parsed) {
+        if (parsed.kind === 'component') {
+          endpoint = `${API}/api/components`
+          kindLabel = 'component'
+        } else if (parsed.kind === 'entity') {
+          endpoint = `${API}/api/entities`
+          kindLabel = 'entity'
+        } else {
+          setSaveStatus('Error: source is an expression, not a define block — write `define Name { ... }` to save')
+          setSaving(false)
+          return
+        }
+      }
+    } catch (err) {
+      setSaveStatus(`Parse error: ${err instanceof Error ? err.message : String(err)}`)
+      setSaving(false)
+      return
+    }
+
+    try {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: getSource() }),
+        body: JSON.stringify({ source }),
       })
       const data = await res.json() as { name?: string; error?: string }
       if (res.ok) {
-        setSaveStatus(`Saved: ${data.name}`)
+        setSaveStatus(`Saved ${kindLabel}: ${data.name}`)
         refreshCompletionCatalog()
+        if (kindLabel === 'component') refreshComponents()
       } else {
         setSaveStatus(`Error: ${data.error ?? 'unknown'}`)
       }
