@@ -93,7 +93,7 @@ The plan is organized into a sequence of platform phases plus one evergreen stre
 ```
 Phase 0: Foundations              [COMPLETE]
 Phase 1: The Data Platform        [COMPLETE — 2026-04-22]
-Phase 2: The Presentation Platform [SPEC COMPLETE; IMPLEMENTATION PENDING]
+Phase 2: The Presentation Platform [COMPLETE — 2026-04-23]
 Phase 3: Visual Authoring         [PLANNED]
 Phase 4: The Agent Platform       [PARTIAL]
 Phase 5: Distribution             [PLANNED]
@@ -200,7 +200,7 @@ Entities as the unified unit of data + behavior. Every capability in the system 
 
 ## Phase 2 — The Presentation Platform
 
-**Status: Specification complete. Implementation pending.**
+**Status: Complete (2026-04-23).** 1003 tests. 7 sub-phases, ~10 sessions.
 
 Components as the unified unit of UI. Mirrors the data platform in structure: base components + layout primitives are the primitives; derived components are user-authored compositions with structural input contracts. Components are first-class values, allowing generic containers (one `Strip` for movies, books, photos) and higher-order composition.
 
@@ -215,17 +215,17 @@ Components as the unified unit of UI. Mirrors the data platform in structure: ba
 - Entity-component binding in card configs with structural validation
 - Reactivity flows through the existing entity event system
 
-### What's planned
+### What shipped
 
-A 7-sub-phase implementation plan (`docs/components-implementation-plan.md`) will break this into shippable chunks, same shape as the entity model implementation plan:
+7 sub-phases per `docs/components-implementation-plan.md`:
 
-- 2a: Layout primitives + base component interface formalization
-- 2b: Component DSL grammar + parser extensions
-- 2c: Component registry + persistence
-- 2d: Structural contract matcher
-- 2e: Component rendering engine (React)
-- 2f: Component catalog integration
-- 2g: Entity-component binding + default fallback
+- **2a** — `ComponentDef`, `TypeExpr`, `PropDecl`, layout primitives (Stack/Row/Grid/Overlay/Scroll/CardContainer/Spacer) as React components, base + layout ComponentDef registries
+- **2b** — MEL grammar extended with component productions (`input`, `props`, `render`, type expressions, layout_call, component_call); ParsedComponent; printer round-trip
+- **2c** — ComponentRegistry (with pre-registered base + layout); derived_components SQLite table; CRUD routes at `/api/components`; boot-time loader
+- **2d** — Structural contract matcher (`satisfies`) with semantic subtypes, pointed error paths, and runtime `inferType` for any MaisieValue
+- **2e** — Rendering engine walks ExprNode trees, dispatches component/layout calls, evaluates MEL inline, cycle detection; base components route to FieldRenderer; ComponentRenderer React wrapper with validation
+- **2f** — Editor autocomplete includes components; `get_component_catalog` action discoverable via PluginAction surface
+- **2g** — CardConfig gains `component` + `componentProps`; DynamicCard delegates to ComponentRenderer when set; DefaultTile built-in auto-renders any record; wizard Step 3 offers component selection
 
 ### Reference
 
