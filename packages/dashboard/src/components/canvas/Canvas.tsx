@@ -9,8 +9,11 @@ import { useCanvasDocument } from '../../hooks/useCanvasDocument'
 import { hasWire } from '../../lib/canvas/document'
 import { validateWire, type WireStatus } from '../../lib/canvas/wire-validator'
 import { resolveEntityPorts, resolveComponentPorts, type PlacementPorts } from '../../lib/canvas/type-resolver'
+import { canEmitComponent, canEmitEntity, emitComponent, emitEntity } from '../../lib/canvas/emit'
+import { resolveComponent, refreshComponents } from '../../lib/components/resolver'
+import { refreshCompletionCatalog } from '../../lib/editor/mel-completion'
 import type { Placement as PlacementType } from '../../lib/canvas/document'
-import type { MaisieValue, TypeExpr } from '@maisie/shared'
+import type { MaisieValue, TypeExpr, ComponentDef } from '@maisie/shared'
 
 // Pending wire during drag
 interface PendingWire {
@@ -30,6 +33,66 @@ export function Canvas() {
   const [portPositions, setPortPositions] = useState<PortPositions>(new Map())
   const [placementPorts, setPlacementPorts] = useState<Map<string, PlacementPorts>>(new Map())
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<string | null>(null)
+
+  // Compute emit availability from the current doc
+  const componentCheck = canEmitComponent(canvas.doc)
+  const entityCheck = canEmitEntity(canvas.doc)
+  const canEmitComponentError = componentCheck.ok ? null : componentCheck.error
+  const canEmitEntityError = entityCheck.ok ? null : entityCheck.error
+
+  // Save as component: emit → POST → refresh catalog
+  const handleSaveComponent = useCallback(async (name: string, description: string) => {
+    const result = emitComponent(canvas.doc, { name, description: description || undefined }, resolveComponent as (n: string) => ComponentDef | undefined)
+    if (!result.ok || !result.artifact) {
+      setSaveStatus(`Error: ${result.error}`)
+      return
+    }
+    try {
+      const res = await fetch('/api/components', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ component: result.artifact }),
+      })
+      if (!res.ok) {
+        const body = await res.json() as { error?: string }
+        setSaveStatus(`Save failed: ${body.error ?? res.statusText}`)
+        return
+      }
+      await refreshComponents()
+      refreshCompletionCatalog()
+      setSaveStatus(`Saved component "${name}"`)
+      setTimeout(() => setSaveStatus(null), 3000)
+    } catch (err) {
+      setSaveStatus(`Network error: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }, [canvas.doc])
+
+  // Save as entity: emit → POST → refresh catalog
+  const handleSaveEntity = useCallback(async (name: string, description: string) => {
+    const result = emitEntity(canvas.doc, { name, description: description || undefined }, resolveComponent as (n: string) => ComponentDef | undefined)
+    if (!result.ok || !result.artifact) {
+      setSaveStatus(`Error: ${result.error}`)
+      return
+    }
+    try {
+      const res = await fetch('/api/entities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entity: result.artifact }),
+      })
+      if (!res.ok) {
+        const body = await res.json() as { error?: string }
+        setSaveStatus(`Save failed: ${body.error ?? res.statusText}`)
+        return
+      }
+      refreshCompletionCatalog()
+      setSaveStatus(`Saved entity "${name}"`)
+      setTimeout(() => setSaveStatus(null), 3000)
+    } catch (err) {
+      setSaveStatus(`Network error: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }, [canvas.doc])
 
   // Cache of resolved ports per placement — avoid re-fetching on every render
   const portsCache = useRef<Map<string, PlacementPorts>>(new Map())
@@ -231,6 +294,12 @@ export function Canvas() {
   return (
     <DndContext onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEnd}>
       <div className="canvas-layout-outer">
+        <SaveArtifactPanel
+          onSaveComponent={handleSaveComponent}
+          onSaveEntity={handleSaveEntity}
+          canEmit={{ component: canEmitComponentError, entity: canEmitEntityError }}
+          status={saveStatus}
+        />
         <div className="canvas-layout">
           <Palette />
           <CanvasSurface
@@ -404,3 +473,123 @@ function PlacementWithPorts({ placement, selected, onSelect, registerPort }: Pla
   )
 }
 
+// ── SaveArtifactPanel ─────────────────────────────────────────────────────────
+
+interface SaveArtifactPanelProps {
+  onSaveComponent: (name: string, description: string) => Promise<void>
+  onSaveEntity: (name: string, description: string) => Promise<void>
+  canEmit: { component: string | null; entity: string | null }
+  status: string | null
+}
+
+function SaveArtifactPanel({
+  onSaveComponent,
+  onSaveEntity,
+  canEmit,
+  status,
+}: SaveArtifactPanelProps) {
+  const [open, setOpen] = useState<'component' | 'entity' | null>(null)
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const handleOpen = (kind: 'component' | 'entity') => {
+    setName('')
+    setDescription('')
+    setOpen(kind)
+  }
+
+  const handleSave = async () => {
+    if (!name.trim() || !open) return
+    setSaving(true)
+    try {
+      if (open === 'component') {
+        await onSaveComponent(name.trim(), description.trim())
+      } else {
+        await onSaveEntity(name.trim(), description.trim())
+      }
+      setOpen(null)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      void handleSave()
+    }
+    if (e.key === 'Escape') setOpen(null)
+  }
+
+  return (
+    <div className="canvas-save-panel">
+      <div className="canvas-save-toolbar">
+        <span className="canvas-save-label">Emit:</span>
+        <button
+          className="canvas-save-btn"
+          disabled={canEmit.component !== null}
+          title={canEmit.component ?? 'Save canvas as a derived component'}
+          onClick={() => handleOpen('component')}
+        >
+          Save as Component
+        </button>
+        <button
+          className="canvas-save-btn"
+          disabled={canEmit.entity !== null}
+          title={canEmit.entity ?? 'Save canvas as a derived entity'}
+          onClick={() => handleOpen('entity')}
+        >
+          Save as Entity
+        </button>
+        {status && <span className="canvas-save-status">{status}</span>}
+      </div>
+
+      {open && (
+        <div className="canvas-save-form" onKeyDown={handleKeyDown}>
+          <div className="canvas-save-form-row">
+            <label className="canvas-save-form-label">
+              Name
+              <input
+                className="canvas-save-form-input"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={open === 'component' ? 'e.g. MovieStrip' : 'e.g. recent-movies-view'}
+                autoFocus
+              />
+            </label>
+          </div>
+          <div className="canvas-save-form-row">
+            <label className="canvas-save-form-label">
+              Description (optional)
+              <textarea
+                className="canvas-save-form-textarea"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+                placeholder="What does this artifact do?"
+              />
+            </label>
+          </div>
+          <div className="canvas-save-form-actions">
+            <button
+              className="canvas-save-form-submit"
+              onClick={() => void handleSave()}
+              disabled={saving || !name.trim()}
+            >
+              {saving ? 'Saving…' : `Save as ${open === 'component' ? 'Component' : 'Entity'}`}
+            </button>
+            <button
+              className="canvas-save-form-cancel"
+              onClick={() => setOpen(null)}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
