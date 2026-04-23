@@ -7,6 +7,7 @@ config({ path: join(import.meta.dir, "../../..", ".env") });
 import { createMqttClient } from "./services/mqtt";
 import { initDb } from "./services/db";
 import { loadDerivedEntities } from "./services/entity-loader";
+import { loadDerivedComponents } from "./services/component-loader";
 import { createApi } from "./api/index";
 import type { Services } from "./api/types";
 import { createUniFiClientFromEnv } from "./skills/network/unifi-client";
@@ -73,6 +74,9 @@ async function main() {
 
   // Load persisted derived entities into the registry
   await loadDerivedEntities(db);
+
+  // Load persisted derived components into the component registry
+  await loadDerivedComponents(db);
 
   // Connect to MQTT broker
   const mqtt = await createMqttClient();

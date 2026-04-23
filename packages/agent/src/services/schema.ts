@@ -256,6 +256,17 @@ export const derivedEntities = sqliteTable('derived_entities', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 })
 
+// Derived (user-authored) component definitions
+export const derivedComponents = sqliteTable('derived_components', {
+  name: text('name').primaryKey(),
+  description: text('description'),
+  input: text('input', { mode: 'json' }).$type<unknown>(),
+  props: text('props', { mode: 'json' }).$type<Record<string, unknown>>(),
+  render: text('render', { mode: 'json' }).$type<unknown>().notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+})
+
 // Plugin configuration overrides (env vars, enabled/disabled)
 export const pluginConfigs = sqliteTable('plugin_configs', {
   id: text('id').primaryKey(),

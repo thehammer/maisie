@@ -52,5 +52,6 @@ export { configurePlugin } from './actions'
 export { validatePlugin, validateActionName, VERB_PREFIXES } from './validators'
 export { deriveHttpPath } from './registry'
 export { EntityRegistry, entityRegistry, synthesizeEntityFromAction, synthesizeEntitiesForPlugin } from './entity-registry'
+export { ComponentRegistry, componentRegistry } from './component-registry'
 export { createEvalRouter } from './eval-routes'
 export default plugin

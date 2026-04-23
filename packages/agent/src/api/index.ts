@@ -24,6 +24,8 @@ import { createPluginActionRouter } from "./plugin-actions";
 import { createBleRouter } from "./ble";
 import { createEntityRouter } from "@maisie/plugin-core/src/entity-routes";
 import { createDerivedEntityStore } from "@maisie/plugin-core/src/derived-entity-store";
+import { createComponentRouter } from "@maisie/plugin-core/src/component-routes";
+import { createDerivedComponentStore } from "@maisie/plugin-core/src/derived-component-store";
 import { createEvalRouter } from "@maisie/plugin-core/src/eval-routes";
 import { entityRegistry } from "@maisie/plugin-core";
 import type { Agent } from "../agent/index";
@@ -43,6 +45,11 @@ export function createApi(services: Services, agent?: Agent, plugins: MaisiePlug
   // this provides a store reference for the router to persist/delete entities.
   const entityRouter = createEntityRouter(derivedStore, {})
   app.route("/api", entityRouter);
+
+  // Component CRUD API (Phase 2c)
+  const componentStore = createDerivedComponentStore(services.db as any)
+  const componentRouter = createComponentRouter(componentStore)
+  app.route("/api", componentRouter);
 
   // MEL eval endpoint (Phase 4a) — evaluate expressions without saving
   const evalRouter = createEvalRouter({})

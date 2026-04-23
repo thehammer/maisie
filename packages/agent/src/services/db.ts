@@ -275,6 +275,16 @@ function migrate(sqlite: Database) {
       updated_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS derived_components (
+      name TEXT PRIMARY KEY,
+      description TEXT,
+      input TEXT,
+      props TEXT,
+      render TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS card_templates (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
