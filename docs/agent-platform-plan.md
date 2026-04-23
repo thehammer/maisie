@@ -47,6 +47,8 @@ Sub-phases 4a and 4b together unlock most of the agent's new capability. 4c onwa
 
 ## Phase 4a — Generic Address Tools
 
+**Status: COMPLETE** *(2026-04-13)*
+
 **Goal:** The agent gains a small set of protocol-level tools that operate against any entity in the catalog. Per-action hand-wired tools remain available but are no longer the only way to compose.
 
 ### What ships
@@ -56,34 +58,46 @@ Four new tool surfaces registered in the agent's tool registry:
 - **`resolve_address(address: string)`** — returns the live value at an entity-field address. Equivalent to `GET /api/entities/:name/:field` via the address resolver. Tier: `inform`.
 - **`invoke_address(address: string, args?: record)`** — calls a function field at an address with optional arguments. Tier: inferred from the target field's declared tier (agent runtime checks before dispatch).
 - **`run_pipeline(expression: string)`** — parses a MEL expression, evaluates it via `evalExprAsync`, returns the result. Tier: `inform` for pure read expressions; runtime checks for any embedded function calls.
-- **`list_entities(filter?: {section?, fieldShape?})`** — returns catalog entries matching a structural filter. Tier: `inform`.
+- **`list_entities(filter?: {section?, fieldNames?})`** — returns catalog entries matching a filter. Tier: `inform`.
 
-### Files to create
+### Files created
 
-- `packages/agent/src/tools/generic-tools.ts` — tool definitions + handlers
-- `packages/agent/src/tools/tier-enforcement.ts` — checks that the tool's actual invocation respects the caller's permitted tier
+- `packages/agent/src/agent/generic-tools.ts` — tool definitions + handlers
+- `packages/agent/src/agent/tier-enforcement.ts` — `canInvoke` / `requireTier` helpers
+- `packages/agent/src/agent/__tests__/generic-tools.test.ts` — 28 tests
 
-### Files to modify
+### Files modified
 
-- `packages/agent/src/agent/index.ts` (or wherever tools register) — add the four generic tools to the base tool set
-- `packages/agent/src/agent/__tests__/` — tests covering the new tools
+- `packages/agent/src/agent/tool-registry.ts` — generic tools included in every `toSdkTools()` call alongside plugin actions; existing tests updated to reflect count
+- `packages/agent/src/agent/__tests__/tool-registry.test.ts` — updated counts; added assertions for the 4 generic tool names
+
+### Deviations from spec
+
+1. **`fieldShape` filter replaced with `fieldNames`** — the spec's `fieldShape` (structural TypeExpr match via `satisfies`) was scoped out for 4a because the entity registry stores field types as strings (`MaisieFieldType | 'record' | 'collection'`), not as `TypeExpr` objects that `satisfies` accepts. A `fieldNames` filter (must have ALL named fields) ships instead. Full structural matching is a 4b+ candidate.
+
+2. **Files at `agent/` not `tools/`** — the spec listed `packages/agent/src/tools/` as the destination. The existing agent patterns all live under `packages/agent/src/agent/`, so the files went there to stay consistent with the codebase layout.
+
+3. **Generic tools always included in `toSdkTools()`** — they are baseline protocol capability, not tied to any plugin scope. Scope filters still apply to plugin-action tools.
+
+4. **`ActionContext` cast** — `createAddressResolver` uses its own loose `ActionContext = { [key: string]: unknown }`. The shared `ActionContext` lacks an index signature, so we cast with `as unknown as Record<string, unknown>` at the boundary.
 
 ### Tests
 
-- `resolve_address` returns the live value for a plugin entity field; returns the evaluated value for a derived entity field
-- `invoke_address` calls a function field; errors when called on a data field
-- `run_pipeline` evaluates a simple MEL expression; rejects pipelines that include act-tier operations when the caller's permitted tier is lower
-- `list_entities` filters by section; filters by field shape (structural match)
+- `resolve_address` — plugin entity data field, derived entity literal, unknown address
+- `invoke_address` — function verb action happy path, tier block (advise > inform), data field error, unknown address
+- `run_pipeline` — literal expr, string expr, plugin entity pipeline with filter, define block rejected, component define block rejected, tier block via inferTier, invalid MEL
+- `list_entities` — no filter, section filter, fieldNames filter, combined filter, empty filter, components included, section filter excludes components, summary shape
+- `tier-enforcement` — canInvoke matrix (inform/act/advise × all tiers), requireTier throws and passes
 
 ### Proof of concept
 
 Chat: "What's the status of the exterior lights?" → agent calls `resolve_address("home-assistant.switch.front_exterior_lights.state")` → returns "off". Same query without hand-wired tools.
 
-Chat: "Show me all switches that are on" → agent constructs `home-assistant.list_switches | filter: state == "on"` and calls `run_pipeline` → returns the list.
+Chat: "Show me all switches that are on" → agent constructs `home-assistant.list_switches.result | filter: state == "on"` and calls `run_pipeline` → returns the list.
 
 ### Estimated scope
 
-2 sessions.
+1 session (completed in 1).
 
 ---
 

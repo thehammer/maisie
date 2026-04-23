@@ -66,26 +66,39 @@ describe('ToolRegistry', () => {
     expect(toolNames).not.toContain('internal_sync')
   })
 
+  // The 4 generic tools (resolve_address, invoke_address, run_pipeline, list_entities)
+  // are always included alongside plugin-action tools.
+  const GENERIC_TOOL_COUNT = 4
+
   test('toSdkTools returns executable tools', () => {
     const registry = createToolRegistry([calibrePlugin])
     const tools = registry.toSdkTools()
-    expect(Object.keys(tools)).toHaveLength(2)
+    // 2 plugin actions + 4 generic tools
+    expect(Object.keys(tools)).toHaveLength(2 + GENERIC_TOOL_COUNT)
     expect(tools['search_books']).toBeDefined()
     expect(tools['get_book_count']).toBeDefined()
+    expect(tools['resolve_address']).toBeDefined()
+    expect(tools['invoke_address']).toBeDefined()
+    expect(tools['run_pipeline']).toBeDefined()
+    expect(tools['list_entities']).toBeDefined()
   })
 
-  test('filters by toolScopes', () => {
+  test('filters by toolScopes (generic tools always included)', () => {
     const registry = createToolRegistry([calibrePlugin])
     const tools = registry.toSdkTools(['search_books'])
-    expect(Object.keys(tools)).toHaveLength(1)
+    // scope filter applies to plugin actions; generic tools always present
+    expect(Object.keys(tools)).toHaveLength(1 + GENERIC_TOOL_COUNT)
     expect(tools['search_books']).toBeDefined()
     expect(tools['get_book_count']).toBeUndefined()
+    expect(tools['resolve_address']).toBeDefined()
   })
 
-  test('empty scopes array returns no tools', () => {
+  test('empty scopes array returns only generic tools', () => {
     const registry = createToolRegistry([calibrePlugin])
     const tools = registry.toSdkTools([])
-    expect(Object.keys(tools)).toHaveLength(0)
+    // No plugin actions, but generic tools remain
+    expect(Object.keys(tools)).toHaveLength(GENERIC_TOOL_COUNT)
+    expect(tools['resolve_address']).toBeDefined()
   })
 
   test('getActionsByTier filters correctly', () => {
@@ -97,10 +110,15 @@ describe('ToolRegistry', () => {
     expect(actActions).toHaveLength(0)
   })
 
-  test('works with zero plugins', () => {
+  test('works with zero plugins (generic tools still present)', () => {
     const registry = createToolRegistry([])
     expect(registry.allActions).toHaveLength(0)
-    expect(registry.toSdkTools()).toEqual({})
+    const tools = registry.toSdkTools()
+    expect(Object.keys(tools)).toHaveLength(GENERIC_TOOL_COUNT)
+    expect(tools['resolve_address']).toBeDefined()
+    expect(tools['invoke_address']).toBeDefined()
+    expect(tools['run_pipeline']).toBeDefined()
+    expect(tools['list_entities']).toBeDefined()
   })
 
   test('merges actions from multiple plugins', () => {
