@@ -299,6 +299,17 @@ function migrate(sqlite: Database) {
       timestamp INTEGER NOT NULL,
       tags TEXT NOT NULL DEFAULT '[]'
     );
+
+    CREATE TABLE IF NOT EXISTS proposals (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL,
+      name TEXT NOT NULL,
+      source TEXT NOT NULL,
+      reasoning TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at INTEGER NOT NULL,
+      resolved_at INTEGER
+    );
   `);
 
   // Column migrations — ALTER TABLE ADD COLUMN for columns added after initial release

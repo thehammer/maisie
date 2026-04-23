@@ -8,6 +8,7 @@ import { createPersonaRouter } from './persona-router'
 import { createAgentLoop } from './loop'
 import { createDerivedEntityStore } from '@maisie/plugin-core/src/derived-entity-store'
 import { createDerivedComponentStore } from '@maisie/plugin-core/src/derived-component-store'
+import { createProposalStore } from '../services/proposal-store'
 
 interface AgentConfig {
   plugins: MaisiePlugin[]
@@ -29,7 +30,10 @@ export function createAgent(config: AgentConfig) {
     componentStore: createDerivedComponentStore(config.db),
   }
 
-  const toolRegistry = createToolRegistry(config.plugins, authoringDeps, memory)
+  const proposalStore = createProposalStore(config.db)
+  const proposalDeps = { proposalStore }
+
+  const toolRegistry = createToolRegistry(config.plugins, authoringDeps, memory, proposalDeps)
   const eventRouter = createEventRouter(config.plugins)
   const personaRouter = createPersonaRouter(config.plugins)
 

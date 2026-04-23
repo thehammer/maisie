@@ -22,6 +22,8 @@ import { createPersonasRouter } from "./personas";
 import { createLayoutRouter } from "./layout";
 import { createPluginActionRouter } from "./plugin-actions";
 import { createBleRouter } from "./ble";
+import { createProposalsRouter } from "./proposals";
+import { createProposalStore } from "../services/proposal-store";
 import { createEntityRouter } from "@maisie/plugin-core/src/entity-routes";
 import { createDerivedEntityStore } from "@maisie/plugin-core/src/derived-entity-store";
 import { createComponentRouter } from "@maisie/plugin-core/src/component-routes";
@@ -50,6 +52,15 @@ export function createApi(services: Services, agent?: Agent, plugins: MaisiePlug
   const componentStore = createDerivedComponentStore(services.db as any)
   const componentRouter = createComponentRouter(componentStore)
   app.route("/api", componentRouter);
+
+  // Proposals API (Phase 4e)
+  const proposalStore = createProposalStore(services.db as any)
+  const proposalsRouter = createProposalsRouter({
+    proposalStore,
+    entityStore: derivedStore,
+    componentStore,
+  })
+  app.route("/api", proposalsRouter);
 
   // MEL eval endpoint (Phase 4a) — evaluate expressions without saving
   const evalRouter = createEvalRouter({})

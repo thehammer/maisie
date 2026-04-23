@@ -23,6 +23,7 @@ const PersonasPage = lazy(() => import("./pages/PersonasPage").then((m) => ({ de
 const StudioPage = lazy(() => import("./pages/StudioPage").then((m) => ({ default: m.StudioPage })));
 import { ChatPanel } from "./components/ChatPanel";
 import { NotificationsFeed } from "./components/NotificationsFeed";
+import { ProposalsPanel } from "./components/ProposalsPanel";
 import { AgentStatus } from "./components/AgentStatus";
 import { DraggableDashboardGrid } from "./components/DraggableDashboardGrid";
 import { CardSlot } from "./components/CardSlot";
@@ -119,6 +120,8 @@ export function App() {
   const { page, navigate } = useHashRoute();
   const [notifCount, setNotifCount] = useState(0);
   const [notifsOpen, setNotifsOpen] = useState(false);
+  const [proposalCount, setProposalCount] = useState(0);
+  const [proposalsOpen, setProposalsOpen] = useState(false);
   const [addCardOpen, setAddCardOpen] = useState(false);
   const [configuringCardId, setConfiguringCardId] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -200,6 +203,7 @@ export function App() {
     <>
       <ChatPanel notificationCount={notifCount} onOpenNotifications={() => setNotifsOpen(true)} />
       <NotificationsFeed open={notifsOpen} onClose={() => setNotifsOpen(false)} onCountChange={setNotifCount} />
+      <ProposalsPanel open={proposalsOpen} onClose={() => setProposalsOpen(false)} onCountChange={setProposalCount} />
     </>
   );
 
@@ -563,6 +567,15 @@ export function App() {
         </div>
         <div className="status">
           <AgentStatus />
+          {proposalCount > 0 && (
+            <button
+              className="proposals-badge-btn"
+              onClick={() => setProposalsOpen(true)}
+              title={`${proposalCount} pending proposal${proposalCount !== 1 ? "s" : ""}`}
+            >
+              {proposalCount} proposal{proposalCount !== 1 ? "s" : ""}
+            </button>
+          )}
           <div className={`status-dot ${agentUp ? "" : "down"}`} />
           {agentUp ? "Agent connected" : "Agent offline"}
           {mqttConnected && <span className="mqtt-badge">LIVE</span>}

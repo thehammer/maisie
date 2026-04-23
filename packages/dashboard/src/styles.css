@@ -2660,6 +2660,56 @@ body {
   background: var(--surface-hover);
 }
 
+/* ── Proposals Panel ──────────────────────────────────────── */
+
+.proposals-badge-btn {
+  background: rgba(251, 191, 36, 0.15);
+  color: var(--yellow);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 12px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.proposals-badge-btn:hover {
+  background: rgba(251, 191, 36, 0.25);
+}
+
+.proposals-panel {
+  width: 420px;
+}
+
+.proposals-item-name {
+  font-weight: 500;
+  color: var(--text);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proposals-source {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  overflow-x: auto;
+  white-space: pre;
+  margin: 0 0 0.5rem;
+}
+
+.proposals-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 /* ── Agent Status Widget ──────────────────────────────────── */
 
 .agent-status-widget {

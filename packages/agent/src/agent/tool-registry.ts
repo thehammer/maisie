@@ -4,12 +4,15 @@ import { z } from 'zod'
 import { createGenericTools } from './generic-tools'
 import { createAuthoringTools } from './authoring-tools'
 import type { AuthoringToolDeps } from './authoring-tools'
+import { createProposalTools } from './proposal-tools'
+import type { ProposalToolDeps } from './proposal-tools'
 import type { MemoryStore } from './memory'
 
 export function createToolRegistry(
   plugins: MaisiePlugin[],
   authoringDeps?: AuthoringToolDeps,
   memoryStore?: MemoryStore,
+  proposalDeps?: ProposalToolDeps,
 ) {
   // Collect all actions with ai config from all plugins
   const allActions = plugins.flatMap(plugin =>
@@ -87,7 +90,12 @@ export function createToolRegistry(
       ? createAuthoringTools(authoringDeps, permittedTier)
       : {}
 
-    return { ...genericTools, ...authoringTools, ...pluginTools }
+    // Proposal tool is included when deps are available (inform tier — no side effect on catalog).
+    const proposalTools = proposalDeps
+      ? createProposalTools(proposalDeps)
+      : {}
+
+    return { ...genericTools, ...authoringTools, ...proposalTools, ...pluginTools }
   }
 
   function getActionsByTier(tier: ActionTier) {

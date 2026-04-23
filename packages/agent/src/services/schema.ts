@@ -275,6 +275,18 @@ export const derivedComponents = sqliteTable('derived_components', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 })
 
+// Agent-proposed derived entities/components, pending human review
+export const proposals = sqliteTable('proposals', {
+  id: text('id').primaryKey(),                        // uuid
+  kind: text('kind').notNull(),                       // 'entity' | 'component'
+  name: text('name').notNull(),                       // the proposed artifact's name
+  source: text('source').notNull(),                   // the MEL source
+  reasoning: text('reasoning'),                       // why the agent proposed this
+  status: text('status').notNull().default('pending'), // 'pending' | 'approved' | 'rejected'
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  resolvedAt: integer('resolved_at', { mode: 'timestamp' }),
+})
+
 // Plugin configuration overrides (env vars, enabled/disabled)
 export const pluginConfigs = sqliteTable('plugin_configs', {
   id: text('id').primaryKey(),

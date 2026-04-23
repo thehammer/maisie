@@ -1,6 +1,6 @@
 # Agent Platform — Implementation Plan
 
-*Last updated 2026-04-13 (Phase 4d complete)*
+*Last updated 2026-04-13 (Phase 4e infrastructure complete)*
 
 Phased implementation plan for Phase 4 (The Agent Platform) described in `docs/super-plan.md`. Builds on the entity model (Phase 1), presentation model (Phase 2), and visual authoring (Phase 3). Each sub-phase is deployable on its own. The existing hand-wired agent tools continue to work throughout.
 
@@ -259,34 +259,75 @@ Chat: "Remember a view that shows me movies I haven't watched yet." → agent co
 
 ## Phase 4e — Proactive Authoring
 
-**Goal:** The agent authors derived entities and components autonomously (at `advise` tier) in response to ongoing concerns. Users see the proposals as cards on the dashboard.
+**Status: INFRASTRUCTURE COMPLETE** *(2026-04-13)*
 
-### What ships
+The infrastructure for proactive authoring has shipped. The autonomous reflection loop (periodic background observation → automated proposal generation) is explicitly deferred as future work — see note below.
 
-- Agent behavior layer: periodic reflection on memory + current state; proposes derived entities for persistent concerns (overdue packages, unusual network activity, printer alerts)
-- A "proposals" section in the dashboard/inbox: each proposal shows the MEL source, the expected output, a Save button (advise-tier approval), and a Reject button
-- Approved proposals persist via `save_entity` / `save_component`
-- Agent learns from approvals and rejections (later — track metrics)
+### What shipped (infrastructure)
 
-### Files to create
+- **`proposals` table** — SQLite table persisting pending/approved/rejected proposals with id, kind, name, source, reasoning, status, createdAt, resolvedAt
+- **`ProposalStore`** — CRUD layer (`create`, `list`, `get`, `markApproved`, `markRejected`, `delete`) mirroring the derived-entity-store pattern
+- **`propose_artifact` agent tool** — Tier: `inform`. The agent calls this to emit a draft proposal. Validates MEL syntax and stores the proposal as pending. No catalog change is made until a human approves. Inform-tier because creating a proposal has no side effect on the catalog.
+- **HTTP routes** (`/api/proposals` CRUD + approve/reject):
+  - `GET /api/proposals` — list, optional `?status` filter
+  - `GET /api/proposals/:id` — get one
+  - `POST /api/proposals/:id/approve` — parse MEL, save via same path as `save_entity`/`save_component`, mark approved
+  - `POST /api/proposals/:id/reject` — mark rejected
+  - `DELETE /api/proposals/:id` — remove entirely
+- **`ProposalsPanel` dashboard component** — slide-out drawer listing pending proposals with kind badge, name, reasoning, MEL source, Approve and Reject buttons; polling every 30s
+- **Pending proposals badge** — visible in the dashboard header whenever pending proposals exist; click to open the panel
 
-- `packages/agent/src/agent/reflection.ts` — periodic background loop
-- `packages/agent/src/agent/proposal-engine.ts` — generates proposals
-- `packages/dashboard/src/components/ProposalsPanel.tsx` — UI for reviewing
+### Files created
+
+- `packages/agent/src/services/proposal-store.ts` — ProposalStore interface + Drizzle implementation
+- `packages/agent/src/services/__tests__/proposal-store.test.ts` — 11 tests
+- `packages/agent/src/agent/proposal-tools.ts` — `propose_artifact` tool + `ProposalToolDeps` interface
+- `packages/agent/src/agent/__tests__/proposal-tools.test.ts` — 6 tests
+- `packages/agent/src/api/proposals.ts` — HTTP route handlers
+- `packages/agent/src/api/__tests__/proposals.test.ts` — 15 tests
+- `packages/dashboard/src/components/ProposalsPanel.tsx` — dashboard UI
+
+### Files modified
+
+- `packages/agent/src/services/schema.ts` — `proposals` table added
+- `packages/agent/src/services/db.ts` — `CREATE TABLE IF NOT EXISTS proposals` migration
+- `packages/agent/src/agent/tool-registry.ts` — accepts optional `proposalDeps`; merges proposal tool into `toSdkTools()`
+- `packages/agent/src/agent/index.ts` — constructs `ProposalStore` and passes as `proposalDeps` to `createToolRegistry`
+- `packages/agent/src/api/index.ts` — mounts `createProposalsRouter` at `/api`
+- `packages/dashboard/src/App.tsx` — imports `ProposalsPanel`, adds `proposalCount`/`proposalsOpen` state, renders badge + panel
+- `packages/dashboard/src/styles.css` — proposals panel and badge styles
 
 ### Tests
 
-- Proposal engine emits a proposal given a sample memory state
-- Approval path: save → appears in catalog
-- Rejection path: proposal discarded, logged
+- Proposal store: create/list/filter/get/markApproved/markRejected/delete (11 tests)
+- propose_artifact tool: valid entity/component MEL, plain expression, invalid syntax, reasoning (6 tests)
+- API routes: list/get/approve/reject/delete, 404s, 409 conflict, MEL parse failure triggers rejection, rejection does not write to catalog (15 tests)
+
+### Deviations from spec
+
+1. **Autonomous reflection loop deferred** — the spec described a periodic background loop that observes memory and autonomously proposes artifacts. This is deferred as a research-level AI behavior problem: what should trigger a reflection, what qualifies as "a persistent concern worth proposing", and how should the agent learn from approval/rejection patterns. Shipping the infrastructure first (proposal table, tool, routes, UI) gives a clean review surface to validate before investing in the autonomous loop.
+
+2. **`propose_artifact` is `inform` tier** — the spec said `advise`. Creating a proposal has no side effect on the catalog; the proposal just enters a queue. Approval is the human-driven advise step. `inform` is correct for the tool because it just records a suggestion.
+
+3. **Slide-out drawer, not a dedicated `#proposals` page** — uses the same panel pattern as `NotificationsFeed`, keeping the UI minimal. The panel is accessible via a badge in the header whenever pending proposals exist.
+
+### Deferred: autonomous reflection loop
+
+The autonomous reflection loop (`packages/agent/src/agent/reflection.ts`, `proposal-engine.ts`) is future work. It requires answers to:
+- What triggers reflection? (time interval, event type, memory length threshold?)
+- What constitutes a "persistent concern" vs. noise?
+- How does the agent avoid spamming proposals for the same pattern?
+- How does approval/rejection feed back into proposal generation?
+
+These are research-quality AI behavior decisions. Deferring them lets the infrastructure ship cleanly and gives the review surface time to be validated with manually-triggered proposals (via chat).
 
 ### Proof of concept
 
-Over a week, the agent observes multiple packages arriving late. It proposes a `late-packages-this-week` derived entity. User approves → a card appears on the dashboard tracking the pattern.
+Chat: "I keep seeing late packages — can you make an entity for that?" → agent calls `propose_artifact(source: "define late-packages-this-week { ...", reasoning: "...")` → proposal appears in dashboard → user clicks Approve → entity saved to catalog → available as a card.
 
 ### Estimated scope
 
-3–4 sessions.
+Infrastructure: 1 session (completed in 1). Autonomous loop: 2–3 additional sessions (deferred).
 
 ---
 
