@@ -4,11 +4,13 @@ import { Palette } from './Palette'
 import { Placement } from './Placement'
 import { Inspector } from './Inspector'
 import { Wire } from './Wire'
+import { Preview } from './Preview'
 import { useCanvasDocument } from '../../hooks/useCanvasDocument'
 import { hasWire } from '../../lib/canvas/document'
 import { validateWire, type WireStatus } from '../../lib/canvas/wire-validator'
 import { resolveEntityPorts, resolveComponentPorts, type PlacementPorts } from '../../lib/canvas/type-resolver'
 import type { Placement as PlacementType } from '../../lib/canvas/document'
+import type { MaisieValue, TypeExpr } from '@maisie/shared'
 
 // Pending wire during drag
 interface PendingWire {
@@ -27,6 +29,7 @@ export function Canvas() {
   const portRefs = useRef<Map<string, HTMLElement>>(new Map())
   const [portPositions, setPortPositions] = useState<PortPositions>(new Map())
   const [placementPorts, setPlacementPorts] = useState<Map<string, PlacementPorts>>(new Map())
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   // Cache of resolved ports per placement — avoid re-fetching on every render
   const portsCache = useRef<Map<string, PlacementPorts>>(new Map())
@@ -191,29 +194,89 @@ export function Canvas() {
     }
   }
 
+  // Preview: resolve the live data for an entity placement by fetching its primary field.
+  // Component placements don't produce data in isolation — return undefined.
+  const resolveInput = useCallback(async (placementId: string): Promise<MaisieValue | undefined> => {
+    const placement = canvas.doc.placements.find((p) => p.id === placementId)
+    if (!placement || placement.kind !== 'entity') return undefined
+
+    try {
+      // First get entity definition to know the field name
+      const defRes = await fetch(`/api/entities/${encodeURIComponent(placement.targetName)}`)
+      if (!defRes.ok) return undefined
+      const entity = await defRes.json() as { fields?: Record<string, { kind: string }> }
+      const dataFields = Object.entries(entity.fields ?? {}).filter(([, f]) => f.kind === 'data')
+      if (dataFields.length === 0) return undefined
+      const fieldName = dataFields[0][0]
+
+      // Fetch the field value
+      const valRes = await fetch(`/api/entities/${encodeURIComponent(placement.targetName)}/${encodeURIComponent(fieldName)}`)
+      if (!valRes.ok) return undefined
+      const body = await valRes.json() as unknown
+      // Derived entity response is wrapped in {value: ...}
+      if (body !== null && typeof body === 'object' && 'value' in (body as object)) {
+        return (body as { value: MaisieValue }).value
+      }
+      return body as MaisieValue
+    } catch {
+      return undefined
+    }
+  }, [canvas.doc.placements])
+
+  // Preview: return the input TypeExpr for a component placement from the ports cache.
+  const resolveInputType = useCallback((placementId: string): TypeExpr | undefined => {
+    return placementPorts.get(placementId)?.input
+  }, [placementPorts])
+
   return (
     <DndContext onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEnd}>
-      <div className="canvas-layout">
-        <Palette />
-        <CanvasSurface
-          canvasRef={canvasRef}
-          canvas={canvas}
-          pendingWire={pendingWire}
-          portPositions={portPositions}
-          placementPorts={placementPorts}
-          registerPort={registerPort}
-          updatePortPositions={updatePortPositions}
-          onKeyDown={handleKeyDown}
-        />
-        <Inspector
-          placement={selectedPlacement}
-          wire={selectedWire}
-          placementPorts={placementPorts}
-          placements={canvas.doc.placements}
-          onDeletePlacement={() => { if (canvas.selectedId) canvas.removePlacement(canvas.selectedId) }}
-          onDeleteWire={() => { if (canvas.selectedId) canvas.removeWire(canvas.selectedId) }}
-        />
+      <div className="canvas-layout-outer">
+        <div className="canvas-layout">
+          <Palette />
+          <CanvasSurface
+            canvasRef={canvasRef}
+            canvas={canvas}
+            pendingWire={pendingWire}
+            portPositions={portPositions}
+            placementPorts={placementPorts}
+            registerPort={registerPort}
+            updatePortPositions={updatePortPositions}
+            onKeyDown={handleKeyDown}
+          />
+          <Inspector
+            placement={selectedPlacement}
+            wire={selectedWire}
+            placementPorts={placementPorts}
+            placements={canvas.doc.placements}
+            onDeletePlacement={() => { if (canvas.selectedId) canvas.removePlacement(canvas.selectedId) }}
+            onDeleteWire={() => { if (canvas.selectedId) canvas.removeWire(canvas.selectedId) }}
+          />
+        </div>
+        <div className={`canvas-preview-drawer${previewOpen ? '' : ' collapsed'}`}>
+          <div className="canvas-preview-toolbar">
+            <span className="canvas-preview-title">Preview</span>
+            <button
+              className="canvas-preview-toggle"
+              onClick={() => setPreviewOpen((v) => !v)}
+            >
+              {previewOpen ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          {previewOpen && (
+            <Preview
+              doc={canvas.doc}
+              resolveInput={resolveInput}
+              resolveInputType={resolveInputType}
+            />
+          )}
+        </div>
       </div>
+      {/* Toggle button in the bottom-right of the canvas area, visible when drawer is closed */}
+      {!previewOpen && (
+        <div className="canvas-preview-fab">
+          <button onClick={() => setPreviewOpen(true)}>Preview</button>
+        </div>
+      )}
     </DndContext>
   )
 }

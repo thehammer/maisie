@@ -5619,3 +5619,87 @@ body {
 .canvas-inspector-wire-status-incompatible { background: rgba(248, 113, 113, 0.15); color: #f87171; }
 .canvas-inspector-wire-status-unknown { background: rgba(136, 136, 136, 0.15); color: var(--text-muted); }
 
+/* ---- Preview drawer ---- */
+
+.canvas-layout-outer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  height: calc(100vh - 120px);
+}
+
+.canvas-layout-outer .canvas-layout {
+  flex: 1 1 0;
+  min-height: 0;
+  padding: 0;
+  height: auto;
+}
+
+.canvas-preview-drawer {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  overflow: auto;
+  max-height: 320px;
+  flex-shrink: 0;
+}
+.canvas-preview-drawer.collapsed {
+  max-height: 0;
+  overflow: hidden;
+  border: none;
+}
+.canvas-preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.canvas-preview-title { font-weight: 600; font-size: 0.85rem; }
+.canvas-preview-toggle {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.canvas-preview-toggle:hover { background: var(--surface-hover); }
+.canvas-preview-empty { padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+.canvas-preview { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; padding: 12px; }
+.canvas-preview-target { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
+.canvas-preview-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.canvas-preview-name { font-size: 0.85rem; font-weight: 600; }
+.canvas-preview-badge { font-size: 0.65rem; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; letter-spacing: 0.05em; }
+.canvas-preview-badge-wired { background: rgba(74, 222, 128, 0.15); color: #4ade80; }
+.canvas-preview-badge-fixture { background: rgba(250, 204, 21, 0.15); color: #facc15; }
+.canvas-preview-badge-none { background: rgba(136, 136, 136, 0.15); color: var(--text-muted); }
+.canvas-preview-note { font-size: 0.7rem; color: var(--text-muted); margin-bottom: 6px; }
+.canvas-preview-body { min-height: 80px; }
+
+/* Floating toggle button — shown when drawer is closed */
+.canvas-preview-fab {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 100;
+}
+.canvas-preview-fab button {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.canvas-preview-fab button:hover { opacity: 0.9; }
+
