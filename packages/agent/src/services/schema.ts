@@ -300,6 +300,13 @@ export const views = sqliteTable('views', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 })
 
+// Canvas document persistence — work-in-progress compositions
+export const canvasDocuments = sqliteTable('canvas_documents', {
+  id: text('id').primaryKey(),               // 'default' singleton for now; future: per user
+  document: text('document', { mode: 'json' }).$type<unknown>().notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+})
+
 // Plugin configuration overrides (env vars, enabled/disabled)
 export const pluginConfigs = sqliteTable('plugin_configs', {
   id: text('id').primaryKey(),

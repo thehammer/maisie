@@ -81,6 +81,14 @@ export function Canvas() {
     }
   }, [canvas.doc])
 
+  // Clear canvas — confirm first, then clear local state + server
+  const handleClearCanvas = useCallback(async () => {
+    if (canvas.doc.placements.length === 0) return
+    if (!window.confirm('Clear the canvas? This cannot be undone.')) return
+    await canvas.clear()
+    setSaveStatus(null)
+  }, [canvas])
+
   // Save as view: emit → POST → refresh catalog
   const handleSaveView = useCallback(async (name: string, description: string) => {
     const result = emitView(canvas.doc, { name, description: description || undefined })
@@ -389,6 +397,10 @@ export function Canvas() {
     }
   }, [canvas])
 
+  if (canvas.restoring) {
+    return <div className="canvas-layout-outer canvas-restoring">Restoring canvas…</div>
+  }
+
   return (
     <DndContext onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEnd}>
       <div className="canvas-layout-outer">
@@ -396,8 +408,10 @@ export function Canvas() {
           onSaveComponent={handleSaveComponent}
           onSaveEntity={handleSaveEntity}
           onSaveView={handleSaveView}
+          onClearCanvas={handleClearCanvas}
           canEmit={{ component: canEmitComponentError, entity: canEmitEntityError, view: canEmitViewError }}
           status={saveStatus}
+          isEmpty={canvas.doc.placements.length === 0}
         />
         <div className="canvas-layout canvas-layout-split">
           {/* Left: Entity palette */}
@@ -651,16 +665,20 @@ interface SaveArtifactPanelProps {
   onSaveComponent: (name: string, description: string) => Promise<void>
   onSaveEntity: (name: string, description: string) => Promise<void>
   onSaveView: (name: string, description: string) => Promise<void>
+  onClearCanvas: () => Promise<void>
   canEmit: { component: string | null; entity: string | null; view: string | null }
   status: string | null
+  isEmpty: boolean
 }
 
 function SaveArtifactPanel({
   onSaveComponent,
   onSaveEntity,
   onSaveView,
+  onClearCanvas,
   canEmit,
   status,
+  isEmpty,
 }: SaveArtifactPanelProps) {
   const [open, setOpen] = useState<'component' | 'entity' | 'view' | null>(null)
   const [name, setName] = useState('')
@@ -735,6 +753,14 @@ function SaveArtifactPanel({
           onClick={() => handleOpen('view')}
         >
           Save as View
+        </button>
+        <button
+          className="canvas-save-btn canvas-clear-btn"
+          disabled={isEmpty}
+          title={isEmpty ? 'Canvas is already empty' : 'Clear all placements and wires'}
+          onClick={() => void onClearCanvas()}
+        >
+          Clear
         </button>
         {status && <span className="canvas-save-status">{status}</span>}
       </div>

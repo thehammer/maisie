@@ -95,7 +95,7 @@ The plan is organized into a sequence of platform phases plus one evergreen stre
 Phase 0: Foundations              [COMPLETE]
 Phase 1: The Data Platform        [COMPLETE — 2026-04-22]
 Phase 2: The Presentation Platform [COMPLETE — 2026-04-23]
-Phase 3: Visual Authoring         [3a-3e COMPLETE — 2026-04-23; 3g-3l PLANNED; 3f ongoing]
+Phase 3: Visual Authoring         [3a-3e COMPLETE — 2026-04-23; 3g-3l COMPLETE — 2026-04-13; 3f ongoing]
 Phase 4: The Agent Platform       [CORE COMPLETE — 2026-04-23; 4e autonomous loop deferred]
 Phase 5: Distribution             [PLANNED]
 Phase 6: Alternative Clients      [DEFERRED]
@@ -237,36 +237,29 @@ Components as the unified unit of UI. Mirrors the data platform in structure: ba
 
 ## Phase 3 — Visual Authoring
 
-**Status: Core complete (2026-04-23).** 1154 tests. Sub-phases 3a–3e shipped. 3f (self-hosting) is ongoing.
+**Status: Core complete (2026-04-23); extension 3g–3l complete (2026-04-13).** 1492 tests. Sub-phases 3a–3e and 3g–3l shipped. 3f (self-hosting) is ongoing.
 
 The UX surface where entities and components are designed visually. The structural type system enables bidirectional authoring: start from data (bottom-up, see what component contracts you satisfy), start from design (top-down, derive the entity shape you need), or expand outward from any point. The tooling should support all three directions without privileging any.
 
-### What shipped
+### What shipped (3a–3e, 3g–3l)
 
-5 sub-phases per `docs/visual-authoring-plan.md`:
+11 sub-phases per `docs/visual-authoring-plan.md`:
 
 - **3a** — Canvas surface with palette (entities + components) + inspector; drag from palette to canvas; placement selection, movement, and deletion. @dnd-kit/core for drag-and-drop.
 - **3b** — Wires between placement ports. Structural validation via `satisfies` from Phase 2d. Color-coded wires: green (compatible), red (incompatible with error details), gray (unknown). SVG cubic bezier curves with fat invisible hit targets.
 - **3c** — Live preview drawer under the canvas. Each component placement renders via ComponentRenderer, using wired data when available or synthesized fixtures (from the component's declared input contract) otherwise. 250ms debounce.
 - **3d** — Link DSL for transforms: identity, pick, rename, compute, chain. Compiles to ExprNode lambdas via `compileLinkExpr`. Transform pill on wires; dedicated TransformEditor in the inspector with per-kind forms. `empty-record` primitive added.
 - **3e** — Save as Component / Save as Entity. `emitComponent` walks the wire graph inward from the root, building a nested component-call/layout-call render tree; `emitEntity` captures the composition as a derived entity. Inline save form with name + description. Catalog refresh on save.
+- **3g** — Richer plugin entity types. `zodToTypeExpr` converts Zod output schemas to full `TypeExpr` values. Structural matcher works end-to-end.
+- **3h** — Function placements on canvas. 13 std lib ops as draggable items. `entity → function → component` compositions fully supported.
+- **3i** — Split palette with compatibility highlighting. Entity/component/function panes; green/yellow/gray badges; sort by compatibility; inspector overlays right column on selection.
+- **3j** — Auto-suggest transform chains. BFS over function signatures finds bridging chains; popover with one-click apply inserts function placements + wires.
+- **3k** — Views as first-class catalog entries. `views` table, registry, CRUD, "Save as View" canvas action. Cards bind views directly. ViewCard resolves entity → chain → component at render time.
+- **3l** — Canvas persistence + round-trip editing. `canvas_documents` table, autosave (1500ms debounce), restore on mount, clear button with confirm dialog. `hydrateView/Entity/Component` functions reconstruct CanvasDocuments from saved artifacts. "Edit in Canvas" button in Studio editor.
 
 ### What's ongoing (3f)
 
 Self-hosting — incrementally replacing hand-coded Studio pieces with authored components. Not time-bounded. Candidates: palette, inspector, canvas preview, placement node. Each replacement is its own 1–2 session iteration.
-
-### What's planned (3g–3l)
-
-Hands-on use of the shipped canvas exposed a real gap: plugin entities carry coarse `'record'` / `'collection'` type strings, while components demand specific shapes. Direct structural matches are rare. The natural bridging pattern is `entity → function(s) → component` — transforms reshape data at each boundary. These sub-phases make that pattern first-class:
-
-- **3g — Richer plugin entity types.** Introspect Zod output schemas into full `TypeExpr` values at entity synthesis. The structural matcher gains real types to work with end-to-end.
-- **3h — Function placements on canvas.** Standard library ops (filter, map, pluck, sort, etc.) become draggable canvas items with their own input/output ports. Wires like `entity → function → component` are a valid and visible composition.
-- **3i — Split palette with compatibility highlighting.** Entities left, components right, functions in a collapsible dock. Selection highlights compatible items in the opposite pane by color (green = direct, yellow = via chain, gray = incompatible), sorted by compatibility.
-- **3j — Auto-suggest transform chains.** When direct compatibility fails, BFS over function signatures finds candidate chains that bridge source to target. Popover offers one-click apply.
-- **3k — Views as first-class catalog entries.** A View = entity + optional function chain + component + props. `views` table, registry, CRUD, canvas "Save as View" emit action. Cards can bind Views directly. View is the canonical name for the entity-component pairing (see vocabulary).
-- **3l — Canvas persistence + round-trip editing.** Canvas state autosaves. Any saved entity/component/view reopens in the canvas for modification. Closes the authoring loop.
-
-Estimated extension: 12–16 sessions. See `docs/visual-authoring-plan.md` for details.
 
 ### Goals
 

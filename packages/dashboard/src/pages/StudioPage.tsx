@@ -32,7 +32,7 @@ export function StudioPage({ onBack }: Props) {
         </div>
       </div>
       {tab === 'editor' ? (
-        <Studio />
+        <Studio onEditInCanvas={() => setTab('canvas')} />
       ) : (
         <Suspense fallback={<div className="studio-loading">Loading...</div>}>
           <Canvas />

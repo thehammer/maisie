@@ -31,6 +31,8 @@ import { createDerivedComponentStore } from "@maisie/plugin-core/src/derived-com
 import { createEvalRouter } from "@maisie/plugin-core/src/eval-routes";
 import { createViewRouter } from "@maisie/plugin-core/src/view-routes";
 import { createViewStore } from "@maisie/plugin-core/src/view-store";
+import { createCanvasRouter } from "@maisie/plugin-core/src/canvas-routes";
+import { createCanvasDocumentStore } from "@maisie/plugin-core/src/canvas-document-store";
 import { entityRegistry } from "@maisie/plugin-core";
 import type { Agent } from "../agent/index";
 import type { MaisiePlugin } from "@maisie/shared";
@@ -68,6 +70,11 @@ export function createApi(services: Services, agent?: Agent, plugins: MaisiePlug
   const viewStore = createViewStore(services.db as any)
   const viewRouter = createViewRouter(viewStore)
   app.route("/api", viewRouter);
+
+  // Canvas document persistence API (Phase 3l)
+  const canvasDocStore = createCanvasDocumentStore(services.db as any)
+  const canvasRouter = createCanvasRouter(canvasDocStore)
+  app.route("/api", canvasRouter);
 
   // MEL eval endpoint (Phase 4a) — evaluate expressions without saving
   const evalRouter = createEvalRouter({})

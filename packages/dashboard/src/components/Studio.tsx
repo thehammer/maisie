@@ -24,6 +24,8 @@ import { melCompletions, refreshCompletionCatalog } from '../lib/editor/mel-comp
 import { melLinter } from '../lib/editor/mel-linter'
 import { parse } from '@maisie/shared'
 import { refreshComponents } from '../lib/components/resolver'
+import { hydrateEntity, hydrateComponent, hydrateView } from '../lib/canvas/hydrate'
+import type { EntityDef, ComponentDef, ViewDef } from '@maisie/shared'
 
 const API = import.meta.env.VITE_API_URL || ''
 
@@ -59,7 +61,12 @@ interface EvalResult {
   error?: string
 }
 
-export function Studio() {
+interface StudioProps {
+  /** Called when user clicks "Edit in Canvas" — switches to the Canvas tab. */
+  onEditInCanvas?: () => void
+}
+
+export function Studio({ onEditInCanvas }: StudioProps = {}) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const [result, setResult] = useState<EvalResult | null>(null)
@@ -182,6 +189,50 @@ export function Studio() {
     setSaveStatus(null)
   }
 
+  const handleEditInCanvas = async () => {
+    if (!onEditInCanvas) return
+    const source = getSource()
+    let hydratedDoc: ReturnType<typeof hydrateEntity> | null = null
+
+    try {
+      const parsed = parse(source)
+      if (parsed && typeof parsed === 'object' && 'kind' in parsed) {
+        if (parsed.kind === 'entity') {
+          hydratedDoc = hydrateEntity(parsed as unknown as EntityDef)
+        } else if (parsed.kind === 'component') {
+          hydratedDoc = hydrateComponent(parsed as unknown as ComponentDef)
+        }
+      }
+    } catch {
+      setSaveStatus('Parse error — cannot load into canvas')
+      return
+    }
+
+    // Also try loading a saved view by name from the source (if the source is a name reference)
+    // For 3l this is a best-effort: if we have a parsed entity/component, use it; otherwise bail.
+    if (!hydratedDoc) {
+      setSaveStatus('Cannot load expression into canvas — write a define block first')
+      return
+    }
+
+    // Save the hydrated document to the server so the Canvas tab picks it up on load
+    try {
+      await fetch('/api/canvas/default', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document: hydratedDoc }),
+      })
+    } catch {
+      // Non-fatal: canvas will just start empty if server is unreachable
+    }
+
+    if (hydratedDoc.hydrateNote) {
+      setSaveStatus(`Note: ${hydratedDoc.hydrateNote}`)
+    }
+
+    onEditInCanvas()
+  }
+
   return (
     <div className="entity-editor">
       <div className="entity-editor-header">
@@ -196,6 +247,11 @@ export function Studio() {
           <button onClick={handleSave} className="edit-layout-btn entity-editor-save-btn" disabled={saving}>
             {saving ? 'Saving...' : 'Save Entity'}
           </button>
+          {onEditInCanvas && (
+            <button onClick={handleEditInCanvas} className="edit-layout-btn">
+              Edit in Canvas
+            </button>
+          )}
           {saveStatus && (
             <span className="entity-editor-status">{saveStatus}</span>
           )}

@@ -321,6 +321,12 @@ function migrate(sqlite: Database) {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS canvas_documents (
+      id TEXT PRIMARY KEY,
+      document TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `);
 
   // Column migrations — ALTER TABLE ADD COLUMN for columns added after initial release

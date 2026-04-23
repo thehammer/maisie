@@ -565,18 +565,47 @@ The first round of canvas work proved the model but revealed a gap: most plugin 
 
 **Scope:** 1 session (estimated 2–3).
 
-### 3l — Canvas persistence + round-trip editing
+### 3l — Canvas persistence + round-trip editing ✓ COMPLETE 2026-04-13
 
 **Goal:** Canvas state persists. Any saved entity, component, or view can be reopened in the canvas for editing.
 
 **What ships:**
-- `canvasDocuments` SQLite table for work-in-progress (keyed by a session or user id)
-- Autosave on meaningful changes (debounced)
-- "Edit in canvas" action on any catalog entry — loads the artifact's structure onto the canvas
-- Round-trip: emit → reload → modify → re-emit produces equivalent results
-- Clear canvas / new canvas affordances
+- `canvasDocuments` SQLite table + migration (`schema.ts` + `db.ts`)
+- `CanvasDocumentStore` (`createCanvasDocumentStore`) — upsert-on-save, null-on-missing-load, no-op clear
+- HTTP routes: `GET /api/canvas/:id`, `PUT /api/canvas/:id`, `DELETE /api/canvas/:id` (`canvas-routes.ts`)
+- Routes mounted in `packages/agent/src/api/index.ts` (singleton id `'default'`)
+- Autosave wired into `useCanvasDocument`: restores on mount (fetches `GET /api/canvas/default`), debounced `PUT` on every doc change (1500ms), skip-during-restore guard via `loadedRef`
+- `clear()` exposed from the hook — `DELETE`s server state and resets local state
+- `hydrate.ts` — `hydrateView`, `hydrateEntity`, `hydrateComponent` (best-effort with `hydrateNote` fallback)
+- "Edit in Canvas" button in Studio editor: parses current source, hydrates to CanvasDocument, `PUT`s to server, switches to Canvas tab
+- "Clear" button in canvas `SaveArtifactPanel` toolbar — prompts `window.confirm`, then calls `clear()`
+- Restoring state indicator (`canvas-restoring` class while initial load is in-flight)
 
-**Scope:** 1–2 sessions.
+**Files changed:**
+- `packages/agent/src/services/schema.ts` — `canvasDocuments` table
+- `packages/agent/src/services/db.ts` — `CREATE TABLE IF NOT EXISTS canvas_documents` migration
+- `packages/agent/src/api/index.ts` — canvas store + router mounted
+- `packages/plugin-core/src/canvas-document-store.ts` — new
+- `packages/plugin-core/src/canvas-routes.ts` — new
+- `packages/dashboard/src/hooks/useCanvasDocument.ts` — autosave + restore + clear + restoring flag
+- `packages/dashboard/src/lib/canvas/hydrate.ts` — new
+- `packages/dashboard/src/components/Studio.tsx` — `onEditInCanvas` prop + "Edit in Canvas" button
+- `packages/dashboard/src/pages/StudioPage.tsx` — passes `onEditInCanvas` to Studio
+- `packages/dashboard/src/components/canvas/Canvas.tsx` — Clear button + restoring guard
+
+**Tests added:**
+- `packages/plugin-core/src/__tests__/canvas-document-store.test.ts` — 7 tests (save/load/clear round-trips, upsert, isolation, complex doc)
+- `packages/plugin-core/src/__tests__/canvas-routes.test.ts` — 8 tests (GET/PUT/DELETE, 400/404 errors, key isolation)
+- `packages/dashboard/src/lib/canvas/__tests__/hydrate.test.ts` — 16 tests (hydrateView: no-chain, 1-step, 2-step, wire order, props, no note; hydrateEntity: no expr, ref, apply-chain, fallback; hydrateComponent: no render, component-call, layout-call, ref arg, fallback, no note)
+
+**Deviations / notes:**
+- Per-user canvas ids are future work; `'default'` singleton used throughout
+- `hydrateEntity` with a ref expression places the entity itself as the terminal node (source → entity), making it editable on canvas
+- Autosave skips during initial restore via a `loadedRef` flag (not state, to avoid re-render loops)
+- Studio "Edit in Canvas" only hydrates `entity` and `component` define blocks; view hydration from a name reference is not attempted (views would require a server fetch; deferred)
+- `window.confirm` used for Clear confirmation per spec — no custom dialog needed
+
+**Scope:** 1 session (estimated 1–2).
 
 ---
 
