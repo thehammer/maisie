@@ -70,6 +70,16 @@ function walk(
     case 'lambda':
       return walk(node.body, tierLookup)
 
+    case 'component-call':
+    case 'layout-call': {
+      // Component and layout invocations themselves are inform (just render).
+      // Recurse into their arg expressions to find any embedded function calls.
+      return Object.values(node.args).reduce<ActionTier>(
+        (acc, arg) => maxTier(acc, walk(arg, tierLookup)),
+        'inform',
+      )
+    }
+
     case 'apply': {
       // Look up the function being applied.
       const fnTier = tierLookup(node.fn) ?? 'inform'

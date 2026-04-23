@@ -10,8 +10,9 @@
  * - Define blocks: one field per line, two-space indent.
  */
 
-import type { ExprNode, ApplyNode, LiteralNode, RefNode, LambdaNode, LetNode, PipeNode } from './ops'
-import type { ParsedEntity, ParsedField, ParsedType } from './parser'
+import type { ExprNode, ApplyNode, LiteralNode, RefNode, LambdaNode, LetNode, PipeNode, ComponentCallNode, LayoutCallNode } from './ops'
+import type { ParsedEntity, ParsedField, ParsedType, ParsedComponent, ParseResult } from './parser'
+import type { TypeExpr } from './component'
 
 // ── Precedence ────────────────────────────────────────────────────────────────
 
@@ -101,6 +102,12 @@ export function printExpr(node: ExprNode, indent = 0): string {
 
     case 'apply':
       return printApply(node, indent)
+
+    case 'component-call':
+      return printComponentCallNode(node as ComponentCallNode, indent)
+
+    case 'layout-call':
+      return printLayoutCallNode(node as LayoutCallNode, indent)
   }
 }
 
@@ -256,4 +263,140 @@ function printField(field: ParsedField): string {
   const typeStr = field.type ? `: ${printType(field.type)}` : ''
   const exprStr = field.expression ? ` = ${printExpr(field.expression, 1)}` : ''
   return `  ${field.name}${typeStr}${exprStr}`
+}
+
+// ── TypeExpr printer ──────────────────────────────────────────────────────────
+
+/**
+ * Convert a TypeExpr to its MEL source representation.
+ */
+export function printTypeExpr(t: TypeExpr): string {
+  switch (t.kind) {
+    case 'any':
+      return 'any'
+
+    case 'scalar':
+      return t.type
+
+    case 'collection':
+      return `collection<${printTypeExpr(t.element)}>`
+
+    case 'record': {
+      const fieldNames = Object.keys(t.fields)
+      if (fieldNames.length === 0) return 'record'
+      const optional = new Set(t.optional ?? [])
+      const fieldStrs = fieldNames.map(name => {
+        const suffix = optional.has(name) ? '?' : ''
+        return `${name}${suffix}: ${printTypeExpr(t.fields[name])}`
+      })
+      return `record<{${fieldStrs.join(', ')}}>`
+    }
+
+    case 'function': {
+      const params = t.params.map(p => `${p.name}: ${printTypeExpr(p.type)}`).join(', ')
+      const ret = t.returns.kind === 'any' ? '' : ` -> ${printTypeExpr(t.returns)}`
+      return `function(${params})${ret}`
+    }
+
+    case 'component':
+      if (t.input) return `component<${printTypeExpr(t.input)}>`
+      return 'component'
+
+    case 'optional':
+      return `${printTypeExpr(t.inner)}?`
+
+    case 'union':
+      return t.members.map(printTypeExpr).join(' | ')
+  }
+}
+
+// ── Render tree printer ───────────────────────────────────────────────────────
+
+/**
+ * Print a render tree node (component-call, layout-call, or MEL expression).
+ */
+export function printRenderTree(node: ExprNode, indent = 0): string {
+  if (node.kind === 'component-call') {
+    return printComponentCallNode(node as ComponentCallNode, indent)
+  }
+  if (node.kind === 'layout-call') {
+    return printLayoutCallNode(node as LayoutCallNode, indent)
+  }
+  return printExpr(node, indent)
+}
+
+function printComponentCallNode(node: ComponentCallNode, indent: number): string {
+  const argEntries = Object.entries(node.args)
+  if (argEntries.length === 0) return `${node.name}()`
+  const argStrs = argEntries.map(([k, v]) => `${k}: ${printRenderTree(v, indent + 1)}`)
+  const oneLiner = `${node.name}(${argStrs.join(', ')})`
+  if (oneLiner.length <= 80) return oneLiner
+  const pad = '  '.repeat(indent + 1)
+  return `${node.name}(\n${argStrs.map(s => `${pad}${s}`).join(',\n')}\n${'  '.repeat(indent)})`
+}
+
+function printLayoutCallNode(node: LayoutCallNode, indent: number): string {
+  const argEntries = Object.entries(node.args)
+  if (argEntries.length === 0) return `${node.name}()`
+  const argStrs = argEntries.map(([k, v]) => {
+    // Special handling for children array
+    if (k === 'children' && v.kind === 'literal' && Array.isArray(v.value)) {
+      const children = v.value as ExprNode[]
+      const childStrs = children.map(c => printRenderTree(c, indent + 2))
+      if (childStrs.length === 0) return `children: []`
+      const oneLine = `children: [${childStrs.join(', ')}]`
+      if (oneLine.length <= 60) return oneLine
+      const pad = '  '.repeat(indent + 2)
+      return `children: [\n${childStrs.map(s => `${pad}${s}`).join(',\n')}\n${'  '.repeat(indent + 1)}]`
+    }
+    return `${k}: ${printRenderTree(v, indent + 1)}`
+  })
+  const oneLiner = `${node.name}(${argStrs.join(', ')})`
+  if (oneLiner.length <= 80) return oneLiner
+  const pad = '  '.repeat(indent + 1)
+  return `${node.name}(\n${argStrs.map(s => `${pad}${s}`).join(',\n')}\n${'  '.repeat(indent)})`
+}
+
+// ── Component printer ─────────────────────────────────────────────────────────
+
+/**
+ * Convert a ParsedComponent to its MEL source representation.
+ */
+export function printComponent(c: ParsedComponent): string {
+  const lines: string[] = [`define ${c.name} {`]
+
+  if (c.description !== undefined) {
+    lines.push(`  description: ${JSON.stringify(c.description)}`)
+  }
+
+  if (c.input !== undefined) {
+    lines.push(`  input: ${printTypeExpr(c.input)}`)
+  }
+
+  if (c.props !== undefined) {
+    lines.push('  props: {')
+    for (const [name, decl] of Object.entries(c.props)) {
+      const typeStr = printTypeExpr(decl.type)
+      const defaultStr = decl.default !== undefined ? ` = ${printExpr(decl.default, 2)}` : ''
+      lines.push(`    ${name}: ${typeStr}${defaultStr}`)
+    }
+    lines.push('  }')
+  }
+
+  lines.push(`  render: ${printRenderTree(c.render, 1)}`)
+  lines.push('}')
+  return lines.join('\n')
+}
+
+// ── Top-level print dispatcher ────────────────────────────────────────────────
+
+/**
+ * Print any ParseResult (entity, component, or expression).
+ */
+export function print(result: ParseResult): string {
+  if ('kind' in result) {
+    if (result.kind === 'entity') return printEntity(result)
+    if (result.kind === 'component') return printComponent(result)
+  }
+  return printExpr(result as ExprNode)
 }

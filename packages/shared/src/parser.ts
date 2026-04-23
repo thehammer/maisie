@@ -25,7 +25,10 @@ import type {
   LambdaNode,
   LetNode,
   PipeNode,
+  ComponentCallNode,
+  LayoutCallNode,
 } from './ops'
+import type { TypeExpr } from './component'
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -45,7 +48,35 @@ export type ParsedEntity = {
   fields: ParsedField[]
 }
 
-export type ParseResult = ExprNode | ParsedEntity
+/**
+ * A parsed component definition produced by parsing a `define` block
+ * that contains a `render:` field.
+ */
+export type ParsedComponent = {
+  kind: 'component'
+  name: string
+  description?: string
+  /** Structural input contract for the component's data. */
+  input?: TypeExpr
+  /** Prop declarations with their types and optional defaults. */
+  props?: Record<string, { type: TypeExpr; default?: ExprNode }>
+  /** Render tree — a component-call, layout-call, or MEL expression. */
+  render: ExprNode
+}
+
+export type ParseResult = ExprNode | ParsedEntity | ParsedComponent
+
+// Layout primitive names — reserved in render position.
+const LAYOUT_PRIMITIVES = new Set([
+  'stack', 'row', 'grid', 'overlay', 'scroll', 'card', 'spacer',
+])
+
+// Scalar type names for type expressions.
+const SCALAR_TYPE_NAMES = new Set([
+  'string', 'number', 'boolean', 'bytes', 'percentage', 'status', 'image',
+  'timestamp', 'epoch_ms', 'duration', 'temperature', 'signal', 'url', 'stream',
+  'progress', 'toggle', 'action', 'json',
+])
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
 
@@ -293,14 +324,52 @@ class Parser {
     return result
   }
 
-  // ── Entity definitions ───────────────────────────────────────────────────────
+  // ── Entity / Component definitions ──────────────────────────────────────────
 
-  private parseDefinition(): ParsedEntity {
+  /**
+   * Scan ahead inside a define block to detect whether it contains a `render:`
+   * field, making it a component. Returns true if component, false if entity.
+   *
+   * We scan without consuming tokens by looking at what field names appear
+   * before seeing `}` or EOF.
+   */
+  private scanIsComponent(): boolean {
+    let offset = 0
+    let braceDepth = 0
+    while (true) {
+      const tok = this.peek(offset)
+      if (tok.type === 'EOF') break
+      if (tok.type === 'LBRACE') { braceDepth++; offset++; continue }
+      if (tok.type === 'RBRACE') {
+        if (braceDepth === 0) break
+        braceDepth--; offset++; continue
+      }
+      // At depth 0, check for `render :`
+      if (braceDepth === 0 && tok.type === 'IDENT' && tok.value === 'render') {
+        const next = this.peek(offset + 1)
+        if (next.type === 'COLON') return true
+      }
+      offset++
+    }
+    return false
+  }
+
+  private parseDefinition(): ParsedEntity | ParsedComponent {
     this.expect('KEYWORD', 'define')
     const nameTok = this.expect('IDENT')
     const name = nameTok.value
     this.expect('LBRACE')
 
+    // Detect component vs entity by scanning for `render:` field.
+    if (this.scanIsComponent()) {
+      return this.parseComponentMembers(name)
+    }
+    return this.parseEntityMembers(name)
+  }
+
+  // ── Entity members ───────────────────────────────────────────────────────────
+
+  private parseEntityMembers(name: string): ParsedEntity {
     const fields: ParsedField[] = []
     let description: string | undefined
 
@@ -320,6 +389,379 @@ class Parser {
 
     this.expect('RBRACE')
     return { kind: 'entity', name, description, fields }
+  }
+
+  // ── Component members ────────────────────────────────────────────────────────
+
+  private parseComponentMembers(name: string): ParsedComponent {
+    let description: string | undefined
+    let input: TypeExpr | undefined
+    let props: Record<string, { type: TypeExpr; default?: ExprNode }> | undefined
+    let render: ExprNode | undefined
+
+    while (!this.check('RBRACE') && !this.check('EOF')) {
+      // description:
+      if (this.check('IDENT', 'description') && this.peek(1).type === 'COLON') {
+        this.consume() // 'description'
+        this.consume() // ':'
+        description = this.expect('STRING').value
+        continue
+      }
+
+      // input:
+      if (this.check('IDENT', 'input') && this.peek(1).type === 'COLON') {
+        this.consume() // 'input'
+        this.consume() // ':'
+        input = this.parseTypeExprFull()
+        continue
+      }
+
+      // props:
+      if (this.check('IDENT', 'props') && this.peek(1).type === 'COLON') {
+        this.consume() // 'props'
+        this.consume() // ':'
+        props = this.parsePropsBlock()
+        continue
+      }
+
+      // render:
+      if (this.check('IDENT', 'render') && this.peek(1).type === 'COLON') {
+        this.consume() // 'render'
+        this.consume() // ':'
+        render = this.parseRenderTree()
+        continue
+      }
+
+      // Unknown field inside a component block — error
+      const tok = this.peek()
+      throw new ParseError(
+        `Unexpected token in component block: ${JSON.stringify(tok.value)} at position ${tok.pos}`,
+        tok.pos,
+      )
+    }
+
+    this.expect('RBRACE')
+
+    if (render === undefined) {
+      throw new ParseError(`Component "${name}" is missing a render: field`, 0)
+    }
+
+    return { kind: 'component', name, description, input, props, render }
+  }
+
+  /**
+   * Parse a props block: `{ propName: type_expr (= default)?, ... }`
+   */
+  private parsePropsBlock(): Record<string, { type: TypeExpr; default?: ExprNode }> {
+    this.expect('LBRACE')
+    const props: Record<string, { type: TypeExpr; default?: ExprNode }> = {}
+
+    while (!this.check('RBRACE') && !this.check('EOF')) {
+      const name = this.expect('IDENT').value
+      this.expect('COLON')
+      const type = this.parseTypeExprFull()
+      let defaultExpr: ExprNode | undefined
+      if (this.tryConsume('EQUALS')) {
+        defaultExpr = this.parseExpression()
+      }
+      props[name] = { type, ...(defaultExpr !== undefined ? { default: defaultExpr } : {}) }
+
+      // Optional comma or newline between props — just skip commas
+      this.tryConsume('COMMA')
+    }
+
+    this.expect('RBRACE')
+    return props
+  }
+
+  /**
+   * Parse a full TypeExpr (the component contract type language).
+   *
+   * type_expr := scalar_type_name
+   *            | "collection" "<" type_expr ">"
+   *            | "record" "<" "{" record_fields "}" ">"
+   *            | "record" "<" IDENT ">"            (bare named type)
+   *            | "record"                          (bare, no type param)
+   *            | "function" "(" params ")" ("→" | "->" type_expr)?
+   *            | "component" ("<" type_expr ">")?
+   *            | "any"
+   *            | IDENT                             (named alias)
+   */
+  parseTypeExprFull(): TypeExpr {
+    const tok = this.peek()
+
+    // "any"
+    if ((tok.type === 'KEYWORD' || tok.type === 'IDENT') && tok.value === 'any') {
+      this.consume()
+      return { kind: 'any' }
+    }
+
+    // "component" ("<" type_expr ">")?
+    if ((tok.type === 'KEYWORD' || tok.type === 'IDENT') && tok.value === 'component') {
+      this.consume()
+      if (this.check('OP', '<')) {
+        this.consume() // '<'
+        const inner = this.parseTypeExprFull()
+        this.expect('OP', '>')
+        return { kind: 'component', input: inner }
+      }
+      return { kind: 'component' }
+    }
+
+    // "collection" "<" type_expr ">"
+    if ((tok.type === 'KEYWORD' || tok.type === 'IDENT') && tok.value === 'collection') {
+      this.consume()
+      if (this.check('OP', '<')) {
+        this.consume() // '<'
+        const elem = this.parseTypeExprFull()
+        this.expect('OP', '>')
+        return { kind: 'collection', element: elem }
+      }
+      // Bare "collection" without type param — element is any
+      return { kind: 'collection', element: { kind: 'any' } }
+    }
+
+    // "record" ("<" "{" ... "}" | IDENT ">")?
+    if ((tok.type === 'KEYWORD' || tok.type === 'IDENT') && tok.value === 'record') {
+      this.consume()
+      if (this.check('OP', '<')) {
+        this.consume() // '<'
+        // Check for inline record body `{...}` or a named type alias
+        if (this.check('LBRACE')) {
+          const { fields, optional } = this.parseRecordBody()
+          this.expect('OP', '>')
+          return { kind: 'record', fields, optional }
+        } else {
+          // Named alias — treat as "record with an IDENT name" (not yet supported structurally)
+          const alias = this.expect('IDENT').value
+          this.expect('OP', '>')
+          // Map to any-typed record for now
+          return { kind: 'record', fields: {}, optional: [alias] }
+        }
+      }
+      // Bare "record" — open record, no required fields
+      return { kind: 'record', fields: {} }
+    }
+
+    // "function" "(" param_list ")" (("→" | "->") return_type)?
+    if (tok.type === 'KEYWORD' && tok.value === 'function') {
+      this.consume()
+      this.expect('LPAREN')
+      const params: Array<{ name: string; type: TypeExpr }> = []
+      if (!this.check('RPAREN')) {
+        params.push(this.parseTypedParam())
+        while (this.tryConsume('COMMA')) {
+          if (this.check('RPAREN')) break
+          params.push(this.parseTypedParam())
+        }
+      }
+      this.expect('RPAREN')
+      // Check for → (Unicode arrow) or -> (ASCII)
+      let returns: TypeExpr = { kind: 'any' }
+      if (this.checkArrow()) {
+        this.consumeArrow()
+        returns = this.parseTypeExprFull()
+      }
+      return { kind: 'function', params, returns }
+    }
+
+    // Scalar type names (keywords and known idents)
+    if ((tok.type === 'KEYWORD' || tok.type === 'IDENT') && SCALAR_TYPE_NAMES.has(tok.value)) {
+      this.consume()
+      return { kind: 'scalar', type: tok.value as import('./field').MaisieFieldType }
+    }
+
+    // Bare IDENT — treat as named alias / any
+    if (tok.type === 'IDENT') {
+      this.consume()
+      // Could be a named type alias — return any for now (Phase 2c resolves names)
+      return { kind: 'any' }
+    }
+
+    throw new ParseError(`Expected type expression at position ${tok.pos}`, tok.pos)
+  }
+
+  /** Parse a `{ field: type, field?: type, ... }` inline record body. */
+  private parseRecordBody(): { fields: Record<string, TypeExpr>; optional?: string[] } {
+    this.expect('LBRACE')
+    const fields: Record<string, TypeExpr> = {}
+    const optional: string[] = []
+
+    while (!this.check('RBRACE') && !this.check('EOF')) {
+      const fieldName = this.expect('IDENT').value
+      // Optional marker `?` after field name
+      const isOptional = !!this.tryConsume('OP', '?') || this.checkOptionalMark()
+      if (isOptional) optional.push(fieldName)
+      this.expect('COLON')
+      const fieldType = this.parseTypeExprFull()
+      fields[fieldName] = fieldType
+      // Optional trailing `?` after type (alternative syntax)
+      this.tryConsume('COMMA')
+    }
+
+    this.expect('RBRACE')
+    return { fields, ...(optional.length > 0 ? { optional } : {}) }
+  }
+
+  /** Check for a trailing `?` marker — used for optional record fields. */
+  private checkOptionalMark(): boolean {
+    // We look for `?` immediately after the field name, before the `:`
+    // In our tokenizer `?` is not a known symbol, so we can't handle it.
+    // Optional fields are handled via `?` suffix on field name in the grammar spec
+    // but since our tokenizer doesn't produce a `?` token, we skip this for now.
+    return false
+  }
+
+  /** Parse `name: type_expr` for function parameter type lists. */
+  private parseTypedParam(): { name: string; type: TypeExpr } {
+    const name = this.expect('IDENT').value
+    this.expect('COLON')
+    const type = this.parseTypeExprFull()
+    return { name, type }
+  }
+
+  /** Check if current token is an arrow (→ or ->) */
+  private checkArrow(): boolean {
+    const tok = this.peek()
+    // → is a multi-char unicode — tokenizer would emit it as an IDENT or OP.
+    // We handle ASCII `->` which tokenizes as OP `-` followed by OP `>`.
+    // And IDENT `→` (unicode) if the tokenizer passes it through.
+    if (tok.type === 'IDENT' && tok.value === '→') return true
+    // ASCII arrow: `-` followed immediately by `>`
+    if (tok.type === 'OP' && tok.value === '-' && this.peek(1).type === 'OP' && this.peek(1).value === '>') return true
+    return false
+  }
+
+  /** Consume an arrow token (→ or ->) */
+  private consumeArrow(): void {
+    const tok = this.peek()
+    if (tok.type === 'IDENT' && tok.value === '→') {
+      this.consume()
+    } else if (tok.type === 'OP' && tok.value === '-') {
+      this.consume() // '-'
+      this.consume() // '>'
+    }
+  }
+
+  // ── Render tree ──────────────────────────────────────────────────────────────
+
+  /**
+   * Parse a render tree expression.
+   *
+   * render_tree := layout_call | component_call | expression
+   *
+   * Layout calls: `overlay(...)`, `stack(...)`, etc.
+   * Component calls: `NamedComponent(...)` or base component `text(...)`, `image(...)`
+   * Expressions: MEL expressions for data-level transforms
+   *
+   * We use a lookahead: if we see `IDENT "("` where the ident is a layout primitive,
+   * treat as layout call. If ident is followed by `(` with named args, treat as
+   * component call. Otherwise parse as a regular MEL expression.
+   */
+  private parseRenderTree(): ExprNode {
+    const tok = this.peek()
+
+    // Layout primitive: known layout name followed by `(`
+    if (tok.type === 'IDENT' && LAYOUT_PRIMITIVES.has(tok.value) && this.peek(1).type === 'LPAREN') {
+      return this.parseLayoutCall()
+    }
+
+    // Component call: IDENT (possibly multi-part) followed by `(` with named args
+    // We detect named args by checking for `IDENT ":"` inside the parens.
+    if (tok.type === 'IDENT' && this.peek(1).type === 'LPAREN' && this.isNamedArgCall(1)) {
+      return this.parseComponentCall()
+    }
+
+    // Regular MEL expression (self.coverUrl, self.items | map: ..., etc.)
+    return this.parseExpression()
+  }
+
+  /**
+   * Lookahead: does the call starting at offset (pointing at LPAREN) have named args?
+   * Named args look like `IDENT ":"` as the first content.
+   * Returns true if this looks like a named-arg call.
+   */
+  private isNamedArgCall(lparenOffset: number): boolean {
+    // peek at lparenOffset = LPAREN, lparenOffset+1 = first token inside
+    const first = this.peek(lparenOffset + 1)
+    const second = this.peek(lparenOffset + 2)
+    if (first.type === 'RPAREN') return false // empty args — treat as component call
+    if (first.type === 'IDENT' && second.type === 'COLON') return true
+    if (first.type === 'LBRACKET') return true // children: [...]
+    return false
+  }
+
+  /**
+   * Parse a layout call: `layoutName(named_arg_list?)`.
+   * Layout calls always use named arguments.
+   */
+  private parseLayoutCall(): LayoutCallNode {
+    const name = this.expect('IDENT').value
+    this.expect('LPAREN')
+    const args = this.parseRenderArgList()
+    this.expect('RPAREN')
+    return { kind: 'layout-call', name, args }
+  }
+
+  /**
+   * Parse a component call: `ComponentName(named_arg_list?)`.
+   * Component calls use named arguments.
+   */
+  private parseComponentCall(): ComponentCallNode {
+    // Component name may be dotted (components.MovieTile)
+    const nameTok = this.expect('IDENT')
+    let name = nameTok.value
+    while (this.check('DOT') && this.peek(1).type === 'IDENT') {
+      this.consume() // '.'
+      name += '.' + this.expect('IDENT').value
+    }
+    this.expect('LPAREN')
+    const args = this.parseRenderArgList()
+    this.expect('RPAREN')
+    return { kind: 'component-call', name, args }
+  }
+
+  /**
+   * Parse a list of named arguments for render calls.
+   * Each argument is `name: value` where value is a render tree or MEL expression.
+   *
+   * named_arg_list := named_arg ("," named_arg)*
+   * named_arg := IDENT ":" (render_tree | "[" render_tree_list "]")
+   */
+  private parseRenderArgList(): Record<string, ExprNode> {
+    const args: Record<string, ExprNode> = {}
+    if (this.check('RPAREN')) return args
+
+    this.parseOneRenderArg(args)
+    while (this.tryConsume('COMMA')) {
+      if (this.check('RPAREN')) break // trailing comma
+      this.parseOneRenderArg(args)
+    }
+    return args
+  }
+
+  private parseOneRenderArg(args: Record<string, ExprNode>): void {
+    const key = this.expect('IDENT').value
+    this.expect('COLON')
+
+    // `children: [...]` — array of render trees
+    if (this.check('LBRACKET')) {
+      this.consume() // '['
+      const elements: ExprNode[] = []
+      if (!this.check('RBRACKET')) {
+        elements.push(this.parseRenderTree())
+        while (this.tryConsume('COMMA')) {
+          if (this.check('RBRACKET')) break
+          elements.push(this.parseRenderTree())
+        }
+      }
+      this.expect('RBRACKET')
+      args[key] = { kind: 'literal', value: elements as never }
+      return
+    }
+
+    // Nested render tree or MEL expression
+    args[key] = this.parseRenderTree()
   }
 
   private parseFieldDef(): ParsedField {
@@ -978,7 +1420,8 @@ class Parser {
 /**
  * Parse a MEL source string.
  *
- * Returns a ParsedEntity for `define` blocks, or an ExprNode for expressions.
+ * Returns a ParsedEntity or ParsedComponent for `define` blocks, or an ExprNode
+ * for expressions.
  *
  * @throws ParseError if the source is syntactically invalid.
  */
@@ -993,8 +1436,32 @@ export function parse(source: string): ParseResult {
  */
 export function parseExpression(source: string): ExprNode {
   const result = new Parser(source).parse()
-  if ('kind' in result && result.kind === 'entity') {
-    throw new ParseError('Expected expression, got entity definition', 0)
+  if ('kind' in result && (result.kind === 'entity' || result.kind === 'component')) {
+    throw new ParseError('Expected expression, got definition', 0)
   }
   return result as ExprNode
 }
+
+/**
+ * Parse a component definition.
+ *
+ * @throws ParseError if the source is not a valid component definition.
+ */
+export function parseComponent(source: string): ParsedComponent {
+  const result = new Parser(source).parse()
+  if (!('kind' in result) || result.kind !== 'component') {
+    throw new ParseError('Expected component definition', 0)
+  }
+  return result
+}
+
+/**
+ * Parse a type expression.
+ *
+ * @throws ParseError if the source is not a valid type expression.
+ */
+export function parseTypeExpr(source: string): TypeExpr {
+  return new Parser(source).parseTypeExprFull()
+}
+
+export type { TypeExpr }

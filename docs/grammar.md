@@ -283,3 +283,154 @@ Multiple sequential `let` bindings nest.
 | property | After `.` in dotted path | `tags.propertyName` |
 | punctuation | `{`, `}`, `(`, `)`, `[`, `]`, `,`, `.`, `:` | `tags.punctuation` |
 | comment | `# ...` | `tags.lineComment` |
+
+---
+
+## 7. Component Extensions
+
+This section extends Section 3 (Grammar) with component-specific productions. The entity grammar is unchanged; these productions activate when a `define` block contains a `render:` field.
+
+### Component vs Entity Detection
+
+The parser distinguishes a component from an entity by scanning for a `render:` member. If found, the block is a `ParsedComponent`; otherwise it is a `ParsedEntity`. Mixing data fields (`data_field`, `function_field`) with component fields (`input_field`, `render_field`) in the same block is an error.
+
+### Augmented `definition` production
+
+```
+definition     ::= "define" IDENT_SEG "{" component_body "}"   # if render: present
+                 | "define" IDENT_SEG "{" entity_body "}"       # existing (no render:)
+
+component_body ::= component_member*
+
+component_member ::= description_field    # shared with entities
+                   | input_field          NEW
+                   | props_field          NEW
+                   | render_field         NEW
+```
+
+### New productions
+
+```
+input_field    ::= "input" ":" type_expr
+
+props_field    ::= "props" ":" "{" prop_decl* "}"
+prop_decl      ::= IDENT_SEG ":" type_expr ("=" expression)? ","?
+
+render_field   ::= "render" ":" render_tree
+render_tree    ::= layout_call | component_call | expression
+
+layout_call    ::= LAYOUT_NAME "(" named_arg_list? ")"
+component_call ::= IDENT_SEG ("." IDENT_SEG)* "(" named_arg_list? ")"
+
+named_arg_list ::= named_arg ("," named_arg)* ","?
+named_arg      ::= IDENT_SEG ":" (render_tree | "[" render_tree_list "]")
+render_tree_list ::= render_tree ("," render_tree)* ","?
+
+LAYOUT_NAME    ::= "stack" | "row" | "grid" | "overlay" | "scroll" | "card" | "spacer"
+```
+
+Layout primitive names are contextually reserved — they parse as layout calls only when appearing as the root of a `render_tree` or inside a `named_arg` value. In all other positions they parse as regular identifiers.
+
+### Extended `type_expr` production
+
+The type expression grammar from Section 2 is extended with the following productions:
+
+```
+type_expr       ::= scalar_type_name
+                  | "collection" "<" type_expr ">"
+                  | "collection"                           # bare — element is any
+                  | "record" "<" "{" record_body "}" ">"  # inline record type
+                  | "record" "<" IDENT_SEG ">"            # named alias
+                  | "record"                              # bare — no required fields
+                  | "function" "(" param_type_list? ")" ("->" type_expr)?
+                  | "component" "<" type_expr ">"         # component with input constraint
+                  | "component"                           # bare component
+                  | "any"
+                  | IDENT_SEG                             # named type alias
+
+record_body     ::= record_field ("," record_field)* ","?
+record_field    ::= IDENT_SEG ("?")? ":" type_expr
+
+param_type_list ::= param_type ("," param_type)*
+param_type      ::= IDENT_SEG ":" type_expr
+
+scalar_type_name ::= "string" | "number" | "boolean" | "bytes" | "percentage"
+                   | "status" | "image" | "timestamp" | "epoch_ms" | "duration"
+                   | "temperature" | "signal" | "url" | "stream" | "progress"
+                   | "toggle" | "action" | "json"
+```
+
+The return type separator for function types accepts ASCII `->` (two tokens: `-` and `>`).
+
+### AST nodes produced
+
+Component-specific AST nodes are added to the `ExprNode` union in `packages/shared/src/ops.ts`:
+
+```typescript
+ComponentCallNode = {
+  kind: 'component-call'
+  name: string                    // resolved via component registry at render time
+  args: Record<string, ExprNode>  // named args
+}
+
+LayoutCallNode = {
+  kind: 'layout-call'
+  name: string                    // 'stack', 'row', 'grid', 'overlay', 'scroll', 'card', 'spacer'
+  args: Record<string, ExprNode>  // named args (children stored as literal array of ExprNode)
+}
+```
+
+These nodes are **not evaluable** via `evalExpr` or `evalExprAsync`. Attempting to evaluate them throws: `"Component nodes not evaluable here — use the component renderer"`. Phase 2e implements the component renderer.
+
+### ParsedComponent
+
+The parser exports `ParsedComponent`:
+
+```typescript
+interface ParsedComponent {
+  kind: 'component'
+  name: string
+  description?: string
+  input?: TypeExpr
+  props?: Record<string, { type: TypeExpr; default?: ExprNode }>
+  render: ExprNode   // component-call, layout-call, or MEL expression
+}
+```
+
+`ParseResult` is updated to `ExprNode | ParsedEntity | ParsedComponent`.
+
+### Example
+
+```
+define MovieTile {
+  description: "A movie tile with cover, rating badge, and hover title."
+
+  input: record<{
+    title:    string,
+    coverUrl: url,
+    rating:   status
+  }>
+
+  render: overlay(
+    children: [
+      image(src: self.coverUrl, fit: "cover"),
+      badge(value: self.rating),
+      text(value: self.title)
+    ]
+  )
+}
+
+define Strip {
+  description: "A horizontal strip of items rendered with a provided tile component."
+
+  props: {
+    itemComponent: component
+    direction: string = "horizontal"
+    gap: number = 12
+  }
+
+  input: collection<record>
+
+  render: scroll(direction: self.props.direction, gap: self.props.gap)
+}
+```

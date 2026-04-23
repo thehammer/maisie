@@ -344,5 +344,8 @@ function expressionReferencesSelf(node: ExprNode): boolean {
     case 'pipe':
       return expressionReferencesSelf(node.value) ||
         node.steps.some(expressionReferencesSelf)
+    case 'component-call':
+    case 'layout-call':
+      return Object.values(node.args).some(expressionReferencesSelf)
   }
 }

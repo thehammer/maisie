@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'bun:test'
-import { parse, parseExpression, ParseError, type ParsedEntity } from '../parser'
-import { printExpr, printEntity } from '../printer'
-import type { ExprNode, ApplyNode, LambdaNode, LetNode, PipeNode } from '../ops'
+import { parse, parseExpression, parseComponent, parseTypeExpr, ParseError, type ParsedEntity, type ParsedComponent } from '../parser'
+import { printExpr, printEntity, printComponent, printTypeExpr, print } from '../printer'
+import type { ExprNode, ApplyNode, LambdaNode, LetNode, PipeNode, ComponentCallNode, LayoutCallNode } from '../ops'
+import type { TypeExpr } from '../component'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -662,5 +663,355 @@ switches | pluck: state`
     const pluckStep = bodyPipe.steps[0] as ApplyNode
     expect(pluckStep.fn).toBe('std.pluck')
     expect(pluckStep.args[0]).toEqual({ kind: 'literal', value: 'state' })
+  })
+})
+
+// ── Component definitions ─────────────────────────────────────────────────────
+
+describe('parser — component definitions', () => {
+  it('detects define block with render: as component', () => {
+    const src = `
+define MovieTile {
+  render: overlay(children: [image(src: self.coverUrl), text(value: self.title)])
+}`.trim()
+    const result = parse(src)
+    expect(result.kind).toBe('component')
+  })
+
+  it('detects define block without render: as entity', () => {
+    const src = `
+define MyEntity {
+  name: string = "hello"
+}`.trim()
+    const result = parse(src)
+    expect(result.kind).toBe('entity')
+  })
+
+  it('parses description field in component', () => {
+    const c = parseComponent(`
+define MovieTile {
+  description: "A movie tile."
+  render: overlay(children: [])
+}`.trim())
+    expect(c.description).toBe('A movie tile.')
+  })
+
+  it('parses simple component with scalar input', () => {
+    const c = parseComponent(`
+define LabelTile {
+  input: string
+  render: text(value: self.input)
+}`.trim())
+    expect(c.kind).toBe('component')
+    expect(c.name).toBe('LabelTile')
+    expect(c.input).toEqual({ kind: 'scalar', type: 'string' })
+    expect(c.render.kind).toBe('component-call')
+    const call = c.render as ComponentCallNode
+    expect(call.name).toBe('text')
+  })
+
+  it('parses component with record<{...}> input', () => {
+    const c = parseComponent(`
+define MovieTile {
+  description: "A movie tile with cover, rating badge, and hover title."
+  input: record<{title: string, coverUrl: url, rating: status}>
+  render: overlay(children: [image(src: self.coverUrl), badge(value: self.rating), text(value: self.title)])
+}`.trim())
+    expect(c.input?.kind).toBe('record')
+    if (c.input?.kind === 'record') {
+      expect(Object.keys(c.input.fields)).toEqual(['title', 'coverUrl', 'rating'])
+      expect(c.input.fields.title).toEqual({ kind: 'scalar', type: 'string' })
+      expect(c.input.fields.coverUrl).toEqual({ kind: 'scalar', type: 'url' })
+      expect(c.input.fields.rating).toEqual({ kind: 'scalar', type: 'status' })
+    }
+  })
+
+  it('parses component with props block', () => {
+    const c = parseComponent(`
+define Strip {
+  props: {
+    itemComponent: component
+    direction: string = "horizontal"
+    gap: number = 12
+  }
+  input: collection<record>
+  render: scroll(direction: self.props.direction)
+}`.trim())
+    expect(c.props).toBeDefined()
+    expect(Object.keys(c.props!)).toEqual(['itemComponent', 'direction', 'gap'])
+    expect(c.props!.itemComponent.type).toEqual({ kind: 'component' })
+    expect(c.props!.direction.type).toEqual({ kind: 'scalar', type: 'string' })
+    expect(c.props!.gap.type).toEqual({ kind: 'scalar', type: 'number' })
+    // Check defaults
+    expect(c.props!.direction.default).toEqual({ kind: 'literal', value: 'horizontal' })
+    expect(c.props!.gap.default).toEqual({ kind: 'literal', value: 12 })
+  })
+
+  it('parses layout call as root render', () => {
+    const c = parseComponent(`
+define MyComponent {
+  input: string
+  render: stack(gap: 8, children: [text(value: self.input)])
+}`.trim())
+    expect(c.render.kind).toBe('layout-call')
+    const layout = c.render as LayoutCallNode
+    expect(layout.name).toBe('stack')
+    expect(layout.args.gap).toEqual({ kind: 'literal', value: 8 })
+  })
+
+  it('parses component with MEL expression in render', () => {
+    const c = parseComponent(`
+define TitleOnly {
+  input: record<{title: string}>
+  render: self.title
+}`.trim())
+    expect(c.render.kind).toBe('ref')
+    expect((c.render as import('../ops').RefNode).name).toBe('self.title')
+  })
+
+  it('parses component with component-typed prop', () => {
+    const c = parseComponent(`
+define Container {
+  props: {
+    tile: component<record<{name: string}>>
+  }
+  input: collection<record>
+  render: scroll(children: [])
+}`.trim())
+    const tileProp = c.props!.tile
+    expect(tileProp.type.kind).toBe('component')
+    if (tileProp.type.kind === 'component' && tileProp.type.input) {
+      expect(tileProp.type.input.kind).toBe('record')
+    }
+  })
+
+  it('parses nested component calls in children', () => {
+    const c = parseComponent(`
+define MovieCard {
+  input: record<{title: string, coverUrl: url}>
+  render: overlay(children: [image(src: self.coverUrl), text(value: self.title)])
+}`.trim())
+    expect(c.render.kind).toBe('layout-call')
+    const overlay = c.render as LayoutCallNode
+    expect(overlay.name).toBe('overlay')
+    const children = overlay.args.children
+    expect(children).toBeDefined()
+  })
+
+  it('throws when render field is missing', () => {
+    expect(() => parseComponent(`
+define BadComponent {
+  input: string
+}`.trim())).toThrow()
+  })
+
+  it('backward compat: entities still parse correctly after component support added', () => {
+    const src = `
+define exterior-lights {
+  description: "Exterior lights"
+  switches: collection = home-assistant.list_switches
+}`.trim()
+    const result = parse(src)
+    expect(result.kind).toBe('entity')
+    const entity = result as ParsedEntity
+    expect(entity.name).toBe('exterior-lights')
+    expect(entity.fields[0].name).toBe('switches')
+  })
+})
+
+// ── Type expressions ──────────────────────────────────────────────────────────
+
+describe('parser — type expressions', () => {
+  it('parses scalar types', () => {
+    expect(parseTypeExpr('string')).toEqual({ kind: 'scalar', type: 'string' })
+    expect(parseTypeExpr('number')).toEqual({ kind: 'scalar', type: 'number' })
+    expect(parseTypeExpr('boolean')).toEqual({ kind: 'scalar', type: 'boolean' })
+    expect(parseTypeExpr('url')).toEqual({ kind: 'scalar', type: 'url' })
+    expect(parseTypeExpr('status')).toEqual({ kind: 'scalar', type: 'status' })
+    expect(parseTypeExpr('timestamp')).toEqual({ kind: 'scalar', type: 'timestamp' })
+    expect(parseTypeExpr('image')).toEqual({ kind: 'scalar', type: 'image' })
+    expect(parseTypeExpr('bytes')).toEqual({ kind: 'scalar', type: 'bytes' })
+    expect(parseTypeExpr('percentage')).toEqual({ kind: 'scalar', type: 'percentage' })
+  })
+
+  it('parses any', () => {
+    expect(parseTypeExpr('any')).toEqual({ kind: 'any' })
+  })
+
+  it('parses collection<scalar>', () => {
+    expect(parseTypeExpr('collection<string>')).toEqual({
+      kind: 'collection',
+      element: { kind: 'scalar', type: 'string' },
+    })
+  })
+
+  it('parses collection<record>', () => {
+    const t = parseTypeExpr('collection<record>')
+    expect(t.kind).toBe('collection')
+    if (t.kind === 'collection') {
+      expect(t.element.kind).toBe('record')
+    }
+  })
+
+  it('parses bare record', () => {
+    expect(parseTypeExpr('record')).toEqual({ kind: 'record', fields: {} })
+  })
+
+  it('parses record<{name: string, age: number}>', () => {
+    const t = parseTypeExpr('record<{name: string, age: number}>')
+    expect(t.kind).toBe('record')
+    if (t.kind === 'record') {
+      expect(t.fields.name).toEqual({ kind: 'scalar', type: 'string' })
+      expect(t.fields.age).toEqual({ kind: 'scalar', type: 'number' })
+    }
+  })
+
+  it('parses nested record in record', () => {
+    const t = parseTypeExpr('record<{title: string, meta: record<{year: number}>}>')
+    expect(t.kind).toBe('record')
+    if (t.kind === 'record') {
+      expect(t.fields.title).toEqual({ kind: 'scalar', type: 'string' })
+      expect(t.fields.meta.kind).toBe('record')
+    }
+  })
+
+  it('parses function type with params', () => {
+    const t = parseTypeExpr('function(name: string, count: number)')
+    expect(t.kind).toBe('function')
+    if (t.kind === 'function') {
+      expect(t.params).toHaveLength(2)
+      expect(t.params[0]).toEqual({ name: 'name', type: { kind: 'scalar', type: 'string' } })
+      expect(t.params[1]).toEqual({ name: 'count', type: { kind: 'scalar', type: 'number' } })
+      expect(t.returns).toEqual({ kind: 'any' })
+    }
+  })
+
+  it('parses function type with return type (ASCII arrow)', () => {
+    const t = parseTypeExpr('function(n: number) -> string')
+    expect(t.kind).toBe('function')
+    if (t.kind === 'function') {
+      expect(t.returns).toEqual({ kind: 'scalar', type: 'string' })
+    }
+  })
+
+  it('parses bare component', () => {
+    expect(parseTypeExpr('component')).toEqual({ kind: 'component' })
+  })
+
+  it('parses component<record<{...}>>', () => {
+    const t = parseTypeExpr('component<record<{title: string}>>')
+    expect(t.kind).toBe('component')
+    if (t.kind === 'component' && t.input) {
+      expect(t.input.kind).toBe('record')
+    }
+  })
+
+  it('parses collection<collection<string>>', () => {
+    const t = parseTypeExpr('collection<collection<string>>')
+    expect(t.kind).toBe('collection')
+    if (t.kind === 'collection') {
+      expect(t.element.kind).toBe('collection')
+    }
+  })
+})
+
+// ── Printer round-trips ───────────────────────────────────────────────────────
+
+describe('printer — component round-trips', () => {
+  function roundTrip(src: string): ParsedComponent {
+    const c1 = parseComponent(src)
+    const printed = printComponent(c1)
+    const c2 = parseComponent(printed)
+    return c2
+  }
+
+  it('round-trips a simple component', () => {
+    const src = `
+define LabelTile {
+  input: string
+  render: text(value: self.input)
+}`.trim()
+    const c = roundTrip(src)
+    expect(c.name).toBe('LabelTile')
+    expect(c.input).toEqual({ kind: 'scalar', type: 'string' })
+  })
+
+  it('round-trips a component with description and record input', () => {
+    const src = `
+define MovieTile {
+  description: "A movie tile."
+  input: record<{title: string, coverUrl: url, rating: status}>
+  render: overlay(children: [image(src: self.coverUrl)])
+}`.trim()
+    const c1 = parseComponent(src)
+    const printed = printComponent(c1)
+    const c2 = parseComponent(printed)
+    expect(c2.description).toBe(c1.description)
+    expect(JSON.stringify(c2.input)).toBe(JSON.stringify(c1.input))
+  })
+
+  it('round-trips a component with props', () => {
+    const src = `
+define Strip {
+  props: {
+    itemComponent: component
+    direction: string = "horizontal"
+    gap: number = 12
+  }
+  input: collection<record>
+  render: scroll(direction: self.props.direction)
+}`.trim()
+    const c = roundTrip(src)
+    expect(Object.keys(c.props!)).toContain('itemComponent')
+    expect(Object.keys(c.props!)).toContain('direction')
+  })
+
+  it('print → parse preserves render tree shape', () => {
+    const src = `define Tile {
+  render: overlay(children: [image(src: self.cover), text(value: self.name)])
+}`.trim()
+    const c1 = parseComponent(src)
+    const printed = printComponent(c1)
+    const c2 = parseComponent(printed)
+    expect(c2.render.kind).toBe('layout-call')
+  })
+
+  it('printTypeExpr round-trips', () => {
+    const types: TypeExpr[] = [
+      { kind: 'any' },
+      { kind: 'scalar', type: 'string' },
+      { kind: 'collection', element: { kind: 'scalar', type: 'number' } },
+      { kind: 'record', fields: { name: { kind: 'scalar', type: 'string' }, age: { kind: 'scalar', type: 'number' } } },
+      { kind: 'function', params: [{ name: 'x', type: { kind: 'scalar', type: 'string' } }], returns: { kind: 'scalar', type: 'boolean' } },
+      { kind: 'component' },
+      { kind: 'component', input: { kind: 'record', fields: { id: { kind: 'scalar', type: 'number' } } } },
+    ]
+    for (const t of types) {
+      const printed = printTypeExpr(t)
+      const parsed = parseTypeExpr(printed)
+      expect(JSON.stringify(parsed)).toBe(JSON.stringify(t))
+    }
+  })
+
+  it('print() dispatches on component kind', () => {
+    const src = `define Foo { render: text(value: self.input) }`
+    const result = parse(src)
+    expect(print(result)).toContain('define Foo')
+  })
+})
+
+// ── Error cases ───────────────────────────────────────────────────────────────
+
+describe('parser — component error cases', () => {
+  it('throws ParseError for missing render field', () => {
+    expect(() => parseComponent(`define X { input: string }`)).toThrow(ParseError)
+  })
+
+  it('throws ParseError for unknown fields in component block', () => {
+    expect(() => parseComponent(`define X { unknownField: string render: text(value: self.x) }`)).toThrow()
+  })
+
+  it('throws for invalid type expression', () => {
+    expect(() => parseTypeExpr('{')).toThrow()
   })
 })

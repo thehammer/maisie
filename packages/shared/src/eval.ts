@@ -186,6 +186,10 @@ export async function evalExprAsync(
       return evalExprAsync(node.body, resolver, letEnv, defs)
     }
 
+    case 'component-call':
+    case 'layout-call':
+      throw new Error('Component nodes not evaluable here — use the component renderer')
+
     case 'pipe': {
       // Evaluate the initial value, then thread through each step.
       let current = await evalExprAsync(node.value, resolver, env, defs)

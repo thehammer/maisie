@@ -83,7 +83,29 @@ export type PipeNode = {
   steps: ExprNode[]
 }
 
-export type ExprNode = LiteralNode | RefNode | ApplyNode | LambdaNode | LetNode | PipeNode
+/**
+ * A component invocation node in a render tree.
+ * Resolved by name via the component registry at render time.
+ * Not evaluable via evalExpr — Phase 2e implements rendering.
+ */
+export type ComponentCallNode = {
+  kind: 'component-call'
+  name: string                       // component name (e.g. "MovieTile", "text")
+  args: Record<string, ExprNode>     // named args
+}
+
+/**
+ * A layout primitive invocation node in a render tree.
+ * Maps to one of the registered layout primitives (stack, row, grid, etc.).
+ * Not evaluable via evalExpr — Phase 2e implements rendering.
+ */
+export type LayoutCallNode = {
+  kind: 'layout-call'
+  name: string                       // layout primitive name (e.g. "overlay", "scroll")
+  args: Record<string, ExprNode>     // named args (includes 'children' if present)
+}
+
+export type ExprNode = LiteralNode | RefNode | ApplyNode | LambdaNode | LetNode | PipeNode | ComponentCallNode | LayoutCallNode
 
 // ── Function definition (serialized, storable) ────────────────────────────────
 
@@ -435,6 +457,10 @@ export function evalExpr(
       }
       return evalExpr(node.body, letEnv, defs)
     }
+
+    case 'component-call':
+    case 'layout-call':
+      throw new Error('Component nodes not evaluable here — use the component renderer')
 
     case 'pipe': {
       // Evaluate the initial value, then thread through each step.
