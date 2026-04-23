@@ -649,3 +649,27 @@ describe('evalExprAsync — errors', () => {
     expect(evalExprAsync(node, resolver)).rejects.toThrow()
   })
 })
+
+// ── Render node pass-through ──────────────────────────────────────────────────
+
+describe('evalExprAsync — render node pass-through', () => {
+  it('component-call node evaluates to itself', async () => {
+    const node: ExprNode = {
+      kind: 'component-call',
+      name: 'MovieTile',
+      args: { title: { kind: 'literal', value: 'Inception' } },
+    }
+    const result = await evalExprAsync(node, resolver)
+    expect(result).toBe(node)
+  })
+
+  it('layout-call node evaluates to itself', async () => {
+    const node: ExprNode = {
+      kind: 'layout-call',
+      name: 'overlay',
+      args: { children: { kind: 'literal', value: [] as never } },
+    }
+    const result = await evalExprAsync(node, resolver)
+    expect(result).toBe(node)
+  })
+})

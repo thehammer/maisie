@@ -460,7 +460,10 @@ export function evalExpr(
 
     case 'component-call':
     case 'layout-call':
-      throw new Error('Component nodes not evaluable here — use the component renderer')
+      // Render nodes evaluate to themselves — the renderer consumes them directly.
+      // This allows expressions like `collection | map: (x) => Tile(x)` to produce
+      // a collection of render nodes that the renderer then walks.
+      return node as unknown as MaisieValue
 
     case 'pipe': {
       // Evaluate the initial value, then thread through each step.

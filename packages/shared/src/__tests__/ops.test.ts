@@ -427,3 +427,41 @@ describe('primitives', () => {
     expect(coll).toHaveLength(1) // original unchanged
   })
 })
+
+// ── Render node pass-through ──────────────────────────────────────────────────
+
+describe('evalExpr — render node pass-through', () => {
+  it('component-call node evaluates to itself', () => {
+    const node: ExprNode = {
+      kind: 'component-call',
+      name: 'MovieTile',
+      args: { title: { kind: 'literal', value: 'Inception' } },
+    }
+    const result = evalExpr(node)
+    expect(result).toBe(node)
+  })
+
+  it('layout-call node evaluates to itself', () => {
+    const node: ExprNode = {
+      kind: 'layout-call',
+      name: 'overlay',
+      args: { children: { kind: 'literal', value: [] as never } },
+    }
+    const result = evalExpr(node)
+    expect(result).toBe(node)
+  })
+
+  it('render nodes can be produced inside a map lambda', () => {
+    // Simulates: collection | map: (item) => Tile(title: item.title)
+    // The lambda produces a component-call node when invoked.
+    const tileNode: ExprNode = {
+      kind: 'component-call',
+      name: 'Tile',
+      args: { title: { kind: 'ref', name: 'title' } },
+    }
+    // evalExpr evaluates the component-call with title resolved from env
+    const result = evalExpr(tileNode, { title: 'Inception' })
+    // The node passes through (self-evaluates); it's not deeply evaluated
+    expect(result).toBe(tileNode)
+  })
+})
