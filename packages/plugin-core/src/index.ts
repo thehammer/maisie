@@ -30,6 +30,7 @@ const plugin: MaisiePlugin = {
     actionDefs.listCardTemplates,
     actionDefs.createCardTemplate,
     actionDefs.deleteCardTemplate,
+    actionDefs.getComponentCatalog,
   ],
   events: [],
 

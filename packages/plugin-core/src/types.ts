@@ -49,6 +49,10 @@ export interface CardConfig {
   sections?: import('@maisie/shared').SectionConfig[]
   /** Collection display layout chosen by the wizard. */
   displayStyle?: 'table' | 'card-list' | 'simple-list'
+  /** Component name to use for rendering. If set, delegates to ComponentRenderer. */
+  component?: string
+  /** Props passed to the component when `component` is set. */
+  componentProps?: Record<string, unknown>
 }
 
 export interface PersonaConfig {

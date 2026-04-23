@@ -438,3 +438,83 @@ describe('catalog bridge: derived entities appear in getCardCatalog', () => {
     expect(entry.section).toBe('entities')
   })
 })
+
+describe('getComponentCatalog: component catalog action', () => {
+  const { getComponentCatalog } = require('../actions')
+  const { componentRegistry } = require('../component-registry')
+
+  const noopCtx = { log: () => {}, emit: () => {} }
+
+  it('returns base and layout components by default', async () => {
+    const catalog = await getComponentCatalog.execute({}, noopCtx)
+    expect(Array.isArray(catalog)).toBe(true)
+    expect(catalog.length).toBeGreaterThan(0)
+
+    const kinds = new Set(catalog.map((c: any) => c.kind))
+    expect(kinds.has('base')).toBe(true)
+    expect(kinds.has('layout')).toBe(true)
+  })
+
+  it('each entry has name, kind', async () => {
+    const catalog = await getComponentCatalog.execute({}, noopCtx)
+    for (const c of catalog) {
+      expect(typeof c.name).toBe('string')
+      expect(['base', 'layout', 'derived']).toContain(c.kind)
+    }
+  })
+
+  it('filters by kind when specified', async () => {
+    const catalog = await getComponentCatalog.execute({ kind: 'base' }, noopCtx)
+    expect(catalog.length).toBeGreaterThan(0)
+    for (const c of catalog) {
+      expect(c.kind).toBe('base')
+    }
+  })
+
+  it('includes derived components registered in the registry', async () => {
+    // Register a derived component directly
+    componentRegistry.register({
+      name: 'TestTile',
+      kind: 'derived',
+      description: 'Test component',
+      render: { kind: 'ref', name: 'test' },
+    })
+
+    const catalog = await getComponentCatalog.execute({}, noopCtx)
+    const found = catalog.find((c: any) => c.name === 'TestTile')
+    expect(found).toBeDefined()
+    expect(found.kind).toBe('derived')
+    expect(found.description).toBe('Test component')
+
+    // Clean up
+    componentRegistry.unregister('TestTile')
+  })
+})
+
+describe('CardConfig: component binding fields', () => {
+  it('CardConfig accepts component and componentProps fields', () => {
+    const config: import('../types').CardConfig = {
+      id: 'test-card',
+      visible: true,
+      col_span: 1,
+      order: 0,
+      component: 'DefaultTile',
+      componentProps: { showBadge: true },
+    }
+    expect(config.component).toBe('DefaultTile')
+    expect(config.componentProps).toEqual({ showBadge: true })
+  })
+
+  it('CardConfig is valid without component binding (backward compat)', () => {
+    const config: import('../types').CardConfig = {
+      id: 'legacy-card',
+      visible: true,
+      col_span: 2,
+      order: 1,
+      title: 'My Card',
+      visibleFields: ['a', 'b'],
+    }
+    expect(config.component).toBeUndefined()
+    expect(config.componentProps).toBeUndefined()
+  })
+})

@@ -3,13 +3,22 @@
  *
  * Maps each base component name to a React element via FieldRenderer.
  * Args from the render tree become the RendererConfig for the renderer.
+ *
+ * Also handles built-in special components like DefaultTile.
  */
 
 import React from 'react'
 import type { ComponentDef, MaisieRecord, MaisieValue, RendererConfig } from '@maisie/shared'
 import { FieldRenderer } from '../renderers/FieldRenderer'
+import { DefaultTile } from './default-tile'
 
 export function renderBaseComponent(component: ComponentDef, args: MaisieRecord): React.ReactNode {
+  // Built-in special components
+  if (component.name === 'DefaultTile') {
+    const input = args.value ?? args.src ?? args.input ?? pickFirst(args)
+    return <DefaultTile input={input as MaisieValue} />
+  }
+
   // Convention: base components receive their value via args. Prefer `value`,
   // then `src`, then `input`, then the first arg present.
   const value = args.value ?? args.src ?? args.input ?? pickFirst(args)

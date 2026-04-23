@@ -360,6 +360,8 @@ export function App() {
       visibleFields: card.visibleFields,
       rendererConfigs: card.rendererConfigs,
       functionFields: card.functionFields,
+      component: card.component,
+      componentProps: card.componentProps,
     } as Partial<import("./hooks/useLayout").CardConfig>);
   }
 
@@ -531,6 +533,8 @@ export function App() {
             titleOverride={widget.title}
             displayStyle={widget.displayStyle}
             functionFields={widget.functionFields}
+            component={widget.component}
+            componentProps={widget.componentProps}
           />
         );
         return null;

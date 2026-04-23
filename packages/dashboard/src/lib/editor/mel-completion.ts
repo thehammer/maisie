@@ -44,19 +44,38 @@ interface EntityCompletion {
   fields: Record<string, { kind: 'data' | 'function'; type?: string; returnType?: string }>
 }
 
+interface ComponentCompletion {
+  name: string
+  kind: 'base' | 'layout' | 'derived'
+  description?: string
+}
+
 let catalogCache: EntityCompletion[] = []
+let componentCache: ComponentCompletion[] = []
 let catalogPromise: Promise<void> | null = null
 
 async function fetchCatalog(): Promise<void> {
   try {
-    const res = await fetch('/api/entities')
-    if (!res.ok) return
-    const entities = await res.json() as { name: string; description?: string; fields?: Record<string, { kind: 'data' | 'function'; type?: string; returnType?: string }> }[]
-    catalogCache = entities.map((e) => ({
-      name: e.name,
-      description: e.description,
-      fields: e.fields ?? {},
-    }))
+    const [entitiesRes, componentsRes] = await Promise.all([
+      fetch('/api/entities'),
+      fetch('/api/components'),
+    ])
+    if (entitiesRes.ok) {
+      const entities = await entitiesRes.json() as { name: string; description?: string; fields?: Record<string, { kind: 'data' | 'function'; type?: string; returnType?: string }> }[]
+      catalogCache = entities.map((e) => ({
+        name: e.name,
+        description: e.description,
+        fields: e.fields ?? {},
+      }))
+    }
+    if (componentsRes.ok) {
+      const components = await componentsRes.json() as ComponentCompletion[]
+      componentCache = components.map((c) => ({
+        name: c.name,
+        kind: c.kind,
+        description: c.description,
+      }))
+    }
   } catch { /* ignore — completions work without catalog */ }
 }
 
@@ -133,7 +152,7 @@ export function melCompletions(context: CompletionContext): CompletionResult | n
     return null
   }
 
-  // Bare identifier — offer entity names + keywords.
+  // Bare identifier — offer entity names + component names + keywords.
   // validFor includes dots and hyphens so completion stays open while typing
   // dotted/hyphenated entity names like `home-assistant`.
   const identMatch = before.match(/([a-zA-Z_][a-zA-Z0-9_.-]*)$/)
@@ -144,9 +163,14 @@ export function melCompletions(context: CompletionContext): CompletionResult | n
       type: 'variable',
       detail: e.description,
     }))
+    const componentOptions: Completion[] = componentCache.map((c) => ({
+      label: c.name,
+      type: 'class',
+      detail: `${c.kind} component${c.description ? ` — ${c.description}` : ''}`,
+    }))
     return {
       from: pos - partial.length,
-      options: [...KEYWORDS, ...entityOptions],
+      options: [...KEYWORDS, ...entityOptions, ...componentOptions],
       validFor: /^[a-zA-Z_][a-zA-Z0-9_.-]*$/,
     }
   }

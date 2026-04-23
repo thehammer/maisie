@@ -5077,3 +5077,177 @@ body {
     grid-template-rows: 1fr 1fr;
   }
 }
+
+/* ── DefaultTile ──────────────────────────────────────────────────────────── */
+
+.default-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.default-tile-image {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: calc(var(--radius) - 4px);
+  display: block;
+}
+
+.default-tile-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.default-tile-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.default-tile-badge {
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(108, 140, 255, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(108, 140, 255, 0.25);
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.default-tile-percent {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.default-tile-text {
+  padding: 0.75rem;
+}
+
+.default-tile-progress-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 0.25rem;
+}
+
+.default-tile-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.default-tile-scalar {
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.default-tile-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.5rem;
+}
+
+.default-tile-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+}
+
+.default-tile-label {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  text-transform: capitalize;
+}
+
+.default-tile-value {
+  color: var(--text);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+
+/* ── Wizard: Component Picker ─────────────────────────────────────────────── */
+
+.wizard-component-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.wizard-component-option {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 0.1rem 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.wizard-component-option:hover {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+
+.wizard-component-option.selected {
+  border-color: var(--accent);
+  background: rgba(108, 140, 255, 0.08);
+}
+
+.wizard-component-option-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.wizard-component-option-kind {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  background: var(--border);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.wizard-component-option-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  grid-column: 1 / -1;
+  grid-row: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+

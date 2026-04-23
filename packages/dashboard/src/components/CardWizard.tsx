@@ -36,6 +36,14 @@ const SECTION_LABELS: Record<string, string> = {
 
 const HIDDEN_SECTIONS = new Set(["dashboard"]);
 
+// ── Component summary (from /api/components) ──────────────────────────────────
+
+interface ComponentSummary {
+  name: string;
+  kind: 'base' | 'layout' | 'derived';
+  description?: string;
+}
+
 // ── Wizard state ──────────────────────────────────────────────────────────────
 
 interface WizardState {
@@ -50,6 +58,10 @@ interface WizardState {
   /** Function fields selected in Step 3 to render as buttons. */
   functionFields: Array<{ name: string; label?: string }>;
   title: string;
+  /** Optional component name selected in Step 3. */
+  selectedComponent: string | undefined;
+  /** Props for the selected component. */
+  componentProps: Record<string, unknown>;
 }
 
 const INITIAL_STATE: WizardState = {
@@ -62,6 +74,8 @@ const INITIAL_STATE: WizardState = {
   rendererConfigs: {},
   functionFields: [],
   title: "",
+  selectedComponent: undefined,
+  componentProps: {},
 };
 
 // ── Comparison operators for filter ──────────────────────────────────────────
@@ -88,6 +102,7 @@ interface CardWizardProps {
 export function CardWizard({ open, onClose, onAdd }: CardWizardProps) {
   const [state, setState] = useState<WizardState>(INITIAL_STATE);
   const catalogApi = useApi<CardDescriptor[]>(open ? "/api/cards/catalog" : null, 0);
+  const componentsApi = useApi<ComponentSummary[]>(open ? "/api/components" : null, 0);
   const catalog = catalogApi.data ?? [];
 
   // When a descriptor is selected, fetch its EntityDef to discover function fields.
@@ -122,10 +137,12 @@ export function CardWizard({ open, onClose, onAdd }: CardWizardProps) {
       order: 0,
       title: state.title || undefined,
       ops: state.ops.length ? state.ops : undefined,
-      displayStyle: state.displayStyle,
-      visibleFields: state.visibleFields.length ? state.visibleFields : undefined,
-      rendererConfigs: Object.keys(state.rendererConfigs).length ? state.rendererConfigs : undefined,
+      displayStyle: state.selectedComponent ? undefined : state.displayStyle,
+      visibleFields: state.selectedComponent ? undefined : (state.visibleFields.length ? state.visibleFields : undefined),
+      rendererConfigs: state.selectedComponent ? undefined : (Object.keys(state.rendererConfigs).length ? state.rendererConfigs : undefined),
       functionFields: state.functionFields.length ? state.functionFields : undefined,
+      component: state.selectedComponent,
+      componentProps: state.selectedComponent && Object.keys(state.componentProps).length ? state.componentProps : undefined,
     };
     onAdd(card);
     handleClose();
@@ -212,11 +229,16 @@ export function CardWizard({ open, onClose, onAdd }: CardWizardProps) {
               <Step3Display
                 descriptor={state.descriptor}
                 selectedEntity={state.selectedEntity}
+                availableComponents={componentsApi.data ?? []}
+                selectedComponent={state.selectedComponent}
+                componentProps={state.componentProps}
                 displayStyle={state.displayStyle}
                 visibleFields={state.visibleFields}
                 rendererConfigs={state.rendererConfigs}
                 functionFields={state.functionFields}
                 title={state.title}
+                onComponentChange={(name) => setState((p) => ({ ...p, selectedComponent: name, componentProps: {} }))}
+                onComponentPropsChange={(props) => setState((p) => ({ ...p, componentProps: props }))}
                 onDisplayStyleChange={(s) => setState((p) => ({ ...p, displayStyle: s }))}
                 onVisibleFieldsChange={(vf) => setState((p) => ({ ...p, visibleFields: vf }))}
                 onRendererConfigChange={(rc) => setState((p) => ({ ...p, rendererConfigs: rc }))}
@@ -509,11 +531,16 @@ function Step2Transform({ descriptor, ops, onChange, onBack, onNext }: Step2Prop
 interface Step3Props {
   descriptor: CardDescriptor;
   selectedEntity: EntityDef | null;
+  availableComponents: ComponentSummary[];
+  selectedComponent: string | undefined;
+  componentProps: Record<string, unknown>;
   displayStyle: 'table' | 'card-list' | 'simple-list' | undefined;
   visibleFields: string[];
   rendererConfigs: CardRendererConfig;
   functionFields: Array<{ name: string; label?: string }>;
   title: string;
+  onComponentChange: (name: string | undefined) => void;
+  onComponentPropsChange: (props: Record<string, unknown>) => void;
   onDisplayStyleChange: (s: 'table' | 'card-list' | 'simple-list' | undefined) => void;
   onVisibleFieldsChange: (vf: string[]) => void;
   onRendererConfigChange: (rc: CardRendererConfig) => void;
@@ -526,11 +553,16 @@ interface Step3Props {
 function Step3Display({
   descriptor,
   selectedEntity,
+  availableComponents,
+  selectedComponent,
+  componentProps,
   displayStyle,
   visibleFields,
   rendererConfigs,
   functionFields,
   title,
+  onComponentChange,
+  onComponentPropsChange,
   onDisplayStyleChange,
   onVisibleFieldsChange,
   onRendererConfigChange,
@@ -583,9 +615,42 @@ function Step3Display({
   const collectionOptions = COMPONENT_OPTIONS["collection"] ?? [];
   const collectionStyleIds = ["card-list", "table", "simple-list"] as const;
 
+  // Group available components for the picker (exclude layout primitives in picker)
+  const pickableComponents: ComponentSummary[] = [
+    { name: "DefaultTile", kind: "base", description: "Auto-renders any record (image + title + badge or label-value list)" },
+    ...availableComponents.filter((c) => c.kind !== "layout"),
+  ];
+
   return (
     <div className="wizard-step-panel">
       <div className="wizard-step-heading">Choose display</div>
+
+      {/* Component picker */}
+      <div className="wizard-field-group">
+        <label className="wizard-field-label">Rendering</label>
+        <div className="wizard-component-picker">
+          <button
+            className={`wizard-component-option ${!selectedComponent ? "selected" : ""}`}
+            onClick={() => onComponentChange(undefined)}
+          >
+            <span className="wizard-component-option-name">Default</span>
+            <span className="wizard-component-option-desc">Field-by-field renderer</span>
+          </button>
+          {pickableComponents.map((c) => (
+            <button
+              key={c.name}
+              className={`wizard-component-option ${selectedComponent === c.name ? "selected" : ""}`}
+              onClick={() => onComponentChange(c.name)}
+            >
+              <span className="wizard-component-option-name">{c.name}</span>
+              <span className="wizard-component-option-kind">{c.kind}</span>
+              {c.description && (
+                <span className="wizard-component-option-desc">{c.description}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Title override */}
       <div className="wizard-field-group">
@@ -598,8 +663,8 @@ function Step3Display({
         />
       </div>
 
-      {/* Collection display style */}
-      {isCollection && (
+      {/* Collection display style — only shown when not using a component */}
+      {isCollection && !selectedComponent && (
         <div className="wizard-field-group">
           <label className="wizard-field-label">Layout style</label>
           <div className="wizard-option-grid">
@@ -622,8 +687,8 @@ function Step3Display({
         </div>
       )}
 
-      {/* Field selector */}
-      <div className="wizard-field-group">
+      {/* Field selector — hidden when a component is selected */}
+      {!selectedComponent && <div className="wizard-field-group">
         <label className="wizard-field-label">Visible fields</label>
         <div className="wizard-field-list">
           {fields.map((f) => {
@@ -665,7 +730,7 @@ function Step3Display({
             );
           })}
         </div>
-      </div>
+      </div>}
 
       {/* Function fields */}
       {entityFunctionFields.length > 0 && (

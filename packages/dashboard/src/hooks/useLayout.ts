@@ -15,6 +15,10 @@ export interface CardConfig {
   displayStyle?: 'table' | 'card-list' | 'simple-list';
   /** Function fields to render as action buttons on the card. */
   functionFields?: Array<{ name: string; label?: string }>;
+  /** Component name to use for rendering. If set, delegates to ComponentRenderer. */
+  component?: string;
+  /** Props passed to the component when `component` is set. */
+  componentProps?: Record<string, unknown>;
 }
 
 interface LayoutState {
@@ -122,7 +126,7 @@ export function useLayout(page: string) {
 
   /** Update the configurator fields on a specific card and persist immediately. */
   const updateCardConfig = useCallback(
-    async (id: string, patch: Pick<CardConfig, "title" | "visibleFields" | "ops" | "rendererConfigs" | "sections">) => {
+    async (id: string, patch: Pick<CardConfig, "title" | "visibleFields" | "ops" | "rendererConfigs" | "sections" | "component" | "componentProps">) => {
       const updated = state.widgets.map((w) => (w.id === id ? { ...w, ...patch } : w));
       setState((s) => ({ ...s, widgets: updated }));
       // Persist immediately — config changes shouldn't require entering edit mode

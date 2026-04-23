@@ -16,6 +16,7 @@ import { useEntitySubscription } from "../hooks/useEntitySubscription";
 import { FieldRenderer, inferRendererConfig } from "../lib/renderers/FieldRenderer";
 import { applyPipeline } from "../lib/pipeline";
 import { CardRefreshContext } from "../lib/CardRefreshContext";
+import { ComponentRenderer } from "./ComponentRenderer";
 import type { MaisieFieldType, OpConfig, CardRendererConfig, SectionConfig } from "@maisie/shared";
 
 // Mirrors plugin-core's CardDescriptor — defined locally since the dashboard
@@ -74,6 +75,15 @@ interface DynamicCardProps {
    * /api/entities/{descriptor.id}/{name} when clicked.
    */
   functionFields?: Array<{ name: string; label?: string }>;
+  /**
+   * Component name to use for rendering. When set, data is fetched normally
+   * then passed to ComponentRenderer instead of the built-in renderers.
+   */
+  component?: string;
+  /**
+   * Props to pass to the component when `component` is set.
+   */
+  componentProps?: Record<string, unknown>;
 }
 
 // Mirrors deriveHttpPath() in plugin-core/registry.ts — strips verb prefix,
@@ -106,6 +116,8 @@ export function DynamicCard({
   sections,
   displayStyle,
   functionFields,
+  component: componentName,
+  componentProps,
 }: DynamicCardProps) {
   // Derived entities (pluginName is undefined) fetch from /api/entities/{id}/{field}
   // which returns {value: ...}. Plugin entities use the plugin's own action endpoint.
@@ -141,6 +153,26 @@ export function DynamicCard({
 
   const errorMsg = error ? String(error) : null;
   const title = titleOverride || descriptor.label;
+
+  // When a component binding is set, delegate to ComponentRenderer after data loads.
+  if (componentName) {
+    return (
+      <CardRefreshContext.Provider value={refresh}>
+        <div className="resource-card">
+          <h3 className="card-title">{title}</h3>
+          {loading && <div className="resource-loading">Loading…</div>}
+          {errorMsg && <div className="resource-error">{errorMsg}</div>}
+          {!loading && data !== null && data !== undefined && (
+            <ComponentRenderer
+              componentName={componentName}
+              input={data as import("@maisie/shared").MaisieValue}
+              props={(componentProps ?? {}) as import("@maisie/shared").MaisieRecord}
+            />
+          )}
+        </div>
+      </CardRefreshContext.Provider>
+    );
+  }
 
   // Filter and reorder fields if visibleFields is set
   const shownFields = visibleFields

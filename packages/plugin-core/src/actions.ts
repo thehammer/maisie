@@ -7,6 +7,7 @@ import { createLayoutService } from './layout-service'
 import type { LayoutService } from './layout-service'
 import { entityRegistry } from './entity-registry'
 import { registry } from './registry'
+import { componentRegistry } from './component-registry'
 
 // ----------------------------------------------------------------
 // Module-level state — injected by plugin init()
@@ -812,5 +813,34 @@ export const deleteCardTemplate = defineAction({
     const { eq } = await import('drizzle-orm')
     await db.delete(cardTemplates).where(eq(cardTemplates.id, input.id))
     return { success: true }
+  },
+})
+
+// ----------------------------------------------------------------
+// Component Catalog
+// ----------------------------------------------------------------
+
+const componentSummarySchema = z.object({
+  name: z.string(),
+  kind: z.enum(['base', 'layout', 'derived']),
+  description: z.string().optional(),
+})
+
+export const getComponentCatalog = defineAction({
+  name: 'get_component_catalog',
+  description: 'List all available components — base, layout, and derived.',
+  input: z.object({ kind: z.enum(['base', 'layout', 'derived']).optional() }),
+  output: z.array(componentSummarySchema),
+  http: { method: 'GET', path: '/api/components/catalog' },
+  ai: { tier: 'inform' },
+  ui: false,
+  async execute(input, _ctx) {
+    const components = componentRegistry.list()
+    const filtered = input.kind ? components.filter((c) => c.kind === input.kind) : components
+    return filtered.map((c) => ({
+      name: c.name,
+      kind: c.kind,
+      description: c.description,
+    }))
   },
 })
