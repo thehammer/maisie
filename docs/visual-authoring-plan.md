@@ -357,7 +357,7 @@ Nothing breaks at any sub-phase:
 
 ---
 
-## Estimated Total
+## Estimated Total (Sub-phases 3a–3f)
 
 | Sub-phase | Sessions | Cumulative |
 |-----------|----------|------------|
@@ -370,8 +370,146 @@ Nothing breaks at any sub-phase:
 
 Realistic total for the core canvas experience: **12–14 sessions** plus ongoing self-hosting work.
 
+Sub-phases 3a–3e shipped on 2026-04-23.
+
+---
+
+## Extension — Deep Composition (Sub-phases 3g–3l)
+
+*Added 2026-04-23 after hands-on use of the canvas shipped in 3a–3e.*
+
+The first round of canvas work proved the model but revealed a gap: most plugin entities are typed as loose `record` or `collection`, while components demand specific shapes. Direct structural matches are rare in practice. The pragmatic bridging pattern is `entity → function(s) → component` — transforms reshape the data at each boundary. These sub-phases make that pattern first-class.
+
+### 3g — Richer plugin entity types
+
+**Goal:** Plugin entities carry deep TypeExpr outputs derived from their Zod schemas, not coarse `'record'` / `'collection'` strings.
+
+**What ships:**
+- `zodToTypeExpr(schema)` — converts a Zod object/array/scalar schema to a `TypeExpr`, preserving `MaisieFieldType` annotations from `field()` (so semantic types like `url`, `timestamp`, `percentage` propagate)
+- `synthesizeEntityFromAction` uses the converter to produce a proper typed output
+- `EntityDef.DataFieldDef.type` accepts `TypeExpr` (alongside the existing string form for backward compatibility)
+- Type resolver in canvas (`resolveEntityPorts`) uses the richer type instead of inferring from a string
+
+**Proof of concept:** `plex.list_recently_added.result` resolves to `collection<record<{ title: string, year: number, addedAt: timestamp, ... }>>` — the actual output shape, not just `collection`.
+
+**Files:**
+- `packages/shared/src/zod-to-type-expr.ts` — converter
+- `packages/plugin-core/src/entity-registry.ts` — use the converter in synthesis
+- `packages/dashboard/src/lib/canvas/type-resolver.ts` — consume richer types
+
+**Scope:** 2–3 sessions.
+
+### 3h — Function placements on canvas
+
+**Goal:** Functions are first-class canvas items, alongside entities and components. Wires connecting `entity → function → component` become a valid and visible composition.
+
+**What ships:**
+- `FunctionDef`-derived descriptors for each standard library function (filter, sort, limit, map, pluck, group, count, sum, any, all) — with explicit input type, output type, and parameter declarations
+- `Placement.kind` gains `'function'`; canvas supports three placement kinds
+- Function placements have input port (left), output port (right), and a parameter panel in the inspector
+- Wires validate at each hop via `satisfies`
+- User-authored lambdas (saved via a future `save_function` tool) slot in here too; built-ins first
+
+**Scope:** 3 sessions.
+
+### 3i — Split palette with compatibility highlighting
+
+**Goal:** Entities on the left, components on the right, functions in a middle dock (collapsible). Selecting any placement highlights compatible items in the opposite palette.
+
+**What ships:**
+- Split palette layout: three vertical strips (entities | canvas | components) with a collapsible function dock
+- Compatibility badge per palette item:
+  - **Green**: direct `satisfies` match
+  - **Yellow**: compatible via a function chain (the system can auto-suggest)
+  - **Gray**: incompatible even with transforms
+- Sort within each group: green first, yellow next, gray below the fold
+- Selection drives highlighting in both directions (selecting an entity highlights compatible components, selecting a component highlights compatible entities)
+
+**Scope:** 2 sessions.
+
+### 3j — Auto-suggest transform chains
+
+**Goal:** When direct compatibility fails, the system proposes function chains that bridge the source to the target.
+
+**What ships:**
+- `findBridgingChains(sourceType, targetType, maxDepth = 3)` — BFS over function signatures, returns candidate chains of function calls that compose to bridge the two types
+- Popover on hover over a "yellow" wire or incompatible drop: shows the suggested chain with a "Apply" button
+- One-click apply inserts the function placements and wires into the canvas
+- Multiple suggestions sorted by chain length; user picks
+- Cache chain searches keyed by source+target type pair
+
+**Scope:** 2–3 sessions (search algorithm + UX).
+
+### 3k — Views as first-class catalog entries
+
+**Goal:** The composition of entity + function chain + component becomes a named catalog entry — a **View**.
+
+**What ships:**
+- `ViewDef` type: `{ name, description, source: { entity, fieldPath }, chain: FnCall[], component: componentName, componentProps }`
+- `views` SQLite table + `ViewStore` (save/loadAll/get/delete) + `viewRegistry`
+- `POST /api/views`, `GET /api/views`, `GET /api/views/:name`, `DELETE /api/views/:name`
+- Canvas "Save as View" action when the root binds both an entity source and a component
+- Views appear in the catalog alongside entities and components
+- Cards can bind a View directly — a card's `component` can point at a view name, which resolves to the full chain at render time
+- Views are addressable (`views.recent-movies-strip`) and queryable via MEL
+
+**Vocabulary note:** the term "view" is now formal (see `docs/super-plan.md` vocabulary).
+
+**Scope:** 2–3 sessions.
+
+### 3l — Canvas persistence + round-trip editing
+
+**Goal:** Canvas state persists. Any saved entity, component, or view can be reopened in the canvas for editing.
+
+**What ships:**
+- `canvasDocuments` SQLite table for work-in-progress (keyed by a session or user id)
+- Autosave on meaningful changes (debounced)
+- "Edit in canvas" action on any catalog entry — loads the artifact's structure onto the canvas
+- Round-trip: emit → reload → modify → re-emit produces equivalent results
+- Clear canvas / new canvas affordances
+
+**Scope:** 1–2 sessions.
+
+---
+
+## Dependency Graph (3g–3l)
+
+```
+3g (richer types) ──┬─→ 3h (function placements)
+                    ├─→ 3i (split palette + highlighting)
+                    └─→ 3j (auto-suggest chains) ──┬─→ 3k (Views)
+                                                    └─→ 3l (persistence + round-trip)
+```
+
+3g is foundational — everything benefits, do first. 3h and 3i can parallel after 3g. 3j depends on 3h (needs function placements to suggest). 3k and 3l can sequence in either order.
+
+---
+
+## Proof-of-concept moment (validates 3g–3l together)
+
+Drag `plex.list_recently_added` onto the canvas. Drag `Strip`. Wire them directly — wire turns yellow, popover suggests *"Add `map` (pluck title, coverUrl, addedAt) + bind to MovieTile."* One click: three placements appear (`list_recently_added` → `map` → `Strip`), all green, preview shows an actual horizontal strip of recent movies. Save as View → `recent-movies-strip` in the catalog → add as a dashboard card → it renders live.
+
+That's the core authoring loop finished.
+
+---
+
+## Estimated Total (3g–3l)
+
+| Sub-phase | Sessions | Cumulative (from 3a) |
+|-----------|----------|----------------------|
+| 3g: Richer plugin entity types | 2–3 | 16–17 |
+| 3h: Function placements | 3 | 19–20 |
+| 3i: Split palette + highlighting | 2 | 21–22 |
+| 3j: Auto-suggest chains | 2–3 | 23–25 |
+| 3k: Views as first-class | 2–3 | 25–28 |
+| 3l: Persistence + round-trip | 1–2 | 26–30 |
+
+Extension total: **12–16 sessions** on top of the original 12–14 of 3a–3f.
+
 ---
 
 ## What Phase 4 (Agent Platform) Inherits
 
 Once visual authoring ships, the agent gains something concrete: it can *propose* canvas compositions. When the agent wants to add a card for a new concern (overdue packages, weekly trends), it can construct a canvas document, validate it against the registries, and surface it to the user as a preview — exactly the same artifact a human would produce. Generic agent tools (`resolve_address`, `invoke_address`, `run_pipeline`) plus canvas document construction give the agent full authoring capability.
+
+With 3g–3l, the agent's proposals can reference saved Views directly — "I noticed you watch movies late at night; want me to pin `recent-movies-strip` to the main dashboard?" becomes a single artifact reference instead of a full composition.

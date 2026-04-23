@@ -83,6 +83,7 @@ These terms are used consistently throughout this document and the codebase.
 | **Address** | The dotted path that identifies any entity, field, function, or component in the catalog |
 | **Catalog** | The homogeneous registry of all entities and components — browsable, filterable, itself queryable as an entity |
 | **Tier** | Autonomy level for agent-callable operations: inform, advise, act |
+| **View** | A named pairing of an entity (optionally through a function chain) with a component and prop values. The canonical unit of "how to show this data." Formal as of 3k. |
 
 ---
 
@@ -94,7 +95,7 @@ The plan is organized into a sequence of platform phases plus one evergreen stre
 Phase 0: Foundations              [COMPLETE]
 Phase 1: The Data Platform        [COMPLETE — 2026-04-22]
 Phase 2: The Presentation Platform [COMPLETE — 2026-04-23]
-Phase 3: Visual Authoring         [CORE COMPLETE — 2026-04-23; 3f (self-hosting) ongoing]
+Phase 3: Visual Authoring         [3a-3e COMPLETE — 2026-04-23; 3g-3l PLANNED; 3f ongoing]
 Phase 4: The Agent Platform       [CORE COMPLETE — 2026-04-23; 4e autonomous loop deferred]
 Phase 5: Distribution             [PLANNED]
 Phase 6: Alternative Clients      [DEFERRED]
@@ -253,6 +254,19 @@ The UX surface where entities and components are designed visually. The structur
 ### What's ongoing (3f)
 
 Self-hosting — incrementally replacing hand-coded Studio pieces with authored components. Not time-bounded. Candidates: palette, inspector, canvas preview, placement node. Each replacement is its own 1–2 session iteration.
+
+### What's planned (3g–3l)
+
+Hands-on use of the shipped canvas exposed a real gap: plugin entities carry coarse `'record'` / `'collection'` type strings, while components demand specific shapes. Direct structural matches are rare. The natural bridging pattern is `entity → function(s) → component` — transforms reshape data at each boundary. These sub-phases make that pattern first-class:
+
+- **3g — Richer plugin entity types.** Introspect Zod output schemas into full `TypeExpr` values at entity synthesis. The structural matcher gains real types to work with end-to-end.
+- **3h — Function placements on canvas.** Standard library ops (filter, map, pluck, sort, etc.) become draggable canvas items with their own input/output ports. Wires like `entity → function → component` are a valid and visible composition.
+- **3i — Split palette with compatibility highlighting.** Entities left, components right, functions in a collapsible dock. Selection highlights compatible items in the opposite pane by color (green = direct, yellow = via chain, gray = incompatible), sorted by compatibility.
+- **3j — Auto-suggest transform chains.** When direct compatibility fails, BFS over function signatures finds candidate chains that bridge source to target. Popover offers one-click apply.
+- **3k — Views as first-class catalog entries.** A View = entity + optional function chain + component + props. `views` table, registry, CRUD, canvas "Save as View" emit action. Cards can bind Views directly. View is the canonical name for the entity-component pairing (see vocabulary).
+- **3l — Canvas persistence + round-trip editing.** Canvas state autosaves. Any saved entity/component/view reopens in the canvas for modification. Closes the authoring loop.
+
+Estimated extension: 12–16 sessions. See `docs/visual-authoring-plan.md` for details.
 
 ### Goals
 
