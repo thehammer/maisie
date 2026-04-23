@@ -6,6 +6,8 @@ import { createToolRegistry } from './tool-registry'
 import { createEventRouter } from './event-router'
 import { createPersonaRouter } from './persona-router'
 import { createAgentLoop } from './loop'
+import { createDerivedEntityStore } from '@maisie/plugin-core/src/derived-entity-store'
+import { createDerivedComponentStore } from '@maisie/plugin-core/src/derived-component-store'
 
 interface AgentConfig {
   plugins: MaisiePlugin[]
@@ -18,7 +20,16 @@ interface AgentConfig {
 
 export function createAgent(config: AgentConfig) {
   const memory = createMemoryStore(config.db)
-  const toolRegistry = createToolRegistry(config.plugins)
+
+  // Build authoring stores from the same db used by the HTTP entity routes.
+  // This ensures saves via agent tools and saves via the REST API go to the
+  // same SQLite tables and the same in-process registries.
+  const authoringDeps = {
+    entityStore: createDerivedEntityStore(config.db),
+    componentStore: createDerivedComponentStore(config.db),
+  }
+
+  const toolRegistry = createToolRegistry(config.plugins, authoringDeps)
   const eventRouter = createEventRouter(config.plugins)
   const personaRouter = createPersonaRouter(config.plugins)
 

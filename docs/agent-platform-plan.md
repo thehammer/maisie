@@ -103,6 +103,8 @@ Chat: "Show me all switches that are on" → agent constructs `home-assistant.li
 
 ## Phase 4b — MEL Authoring Tools
 
+**Status: COMPLETE** *(2026-04-23)*
+
 **Goal:** The agent can create persistent derived entities and components, not just evaluate expressions.
 
 ### What ships
@@ -115,21 +117,31 @@ Three new tool surfaces:
 
 These let the agent propose catalog changes through the existing `advise` flow: the agent writes MEL, surfaces it as a proposal, the user approves, and the artifact is saved.
 
-### Files to create
+### Files created
 
-- `packages/agent/src/tools/authoring-tools.ts` — tool definitions + handlers
+- `packages/agent/src/agent/authoring-tools.ts` — tool definitions + handlers; exports `AuthoringToolDeps` interface
 
-### Files to modify
+### Files modified
 
-- `packages/agent/src/agent/index.ts` — register the new tools
-- Persona prompts in `packages/shared/src/persona.ts` or per-plugin persona defs — add guidance on when to use authoring tools vs. evaluation tools
+- `packages/agent/src/agent/tool-registry.ts` — accepts optional `authoringDeps`; merges authoring tools into every `toSdkTools()` call when deps are present
+- `packages/agent/src/agent/index.ts` — constructs `DerivedEntityStore` + `DerivedComponentStore` from `config.db` and passes them as `authoringDeps` to `createToolRegistry`
 
 ### Tests
 
-- `save_entity` accepts MEL source, persists, returns the created entity
-- `save_entity` rejects invalid MEL with a clear error
-- `save_component` similar
-- `delete_artifact` removes; errors when called on a non-derived entity or missing address
+- `packages/agent/src/agent/__tests__/authoring-tools.test.ts` — 19 tests covering all three tools
+- `save_entity` — happy path (registers + persists, returns EntityDef); component source rejected; plain expression rejected; invalid MEL rejected; tier below advise rejected; plugin entity overwrite blocked
+- `save_component` — happy path (registers + persists, returns ComponentDef); entity source rejected; plain expression rejected; invalid MEL rejected; tier below advise rejected
+- `delete_artifact` — removes derived entity; removes derived component; errors on base component; errors on plugin entity; errors on missing address; tier below advise rejected
+
+### Deviations from spec
+
+1. **File at `agent/` not `tools/`** — spec listed `packages/agent/src/tools/authoring-tools.ts`. Placed at `packages/agent/src/agent/authoring-tools.ts` to match the 4a pattern and keep all agent tools co-located.
+
+2. **Stores created in `agent/index.ts`, not propagated from `api/index.ts`** — the stores are constructed fresh from `config.db` inside `createAgent`. This gives the agent its own store instances that hit the same SQLite tables as the HTTP routes (same `db` reference), ensuring consistency without coupling the agent to the HTTP layer's store objects.
+
+3. **No persona prompt updates** — guidance on authoring-tool usage is deferred; persona prompts remain unchanged. Updating system prompts is a 4c+ concern once personas are entities.
+
+4. **`authoringDeps` is optional in `createToolRegistry`** — when no deps are provided (e.g., in tests that construct a registry without a db), authoring tools are silently omitted. This keeps the tool-registry tests unchanged.
 
 ### Proof of concept
 
@@ -137,7 +149,7 @@ Chat: "Remember a view that shows me movies I haven't watched yet." → agent co
 
 ### Estimated scope
 
-2 sessions.
+2 sessions (completed in 1).
 
 ---
 

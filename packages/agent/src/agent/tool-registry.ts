@@ -2,8 +2,10 @@ import type { MaisiePlugin, ActionTier, ActionContext } from '@maisie/shared'
 import { tool } from 'ai'
 import { z } from 'zod'
 import { createGenericTools } from './generic-tools'
+import { createAuthoringTools } from './authoring-tools'
+import type { AuthoringToolDeps } from './authoring-tools'
 
-export function createToolRegistry(plugins: MaisiePlugin[]) {
+export function createToolRegistry(plugins: MaisiePlugin[], authoringDeps?: AuthoringToolDeps) {
   // Collect all actions with ai config from all plugins
   const allActions = plugins.flatMap(plugin =>
     plugin.actions
@@ -64,7 +66,12 @@ export function createToolRegistry(plugins: MaisiePlugin[]) {
 
     const genericTools = createGenericTools(ctx, permittedTier)
 
-    return { ...genericTools, ...pluginTools }
+    // Authoring tools are included when deps are available.
+    const authoringTools = authoringDeps
+      ? createAuthoringTools(authoringDeps, permittedTier)
+      : {}
+
+    return { ...genericTools, ...authoringTools, ...pluginTools }
   }
 
   function getActionsByTier(tier: ActionTier) {
