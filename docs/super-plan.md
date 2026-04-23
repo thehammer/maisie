@@ -95,7 +95,7 @@ Phase 0: Foundations              [COMPLETE]
 Phase 1: The Data Platform        [COMPLETE — 2026-04-22]
 Phase 2: The Presentation Platform [COMPLETE — 2026-04-23]
 Phase 3: Visual Authoring         [CORE COMPLETE — 2026-04-23; 3f (self-hosting) ongoing]
-Phase 4: The Agent Platform       [PARTIAL]
+Phase 4: The Agent Platform       [CORE COMPLETE — 2026-04-23; 4e autonomous loop deferred]
 Phase 5: Distribution             [PLANNED]
 Phase 6: Alternative Clients      [DEFERRED]
 
@@ -276,37 +276,23 @@ Phase 2 (Presentation Platform) must exist as a running system — components re
 
 ## Phase 4 — The Agent Platform
 
-**Status: Partial.**
+**Status: Core complete (2026-04-23).** 1273 tests. All five sub-phases shipped; the optional autonomous reflection loop in 4e is deferred.
 
-How the agent participates in the platform as a first-class consumer. Today the agent has hand-wired tools per action. With the entity model live, it gains the ability to compose on demand.
+The agent is now a first-class consumer of the entity and component platforms. Per-action hand-wired tools remain available but are no longer the only way to compose — the agent can operate against any entity in the catalog via generic address tools and MEL.
 
-### What exists
+### What shipped
 
-- Per-action tool registration from plugin actions
-- Persona system (`packages/shared/src/persona.ts`) with event subscriptions and tool scopes
-- Tier metadata on actions; checked at call time
-- Anthropic SDK integration for the chat path
-- Memory via SQLite
+5 sub-phases per `docs/agent-platform-plan.md`:
 
-### What's missing
+- **4a** — Generic address tools: `resolve_address`, `invoke_address`, `run_pipeline`, `list_entities`. Tier enforcement via `requireTier` before any side-effecting dispatch.
+- **4b** — MEL authoring tools: `save_entity`, `save_component`, `delete_artifact`. All at `advise` tier so agent-authored artifacts surface for human approval.
+- **4c** — Personas as entities: `personaRegistry` delegates to `entityRegistry`; `personas.natalie` is a real address. Backward compatible — existing `/api/personas/*` routes unchanged.
+- **4d** — Memory as an entity: `memory.conversations`, `memory.notes`, `memory.facts` queryable via MEL; `memory.append_note` callable. Runtime dispatch via sentinel action names in the address resolver.
+- **4e** — Proactive authoring infrastructure: proposals SQLite table + store + `propose_artifact` agent tool + HTTP routes (approve/reject/delete) + dashboard drawer for review. Approval reuses the same save path as manual creation.
 
-**Generic address-based tools.** `resolve_address(address)` and `invoke_address(address, args)` as first-class agent tools. The agent gains the ability to compose queries over any entity in the catalog without per-action tool registration.
+### What's deferred
 
-**MEL as agent authoring.** The agent can construct MEL expressions and submit them to `/api/eval`. This makes ad-hoc composition a primitive capability — "show me all lights that have been on for more than an hour" becomes a generated expression, not a bespoke action.
-
-**Persona event subscriptions as entities.** Personas are entities. Their subscriptions are an entity field. Wake-up triggers propagate through the same MQTT invalidation machinery used for cards.
-
-**Memory as an entity.** The agent's memory store exposes as a catalog entity — queryable, filterable, introspectable by the user.
-
-**Proactive action.** The agent authors derived entities to represent ongoing concerns (overdue packages, unusual network activity, printer alerts). These become cards on the dashboard automatically, with the agent proposing structural changes over time.
-
-### Sub-phases
-
-- 4a: Generic address tools (resolve_address, invoke_address, run_pipeline) — small, high-leverage
-- 4b: MEL-authoring tool for the agent (emit-and-evaluate)
-- 4c: Personas as entities
-- 4d: Memory as an entity
-- 4e: Proactive authoring
+**Autonomous reflection loop** — the 4e infrastructure lets the agent propose artifacts when asked. The autonomous version (agent periodically reflecting on memory + state, generating proposals for persistent concerns) is a research-quality problem: what triggers reflection, what qualifies as a concern, how to learn from approvals. The review surface ships first; the loop follows once the surface has been validated in practice.
 
 ---
 
