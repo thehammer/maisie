@@ -364,6 +364,8 @@ export const PRIMITIVES: Record<string, Primitive> = {
   identity: (a) => a,
   /** call(fn, argRecord) — invoke a MaisieFunction with a record of args. */
   call:     (fn, args) => (fn as MaisieFunction)(args as MaisieRecord),
+  /** empty-record() — returns a fresh empty record {}. Used as a base for record construction. */
+  'empty-record': () => ({} as MaisieRecord),
 }
 
 // ── evalExpr ─────────────────────────────────────────────────────────────────

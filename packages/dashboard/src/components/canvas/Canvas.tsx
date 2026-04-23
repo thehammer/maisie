@@ -250,6 +250,9 @@ export function Canvas() {
             placements={canvas.doc.placements}
             onDeletePlacement={() => { if (canvas.selectedId) canvas.removePlacement(canvas.selectedId) }}
             onDeleteWire={() => { if (canvas.selectedId) canvas.removeWire(canvas.selectedId) }}
+            onSetWireTransform={(transform) => {
+              if (canvas.selectedId) canvas.setWireTransform(canvas.selectedId, transform)
+            }}
           />
         </div>
         <div className={`canvas-preview-drawer${previewOpen ? '' : ' collapsed'}`}>
@@ -342,6 +345,7 @@ function CanvasSurface({
               status={validation.status}
               selected={canvas.selectedId === wire.id}
               message={validation.message}
+              transform={wire.transform}
               onClick={() => canvas.setSelectedId(wire.id)}
             />
           )

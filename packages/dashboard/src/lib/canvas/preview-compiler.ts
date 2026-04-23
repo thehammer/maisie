@@ -1,5 +1,8 @@
 import type { CanvasDocument } from './document'
-import type { MaisieValue, TypeExpr } from '@maisie/shared'
+import type { LinkExpr } from './link-expr'
+import { compileLinkExpr } from './link-expr'
+import type { MaisieValue, MaisieRecord, TypeExpr } from '@maisie/shared'
+import { evalExprAsync, type AddressResolver } from '@maisie/shared'
 
 export interface PreviewTarget {
   placementId: string
@@ -37,7 +40,17 @@ export async function compilePreview(
     if (wire) {
       const wired = await resolvePlacementInput(wire.source.placementId)
       if (wired !== undefined) {
-        input = wired
+        // Apply transform if present
+        let transformed = wired
+        if (wire.transform && wire.transform.kind !== 'identity') {
+          try {
+            transformed = await applyLinkTransform(wired, wire.transform)
+          } catch (e) {
+            error = `transform error: ${e instanceof Error ? e.message : String(e)}`
+            transformed = wired
+          }
+        }
+        input = transformed
         source = 'wired'
       } else {
         // Fall back to fixture
@@ -69,4 +82,48 @@ export async function compilePreview(
   }
 
   return targets
+}
+
+// ── Transform application ─────────────────────────────────────────────────────
+
+/**
+ * A minimal resolver for transform evaluation. Transforms only reference
+ * local bindings (__row), so the resolver should never be called. It throws
+ * if an address escapes, which would indicate a bug in compileLinkExpr.
+ */
+const TRANSFORM_RESOLVER: AddressResolver = {
+  resolve: (address) => Promise.reject(new Error(`unexpected address in transform: ${address}`)),
+  invoke: (address) => Promise.reject(new Error(`unexpected invoke in transform: ${address}`)),
+}
+
+/**
+ * Apply a LinkExpr to a value.
+ *
+ * If the value is a collection, maps the transform over each element.
+ * If the value is a record, applies the transform directly.
+ * If the value is a scalar or null, returns it unchanged.
+ */
+async function applyLinkTransform(value: MaisieValue, link: LinkExpr): Promise<MaisieValue> {
+  const lambdaExpr = compileLinkExpr(link)
+
+  // Evaluate the lambda expression to get the transform function
+  const fn = await evalExprAsync(lambdaExpr, TRANSFORM_RESOLVER) as (args: MaisieRecord) => MaisieValue | Promise<MaisieValue>
+
+  if (Array.isArray(value)) {
+    const results = await Promise.all(
+      value.map(async (row) => {
+        const result = fn(row as MaisieRecord)
+        return await Promise.resolve(result)
+      }),
+    )
+    return results as MaisieValue
+  }
+
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    const result = fn(value as MaisieRecord)
+    return await Promise.resolve(result)
+  }
+
+  // Scalars and null pass through unchanged
+  return value
 }

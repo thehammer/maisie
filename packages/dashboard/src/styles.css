@@ -5605,6 +5605,200 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
+/* ---- Wire transform pill ---- */
+
+.canvas-wire-transform-pill {
+  background: var(--surface);
+  border: 1px solid var(--accent, #818cf8);
+  color: var(--accent, #818cf8);
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ---- Transform editor ---- */
+
+.canvas-transform-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.canvas-transform-kind-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.canvas-transform-kind-picker label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.canvas-transform-kind-picker select {
+  flex: 1;
+  font-size: 0.75rem;
+  padding: 3px 6px;
+  background: var(--surface-2, #1e1e2e);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+}
+
+.canvas-transform-body {
+  background: var(--surface-2, #1e1e2e);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.canvas-transform-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.canvas-transform-field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.canvas-transform-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.canvas-transform-selected-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.canvas-transform-tag {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--accent-subtle, rgba(129, 140, 248, 0.15));
+  border: 1px solid var(--accent, #818cf8);
+  color: var(--accent, #818cf8);
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 0.7rem;
+}
+
+.canvas-transform-tag-remove {
+  background: none;
+  border: none;
+  color: var(--accent, #818cf8);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.canvas-transform-add-btn {
+  align-self: flex-start;
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.canvas-transform-add-btn:hover {
+  border-color: var(--accent, #818cf8);
+  color: var(--accent, #818cf8);
+}
+
+.canvas-transform-mappings,
+.canvas-transform-assignments {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.canvas-transform-mapping-row,
+.canvas-transform-assignment-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.canvas-transform-mapping-row input,
+.canvas-transform-mapping-row select,
+.canvas-transform-assignment-row input,
+.canvas-transform-assignment-row select {
+  font-size: 0.72rem;
+  padding: 2px 4px;
+  background: var(--surface, #13131f);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  min-width: 0;
+  flex: 1;
+}
+
+.canvas-transform-arrow,
+.canvas-transform-equals {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.canvas-transform-remove-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.canvas-transform-remove-btn:hover {
+  color: var(--status-err, #f87171);
+}
+
+.canvas-transform-chain {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.canvas-transform-chain-step {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px;
+}
+
+.canvas-transform-chain-step-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.canvas-transform-chain-step-num {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
 /* ---- Wire inspector status ---- */
 
 .canvas-inspector-wire-status {

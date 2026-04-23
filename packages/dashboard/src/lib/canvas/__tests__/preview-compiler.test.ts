@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'bun:test'
 import { compilePreview } from '../preview-compiler'
 import { emptyDocument, addPlacement, addWire } from '../document'
-import type { TypeExpr, MaisieValue } from '@maisie/shared'
+import { setWireTransform } from '../document'
+import type { TypeExpr, MaisieValue, MaisieRecord } from '@maisie/shared'
 
 // Build a minimal canvas document for testing
 function makeDoc() {
@@ -169,5 +170,163 @@ describe('compilePreview', () => {
     expect(typeof alphaTarget.input).toBe('string')
     expect(betaTarget.componentName).toBe('Beta')
     expect(typeof betaTarget.input).toBe('number')
+  })
+})
+
+// ── Transform-on-wire integration ─────────────────────────────────────────────
+
+describe('compilePreview — transform on wire', () => {
+  it('applies a rename transform to a wired record', async () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'source', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'Target', position: { x: 200, y: 0 } })
+    const [entity, component] = doc.placements
+
+    doc = addWire(doc, {
+      source: { placementId: entity.id },
+      target: { placementId: component.id },
+    })
+    const [wire] = doc.wires
+    doc = setWireTransform(doc, wire.id, {
+      kind: 'rename',
+      mappings: [{ from: 'thumbUrl', to: 'coverUrl' }],
+      keepRest: true,
+    })
+
+    const liveData: MaisieValue = { title: 'Test Movie', thumbUrl: 'https://example.com/img.jpg', rating: 9 }
+
+    const targets = await compilePreview(
+      doc,
+      async (placementId) => placementId === entity.id ? liveData : undefined,
+      () => undefined,
+    )
+
+    expect(targets).toHaveLength(1)
+    const target = targets[0]
+    expect(target.source).toBe('wired')
+    const result = target.input as MaisieRecord
+    expect(result.coverUrl).toBe('https://example.com/img.jpg')
+    expect(result.title).toBe('Test Movie')
+    expect(result.rating).toBe(9)
+    expect(result.thumbUrl).toBe('https://example.com/img.jpg')  // keepRest: true keeps original too
+  })
+
+  it('applies a pick transform to a wired collection', async () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'source', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'Target', position: { x: 200, y: 0 } })
+    const [entity, component] = doc.placements
+
+    doc = addWire(doc, {
+      source: { placementId: entity.id },
+      target: { placementId: component.id },
+    })
+    const [wire] = doc.wires
+    doc = setWireTransform(doc, wire.id, {
+      kind: 'pick',
+      fields: ['title'],
+    })
+
+    const liveData: MaisieValue = [
+      { title: 'The Matrix', thumbUrl: 'https://example.com/1.jpg', rating: 8.7 },
+      { title: 'Inception', thumbUrl: 'https://example.com/2.jpg', rating: 9.1 },
+    ]
+
+    const targets = await compilePreview(
+      doc,
+      async (placementId) => placementId === entity.id ? liveData : undefined,
+      () => undefined,
+    )
+
+    expect(targets).toHaveLength(1)
+    const result = targets[0].input as MaisieRecord[]
+    expect(Array.isArray(result)).toBe(true)
+    expect(result).toHaveLength(2)
+    expect(result[0]).toEqual({ title: 'The Matrix' })
+    expect(result[1]).toEqual({ title: 'Inception' })
+  })
+
+  it('applies a compute transform to add literal fields', async () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'source', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'Target', position: { x: 200, y: 0 } })
+    const [entity, component] = doc.placements
+
+    doc = addWire(doc, {
+      source: { placementId: entity.id },
+      target: { placementId: component.id },
+    })
+    const [wire] = doc.wires
+    doc = setWireTransform(doc, wire.id, {
+      kind: 'compute',
+      assignments: [{ name: 'rating', value: 'unrated' }],
+      keepRest: true,
+    })
+
+    const liveData: MaisieValue = { title: 'The Matrix', thumbUrl: 'https://example.com/img.jpg' }
+
+    const targets = await compilePreview(
+      doc,
+      async (placementId) => placementId === entity.id ? liveData : undefined,
+      () => undefined,
+    )
+
+    expect(targets).toHaveLength(1)
+    const result = targets[0].input as MaisieRecord
+    expect(result.title).toBe('The Matrix')
+    expect(result.rating).toBe('unrated')
+  })
+
+  it('identity transform passes data through unchanged', async () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'source', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'Target', position: { x: 200, y: 0 } })
+    const [entity, component] = doc.placements
+
+    doc = addWire(doc, {
+      source: { placementId: entity.id },
+      target: { placementId: component.id },
+    })
+    const [wire] = doc.wires
+    doc = setWireTransform(doc, wire.id, { kind: 'identity' })
+
+    const liveData: MaisieValue = { title: 'Test', value: 42 }
+
+    const targets = await compilePreview(
+      doc,
+      async (placementId) => placementId === entity.id ? liveData : undefined,
+      () => undefined,
+    )
+
+    expect(targets).toHaveLength(1)
+    expect(targets[0].input).toEqual(liveData)
+  })
+
+  it('scalar values pass through a transform unchanged', async () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'source', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'Target', position: { x: 200, y: 0 } })
+    const [entity, component] = doc.placements
+
+    doc = addWire(doc, {
+      source: { placementId: entity.id },
+      target: { placementId: component.id },
+    })
+    const [wire] = doc.wires
+    doc = setWireTransform(doc, wire.id, {
+      kind: 'pick',
+      fields: ['name'],
+    })
+
+    const liveData: MaisieValue = 'just a string'
+
+    const targets = await compilePreview(
+      doc,
+      async (placementId) => placementId === entity.id ? liveData : undefined,
+      () => undefined,
+    )
+
+    // Scalars pass through unchanged
+    expect(targets[0].input).toBe('just a string')
   })
 })

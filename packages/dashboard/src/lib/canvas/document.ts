@@ -5,6 +5,8 @@
  * the document shape and pure helpers for manipulating it.
  */
 
+import type { LinkExpr } from './link-expr'
+
 export interface CanvasDocument {
   version: 1
   placements: Placement[]
@@ -23,8 +25,11 @@ export interface Wire {
   id: string
   source: { placementId: string; field?: string }
   target: { placementId: string; slot?: string }
-  // transform?: LinkExpr — reserved for Phase 3d
+  /** Optional transform applied to the source value before it reaches the target. */
+  transform?: LinkExpr
 }
+
+export type { LinkExpr } from './link-expr'
 
 export function emptyDocument(): CanvasDocument {
   return { version: 1, placements: [], wires: [] }
@@ -90,6 +95,32 @@ export function hasWire(
       w.target.placementId === target.placementId &&
       w.target.slot === target.slot,
   )
+}
+
+/**
+ * Set (or clear) the transform on a wire. Returns a new document.
+ */
+export function setWireTransform(
+  doc: CanvasDocument,
+  wireId: string,
+  transform: LinkExpr | undefined,
+): CanvasDocument {
+  return {
+    ...doc,
+    wires: doc.wires.map((w) =>
+      w.id === wireId ? { ...w, transform } : w,
+    ),
+  }
+}
+
+/**
+ * Get the transform for a wire, or undefined if none is set.
+ */
+export function getWireTransform(
+  doc: CanvasDocument,
+  wireId: string,
+): LinkExpr | undefined {
+  return doc.wires.find((w) => w.id === wireId)?.transform
 }
 
 function generateId(prefix: string): string {

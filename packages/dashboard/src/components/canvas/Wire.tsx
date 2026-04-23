@@ -1,4 +1,5 @@
 import type { WireStatus } from '../../lib/canvas/wire-validator'
+import type { LinkExpr } from '../../lib/canvas/link-expr'
 
 interface WireProps {
   from: { x: number; y: number }
@@ -7,6 +8,7 @@ interface WireProps {
   selected?: boolean
   onClick?: () => void
   message?: string
+  transform?: LinkExpr
 }
 
 const STATUS_COLOR: Record<WireStatus, string> = {
@@ -16,7 +18,7 @@ const STATUS_COLOR: Record<WireStatus, string> = {
   unknown: 'var(--text-muted, #888)',
 }
 
-export function Wire({ from, to, status, selected, onClick, message }: WireProps) {
+export function Wire({ from, to, status, selected, onClick, message, transform }: WireProps) {
   // Cubic bezier — handles offset horizontally by half the distance
   const dx = Math.abs(to.x - from.x) * 0.5
   const path = `M ${from.x} ${from.y} C ${from.x + dx} ${from.y}, ${to.x - dx} ${to.y}, ${to.x} ${to.y}`
@@ -25,6 +27,10 @@ export function Wire({ from, to, status, selected, onClick, message }: WireProps
     e.stopPropagation()
     onClick?.()
   }
+
+  const midX = (from.x + to.x) / 2
+  const midY = (from.y + to.y) / 2
+  const hasTransform = transform && transform.kind !== 'identity'
 
   return (
     <g className={`canvas-wire ${selected ? 'selected' : ''}`} onClick={handleClick}>
@@ -37,6 +43,19 @@ export function Wire({ from, to, status, selected, onClick, message }: WireProps
           height={60}
         >
           <div className="canvas-wire-tooltip">{message}</div>
+        </foreignObject>
+      )}
+      {hasTransform && !selected && (
+        <foreignObject
+          x={midX - 28}
+          y={midY - 11}
+          width={56}
+          height={22}
+          style={{ pointerEvents: 'none' }}
+        >
+          <div className="canvas-wire-transform-pill">
+            {transform.kind}
+          </div>
         </foreignObject>
       )}
       {/* invisible thicker hit target for easier clicking */}

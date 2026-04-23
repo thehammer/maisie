@@ -1,7 +1,9 @@
 import { useApi } from '../../hooks/useApi'
 import type { Placement, Wire } from '../../lib/canvas/document'
+import type { LinkExpr } from '../../lib/canvas/link-expr'
 import { validateWire, type WireStatus } from '../../lib/canvas/wire-validator'
 import type { PlacementPorts } from '../../lib/canvas/type-resolver'
+import { TransformEditor } from './TransformEditor'
 
 interface InspectorProps {
   placement: Placement | null
@@ -10,6 +12,7 @@ interface InspectorProps {
   placementPorts: Map<string, PlacementPorts>
   onDeletePlacement: () => void
   onDeleteWire: () => void
+  onSetWireTransform: (transform: LinkExpr | undefined) => void
 }
 
 export function Inspector({
@@ -19,6 +22,7 @@ export function Inspector({
   placementPorts,
   onDeletePlacement,
   onDeleteWire,
+  onSetWireTransform,
 }: InspectorProps) {
   if (!placement && !wire) {
     return (
@@ -35,6 +39,7 @@ export function Inspector({
         placements={placements}
         placementPorts={placementPorts}
         onDelete={onDeleteWire}
+        onSetTransform={onSetWireTransform}
       />
     )
   }
@@ -64,14 +69,22 @@ interface WireInspectorProps {
   placements: Placement[]
   placementPorts: Map<string, PlacementPorts>
   onDelete: () => void
+  onSetTransform: (transform: LinkExpr | undefined) => void
 }
 
-function WireInspector({ wire, placements, placementPorts, onDelete }: WireInspectorProps) {
+function WireInspector({ wire, placements, placementPorts, onDelete, onSetTransform }: WireInspectorProps) {
   const sourcePlacement = placements.find((p) => p.id === wire.source.placementId)
   const targetPlacement = placements.find((p) => p.id === wire.target.placementId)
   const srcPorts = placementPorts.get(wire.source.placementId)
   const tgtPorts = placementPorts.get(wire.target.placementId)
   const validation = validateWire(srcPorts?.output, tgtPorts?.input)
+
+  // Extract source field names for the transform editor
+  const sourceFields = srcPorts?.output?.kind === 'record'
+    ? Object.keys(srcPorts.output.fields)
+    : srcPorts?.output?.kind === 'collection' && srcPorts.output.element.kind === 'record'
+      ? Object.keys(srcPorts.output.element.fields)
+      : undefined
 
   return (
     <aside className="canvas-inspector">
@@ -107,6 +120,13 @@ function WireInspector({ wire, placements, placementPorts, onDelete }: WireInspe
         {validation.message && (
           <div className="canvas-inspector-error">{validation.message}</div>
         )}
+
+        <div className="canvas-inspector-section-title">Transform</div>
+        <TransformEditor
+          value={wire.transform}
+          onChange={onSetTransform}
+          sourceFields={sourceFields}
+        />
       </div>
       <div className="canvas-inspector-actions">
         <button onClick={onDelete} className="edit-layout-btn cancel">Delete Wire</button>

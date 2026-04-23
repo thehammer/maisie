@@ -9,6 +9,8 @@ import {
   removeWire,
   getWire,
   hasWire,
+  setWireTransform,
+  getWireTransform,
   type CanvasDocument,
 } from '../document'
 
@@ -260,5 +262,84 @@ describe('hasWire', () => {
     expect(hasWire(doc, { placementId: src.id, field: 'other' }, { placementId: tgt.id, slot: 'input' })).toBe(false)
     // Exact match — should be true
     expect(hasWire(doc, { placementId: src.id, field: 'items' }, { placementId: tgt.id, slot: 'input' })).toBe(true)
+  })
+})
+
+// ── setWireTransform / getWireTransform ───────────────────────────────────────
+
+describe('setWireTransform', () => {
+  function makeDocWithWire() {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 100, y: 0 } })
+    const [src, tgt] = doc.placements
+    doc = addWire(doc, { source: { placementId: src.id }, target: { placementId: tgt.id } })
+    return { doc, wire: doc.wires[0] }
+  }
+
+  it('sets a transform on a wire', () => {
+    const { doc, wire } = makeDocWithWire()
+    const next = setWireTransform(doc, wire.id, { kind: 'pick', fields: ['title'] })
+    const updated = next.wires.find((w) => w.id === wire.id)!
+    expect(updated.transform).toEqual({ kind: 'pick', fields: ['title'] })
+  })
+
+  it('clears a transform when undefined is passed', () => {
+    const { doc, wire } = makeDocWithWire()
+    let next = setWireTransform(doc, wire.id, { kind: 'pick', fields: ['title'] })
+    next = setWireTransform(next, wire.id, undefined)
+    const updated = next.wires.find((w) => w.id === wire.id)!
+    expect(updated.transform).toBeUndefined()
+  })
+
+  it('does not mutate the original document', () => {
+    const { doc, wire } = makeDocWithWire()
+    setWireTransform(doc, wire.id, { kind: 'pick', fields: ['title'] })
+    expect(doc.wires[0].transform).toBeUndefined()
+  })
+
+  it('is a no-op for an unknown wire id', () => {
+    const { doc } = makeDocWithWire()
+    const next = setWireTransform(doc, 'nonexistent', { kind: 'pick', fields: ['x'] })
+    expect(next.wires[0].transform).toBeUndefined()
+  })
+
+  it('does not affect other wires', () => {
+    let { doc } = makeDocWithWire()
+    const [src, tgt] = doc.placements
+    doc = addWire(doc, { source: { placementId: src.id, field: 'extra' }, target: { placementId: tgt.id } })
+    const [w1, w2] = doc.wires
+    const next = setWireTransform(doc, w1.id, { kind: 'rename', mappings: [{ from: 'a', to: 'b' }] })
+    expect(next.wires.find((w) => w.id === w2.id)!.transform).toBeUndefined()
+  })
+})
+
+describe('getWireTransform', () => {
+  it('returns the transform on a wire', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 100, y: 0 } })
+    const [src, tgt] = doc.placements
+    doc = addWire(doc, { source: { placementId: src.id }, target: { placementId: tgt.id } })
+    const [wire] = doc.wires
+    doc = setWireTransform(doc, wire.id, { kind: 'compute', assignments: [{ name: 'x', value: 1 }] })
+    expect(getWireTransform(doc, wire.id)).toEqual({
+      kind: 'compute',
+      assignments: [{ name: 'x', value: 1 }],
+    })
+  })
+
+  it('returns undefined when no transform is set', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'tgt', position: { x: 100, y: 0 } })
+    const [src, tgt] = doc.placements
+    doc = addWire(doc, { source: { placementId: src.id }, target: { placementId: tgt.id } })
+    const [wire] = doc.wires
+    expect(getWireTransform(doc, wire.id)).toBeUndefined()
+  })
+
+  it('returns undefined for an unknown wire id', () => {
+    expect(getWireTransform(emptyDocument(), 'missing')).toBeUndefined()
   })
 })

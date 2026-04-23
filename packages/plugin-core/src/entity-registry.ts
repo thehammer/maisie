@@ -208,6 +208,7 @@ const KNOWN_PRIMITIVES = new Set([
   'and', 'or', 'not',
   'concat', 'len', 'str',
   'if', 'identity', 'call',
+  'empty-record',
 ])
 
 /**
