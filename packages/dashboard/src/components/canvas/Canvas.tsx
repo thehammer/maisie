@@ -8,7 +8,7 @@ import { Preview } from './Preview'
 import { useCanvasDocument } from '../../hooks/useCanvasDocument'
 import { hasWire } from '../../lib/canvas/document'
 import { validateWire, type WireStatus } from '../../lib/canvas/wire-validator'
-import { resolveEntityPorts, resolveComponentPorts, type PlacementPorts } from '../../lib/canvas/type-resolver'
+import { resolveEntityPorts, resolveComponentPorts, resolveFunctionPorts, type PlacementPorts } from '../../lib/canvas/type-resolver'
 import { canEmitComponent, canEmitEntity, emitComponent, emitEntity } from '../../lib/canvas/emit'
 import { resolveComponent, refreshComponents } from '../../lib/components/resolver'
 import { refreshCompletionCatalog } from '../../lib/editor/mel-completion'
@@ -103,10 +103,14 @@ export function Canvas() {
     if (toFetch.length === 0) return
 
     const fetches = toFetch.map(async (p) => {
-      const ports =
-        p.kind === 'entity'
-          ? await resolveEntityPorts(p.targetName)
-          : await resolveComponentPorts(p.targetName)
+      let ports: PlacementPorts | null
+      if (p.kind === 'entity') {
+        ports = await resolveEntityPorts(p.targetName)
+      } else if (p.kind === 'function') {
+        ports = resolveFunctionPorts(p.targetName)
+      } else {
+        ports = await resolveComponentPorts(p.targetName)
+      }
       if (ports) portsCache.current.set(p.id, ports)
     })
 
@@ -179,7 +183,7 @@ export function Canvas() {
     const { active, over, delta } = event
     const data = active.data.current as {
       source?: string
-      kind?: 'entity' | 'component'
+      kind?: 'entity' | 'component' | 'function'
       targetName?: string
       placementId?: string
       role?: string
@@ -321,6 +325,9 @@ export function Canvas() {
             onDeleteWire={() => { if (canvas.selectedId) canvas.removeWire(canvas.selectedId) }}
             onSetWireTransform={(transform) => {
               if (canvas.selectedId) canvas.setWireTransform(canvas.selectedId, transform)
+            }}
+            onUpdatePlacementConfig={(config) => {
+              if (canvas.selectedId) canvas.updatePlacementConfig(canvas.selectedId, config)
             }}
           />
         </div>

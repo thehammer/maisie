@@ -411,18 +411,47 @@ The first round of canvas work proved the model but revealed a gap: most plugin 
 
 **Scope:** 1 session (estimated 2–3).
 
-### 3h — Function placements on canvas
+### 3h — Function placements on canvas ✓ COMPLETE 2026-04-13
 
 **Goal:** Functions are first-class canvas items, alongside entities and components. Wires connecting `entity → function → component` become a valid and visible composition.
 
 **What ships:**
-- `FunctionDef`-derived descriptors for each standard library function (filter, sort, limit, map, pluck, group, count, sum, any, all) — with explicit input type, output type, and parameter declarations
+- `FunctionDescriptor` type + `STD_FUNCTION_DESCRIPTORS` array in `@maisie/shared` — one entry per std lib op with explicit input TypeExpr, output TypeExpr, and inline parameter declarations
 - `Placement.kind` gains `'function'`; canvas supports three placement kinds
 - Function placements have input port (left), output port (right), and a parameter panel in the inspector
-- Wires validate at each hop via `satisfies`
-- User-authored lambdas (saved via a future `save_function` tool) slot in here too; built-ins first
+- `resolveFunctionPorts(id)` — synchronous port resolution from static registry data
+- `updatePlacementConfig(doc, id, config)` — helper to merge inline param values onto any placement
+- Palette "Functions" section with all 13 std lib functions, visually distinguished with `canvas-palette-item-function` class
+- Inspector `FunctionInspector` component: description, per-param input controls (string/number/textarea for lambdas), port summary
+- Preview compiler: `resolveValueForPlacement` recursively follows function placements as transform nodes in the chain; each hop calls `applyFunctionPlacement` via `evalExprAsync`
+- Emit: `buildSourceExpression` handles function kind — builds an `ApplyNode(fnId, upstream, ...inlineParams)` from `placement.config`
 
-**Scope:** 3 sessions.
+**Files changed:**
+- `packages/shared/src/function-registry-data.ts` — FunctionDescriptor types + STD_FUNCTION_DESCRIPTORS (new)
+- `packages/shared/src/index.ts` — exports function-registry-data
+- `packages/dashboard/src/lib/canvas/document.ts` — Placement.kind extended; updatePlacementConfig added
+- `packages/dashboard/src/lib/canvas/type-resolver.ts` — resolveFunctionPorts added
+- `packages/dashboard/src/lib/canvas/preview-compiler.ts` — function chain traversal via resolveValueForPlacement + applyFunctionPlacement
+- `packages/dashboard/src/lib/canvas/emit.ts` — buildSourceExpression handles function kind
+- `packages/dashboard/src/hooks/useCanvasDocument.ts` — updatePlacementConfig wired in
+- `packages/dashboard/src/components/canvas/Palette.tsx` — Functions section added
+- `packages/dashboard/src/components/canvas/Placement.tsx` — function kind renders with both ports
+- `packages/dashboard/src/components/canvas/Canvas.tsx` — resolveFunctionPorts in type resolution; function kind in drag handler
+- `packages/dashboard/src/components/canvas/Inspector.tsx` — FunctionInspector added
+
+**Tests added:**
+- `packages/shared/src/__tests__/function-registry-data.test.ts` — 24 tests (completeness, shape, types, params, getFunctionDescriptor)
+- `packages/dashboard/src/lib/canvas/__tests__/document.test.ts` — function placement tests + updatePlacementConfig tests
+- `packages/dashboard/src/lib/canvas/__tests__/type-resolver.test.ts` — resolveFunctionPorts tests
+- `packages/dashboard/src/lib/canvas/__tests__/preview-compiler.test.ts` — function chain tests (entity→limit→component, double-hop, no-upstream fallback)
+- `packages/dashboard/src/lib/canvas/__tests__/emit.test.ts` — entity→function→component emit tests
+
+**Deviations / notes:**
+- Lambda params in config are stored as raw strings; the preview-compiler passes them as string literals to the evaluator rather than parsing them as MEL expressions. Full lambda evaluation from the inspector textarea is deferred to a future iteration (parser integration is non-trivial and out of scope for 3h).
+- `canEmitComponent`/`canEmitEntity` work unchanged — function placements always have outgoing wires so they're never the root.
+- 1363 tests pass, typecheck clean, dashboard builds.
+
+**Scope:** 1 session (estimated 3).
 
 ### 3i — Split palette with compatibility highlighting
 

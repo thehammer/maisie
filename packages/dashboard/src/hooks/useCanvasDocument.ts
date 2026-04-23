@@ -11,6 +11,7 @@ import {
   addWire,
   removeWire,
   setWireTransform,
+  updatePlacementConfig,
 } from '../lib/canvas/document'
 
 export interface UseCanvasDocument {
@@ -18,6 +19,7 @@ export interface UseCanvasDocument {
   addPlacement: (placement: Omit<Placement, 'id'>) => void
   removePlacement: (id: string) => void
   movePlacement: (id: string, position: { x: number; y: number }) => void
+  updatePlacementConfig: (id: string, config: Record<string, unknown>) => void
   addWire: (wire: Omit<Wire, 'id'>) => void
   removeWire: (id: string) => void
   setWireTransform: (wireId: string, transform: LinkExpr | undefined) => void
@@ -37,6 +39,10 @@ export function useCanvasDocument(): UseCanvasDocument {
       setSelectedId((curr) => (curr === id ? null : curr))
     }, []),
     movePlacement: useCallback((id, pos) => setDoc((d) => movePlacement(d, id, pos)), []),
+    updatePlacementConfig: useCallback(
+      (id, config) => setDoc((d) => updatePlacementConfig(d, id, config)),
+      [],
+    ),
     addWire: useCallback((wire) => setDoc((d) => addWire(d, wire)), []),
     removeWire: useCallback((id) => {
       setDoc((d) => removeWire(d, id))

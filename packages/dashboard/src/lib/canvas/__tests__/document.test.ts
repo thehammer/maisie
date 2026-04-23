@@ -11,6 +11,7 @@ import {
   hasWire,
   setWireTransform,
   getWireTransform,
+  updatePlacementConfig,
   type CanvasDocument,
 } from '../document'
 
@@ -341,5 +342,112 @@ describe('getWireTransform', () => {
 
   it('returns undefined for an unknown wire id', () => {
     expect(getWireTransform(emptyDocument(), 'missing')).toBeUndefined()
+  })
+})
+
+// ── Function placement tests ──────────────────────────────────────────────────
+
+describe('function placements', () => {
+  it('addPlacement accepts kind=function', () => {
+    const doc = emptyDocument()
+    const next = addPlacement(doc, {
+      kind: 'function',
+      targetName: 'std.filter',
+      position: { x: 50, y: 50 },
+    })
+    expect(next.placements).toHaveLength(1)
+    const p = next.placements[0]
+    expect(p.kind).toBe('function')
+    expect(p.targetName).toBe('std.filter')
+  })
+
+  it('function placements coexist with entity and component placements', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'plex.movies', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'function', targetName: 'std.filter', position: { x: 150, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'Strip', position: { x: 300, y: 0 } })
+    expect(doc.placements).toHaveLength(3)
+    expect(doc.placements.map((p) => p.kind)).toEqual(['entity', 'function', 'component'])
+  })
+
+  it('removePlacement removes a function placement and its wires', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'source', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'function', targetName: 'std.limit', position: { x: 150, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'Strip', position: { x: 300, y: 0 } })
+    const [src, fn, tgt] = doc.placements
+
+    doc = addWire(doc, { source: { placementId: src.id }, target: { placementId: fn.id } })
+    doc = addWire(doc, { source: { placementId: fn.id }, target: { placementId: tgt.id } })
+
+    const afterRemove = removePlacement(doc, fn.id)
+    expect(afterRemove.placements).toHaveLength(2)
+    // Both wires should be gone since they both reference the removed function
+    expect(afterRemove.wires).toHaveLength(0)
+  })
+})
+
+// ── updatePlacementConfig ─────────────────────────────────────────────────────
+
+describe('updatePlacementConfig', () => {
+  it('merges config values onto a placement', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, {
+      kind: 'function',
+      targetName: 'std.limit',
+      position: { x: 0, y: 0 },
+    })
+    const [p] = doc.placements
+    const next = updatePlacementConfig(doc, p.id, { n: 5 })
+    expect(next.placements[0].config).toEqual({ n: 5 })
+  })
+
+  it('merges with existing config values (does not replace)', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, {
+      kind: 'function',
+      targetName: 'std.sort',
+      position: { x: 0, y: 0 },
+      config: { field: 'title' },
+    })
+    const [p] = doc.placements
+    const next = updatePlacementConfig(doc, p.id, { direction: 'desc' })
+    expect(next.placements[0].config).toEqual({ field: 'title', direction: 'desc' })
+  })
+
+  it('later values override earlier ones for the same key', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, {
+      kind: 'function',
+      targetName: 'std.limit',
+      position: { x: 0, y: 0 },
+      config: { n: 10 },
+    })
+    const [p] = doc.placements
+    const next = updatePlacementConfig(doc, p.id, { n: 20 })
+    expect(next.placements[0].config?.n).toBe(20)
+  })
+
+  it('does not mutate the original document', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'function', targetName: 'std.limit', position: { x: 0, y: 0 } })
+    const [p] = doc.placements
+    updatePlacementConfig(doc, p.id, { n: 99 })
+    expect(doc.placements[0].config).toBeUndefined()
+  })
+
+  it('is a no-op for an unknown id', () => {
+    const doc = emptyDocument()
+    const next = updatePlacementConfig(doc, 'nonexistent', { x: 1 })
+    expect(next.placements).toHaveLength(0)
+  })
+
+  it('does not affect other placements', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'function', targetName: 'std.limit', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'function', targetName: 'std.sort', position: { x: 150, y: 0 } })
+    const [p1, p2] = doc.placements
+    const next = updatePlacementConfig(doc, p1.id, { n: 5 })
+    expect(next.placements.find((p) => p.id === p2.id)!.config).toBeUndefined()
   })
 })

@@ -4,6 +4,7 @@ import type { LinkExpr } from '../../lib/canvas/link-expr'
 import { validateWire, type WireStatus } from '../../lib/canvas/wire-validator'
 import type { PlacementPorts } from '../../lib/canvas/type-resolver'
 import { TransformEditor } from './TransformEditor'
+import { getFunctionDescriptor } from '@maisie/shared'
 
 interface InspectorProps {
   placement: Placement | null
@@ -13,6 +14,7 @@ interface InspectorProps {
   onDeletePlacement: () => void
   onDeleteWire: () => void
   onSetWireTransform: (transform: LinkExpr | undefined) => void
+  onUpdatePlacementConfig: (config: Record<string, unknown>) => void
 }
 
 export function Inspector({
@@ -23,6 +25,7 @@ export function Inspector({
   onDeletePlacement,
   onDeleteWire,
   onSetWireTransform,
+  onUpdatePlacementConfig,
 }: InspectorProps) {
   if (!placement && !wire) {
     return (
@@ -54,6 +57,11 @@ export function Inspector({
       </div>
       {placement.kind === 'entity' ? (
         <EntityInspector name={placement.targetName} />
+      ) : placement.kind === 'function' ? (
+        <FunctionInspector
+          placement={placement}
+          onUpdateConfig={onUpdatePlacementConfig}
+        />
       ) : (
         <ComponentInspector name={placement.targetName} />
       )}
@@ -132,6 +140,89 @@ function WireInspector({ wire, placements, placementPorts, onDelete, onSetTransf
         <button onClick={onDelete} className="edit-layout-btn cancel">Delete Wire</button>
       </div>
     </aside>
+  )
+}
+
+interface FunctionInspectorProps {
+  placement: Placement
+  onUpdateConfig: (config: Record<string, unknown>) => void
+}
+
+function FunctionInspector({ placement, onUpdateConfig }: FunctionInspectorProps) {
+  const descriptor = getFunctionDescriptor(placement.targetName)
+  if (!descriptor) {
+    return (
+      <div className="canvas-inspector-body">
+        <div className="canvas-inspector-error">Unknown function: {placement.targetName}</div>
+      </div>
+    )
+  }
+
+  const config = placement.config ?? {}
+  const inlineParams = descriptor.params?.filter((p) => p.inline) ?? []
+
+  return (
+    <div className="canvas-inspector-body">
+      {descriptor.description && (
+        <div className="canvas-inspector-description">{descriptor.description}</div>
+      )}
+
+      {inlineParams.length > 0 && (
+        <>
+          <div className="canvas-inspector-section-title">Parameters</div>
+          {inlineParams.map((param) => {
+            const currentValue = config[param.name] ?? param.default ?? ''
+            const isLambda = param.type.kind === 'function'
+            const isNumber = param.type.kind === 'scalar' && param.type.type === 'number'
+
+            return (
+              <div key={param.name} className="canvas-inspector-field canvas-inspector-param">
+                <label className="canvas-inspector-param-label">
+                  <span className="canvas-inspector-field-name">{param.name}</span>
+                  {param.description && (
+                    <span className="canvas-inspector-param-hint">{param.description}</span>
+                  )}
+                  {isLambda ? (
+                    <textarea
+                      className="canvas-inspector-param-textarea"
+                      rows={3}
+                      value={String(currentValue)}
+                      placeholder={`e.g. (x) => x.active`}
+                      onChange={(e) => onUpdateConfig({ [param.name]: e.target.value })}
+                    />
+                  ) : isNumber ? (
+                    <input
+                      className="canvas-inspector-param-input"
+                      type="number"
+                      value={Number(currentValue)}
+                      onChange={(e) => onUpdateConfig({ [param.name]: Number(e.target.value) })}
+                    />
+                  ) : (
+                    <input
+                      className="canvas-inspector-param-input"
+                      type="text"
+                      value={String(currentValue)}
+                      placeholder={param.default !== undefined ? String(param.default) : ''}
+                      onChange={(e) => onUpdateConfig({ [param.name]: e.target.value })}
+                    />
+                  )}
+                </label>
+              </div>
+            )
+          })}
+        </>
+      )}
+
+      <div className="canvas-inspector-section-title">Ports</div>
+      <div className="canvas-inspector-field">
+        <span className="canvas-inspector-field-name">in</span>
+        <span className="canvas-inspector-field-type">{descriptor.input.kind}</span>
+      </div>
+      <div className="canvas-inspector-field">
+        <span className="canvas-inspector-field-name">out</span>
+        <span className="canvas-inspector-field-type">{descriptor.output.kind}</span>
+      </div>
+    </div>
   )
 }
 

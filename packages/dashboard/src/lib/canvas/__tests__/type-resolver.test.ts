@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test'
-import { resolveEntityPorts, resolveComponentPorts } from '../type-resolver'
+import { resolveEntityPorts, resolveComponentPorts, resolveFunctionPorts } from '../type-resolver'
 import type { EntityDef, ComponentDef } from '@maisie/shared'
 
 // ── Mock fetch ─────────────────────────────────────────────────────────────────
@@ -163,5 +163,53 @@ describe('resolveComponentPorts', () => {
     const ports = await resolveComponentPorts('NonExistent')
     globalThis.fetch = originalFetch
     expect(ports).toBeNull()
+  })
+})
+
+// ── Function port resolution ───────────────────────────────────────────────────
+
+describe('resolveFunctionPorts', () => {
+  it('returns both input and output for a known function id', () => {
+    const ports = resolveFunctionPorts('std.filter')
+    expect(ports).not.toBeNull()
+    expect(ports!.input).toBeDefined()
+    expect(ports!.output).toBeDefined()
+    expect(ports!.input!.kind).toBe('collection')
+    expect(ports!.output!.kind).toBe('collection')
+  })
+
+  it('std.count has collection input and scalar number output', () => {
+    const ports = resolveFunctionPorts('std.count')
+    expect(ports!.input!.kind).toBe('collection')
+    expect(ports!.output!.kind).toBe('scalar')
+    const out = ports!.output as { kind: 'scalar'; type: string }
+    expect(out.type).toBe('number')
+  })
+
+  it('std.any has collection input and scalar boolean output', () => {
+    const ports = resolveFunctionPorts('std.any')
+    const out = ports!.output as { kind: 'scalar'; type: string }
+    expect(out.type).toBe('boolean')
+  })
+
+  it('std.first has any output', () => {
+    const ports = resolveFunctionPorts('std.first')
+    expect(ports!.output!.kind).toBe('any')
+  })
+
+  it('returns null for an unknown function id', () => {
+    expect(resolveFunctionPorts('std.unknown')).toBeNull()
+    expect(resolveFunctionPorts('not.a.function')).toBeNull()
+  })
+
+  it('is synchronous (no async needed)', () => {
+    // resolveFunctionPorts is sync; this test documents that
+    const result = resolveFunctionPorts('std.limit')
+    expect(result).not.toBeNull()
+  })
+
+  it('has no props field (functions only have input and output ports)', () => {
+    const ports = resolveFunctionPorts('std.sort')
+    expect(ports!.props).toBeUndefined()
   })
 })

@@ -7,7 +7,8 @@
 
 import type { CanvasDocument, Placement, Wire } from './document'
 import type { ComponentDef, EntityDef, DataFieldDef } from '@maisie/shared'
-import type { ExprNode, ComponentCallNode, LayoutCallNode } from '@maisie/shared'
+import type { ExprNode, ComponentCallNode, LayoutCallNode, MaisieScalar } from '@maisie/shared'
+import { STD_LIB } from '@maisie/shared'
 import { compileLinkExpr } from './link-expr'
 
 // ── Public interface ──────────────────────────────────────────────────────────
@@ -225,6 +226,7 @@ function buildRenderTree(
  * placement's wire.
  *
  *   - Entity placements → a RefNode to `{entityName}.result`
+ *   - Function placements → an ApplyNode wrapping the upstream source expression
  *   - Component placements → recurse into that component's render tree
  */
 function buildSourceExpression(
@@ -238,13 +240,60 @@ function buildSourceExpression(
     // primary action similarly. The consuming component receives a data value.
     return { kind: 'ref', name: `${placement.targetName}.result` }
   }
+
+  if (placement.kind === 'function') {
+    // Find the wire feeding into this function placement
+    const incomingWire = doc.wires.find((w) => w.target.placementId === placement.id)
+    const upstreamPlacement = incomingWire
+      ? doc.placements.find((p) => p.id === incomingWire.source.placementId)
+      : undefined
+
+    let upstreamExpr: ExprNode
+    if (upstreamPlacement) {
+      upstreamExpr = buildSourceExpression(doc, upstreamPlacement, resolveComponentDef)
+      // Apply the incoming wire's transform if present
+      if (incomingWire?.transform && incomingWire.transform.kind !== 'identity') {
+        const lambda = compileLinkExpr(incomingWire.transform)
+        upstreamExpr = { kind: 'apply', fn: 'call', args: [lambda, upstreamExpr] }
+      }
+    } else {
+      // No upstream — produce a ref to a placeholder (incomplete canvas)
+      upstreamExpr = { kind: 'literal', value: null }
+    }
+
+    // Build the function application: apply(fnId, upstream, ...inlineParams)
+    // Inline param values come from placement.config
+    const config = placement.config ?? {}
+    // Look up the FunctionDef to know the param names and build positional args
+    const fnId = placement.targetName
+    const def = STD_LIB[fnId]
+    if (!def) {
+      // Unknown function — just pass through the upstream
+      return upstreamExpr
+    }
+
+    const paramArgs: ExprNode[] = def.params.slice(1).map((paramName) => {
+      const val = config[paramName]
+      return {
+        kind: 'literal',
+        value: (val !== undefined ? val : null) as MaisieScalar,
+      }
+    })
+
+    return {
+      kind: 'apply',
+      fn: fnId,
+      args: [upstreamExpr, ...paramArgs],
+    }
+  }
+
   // Component-as-data-source: recurse into its render tree.
   return buildRenderTree(doc, placement, resolveComponentDef)
 }
 
 /**
  * Build a data-oriented ExprNode for an emitted entity's primary field.
- * Delegates to buildSourceExpression for entity roots (simple ref) and
+ * Delegates to buildSourceExpression for entity/function roots and
  * buildRenderTree for component roots (captures the composed render as data).
  */
 function buildDataExpression(
@@ -252,7 +301,7 @@ function buildDataExpression(
   root: Placement,
   resolveComponentDef: (name: string) => ComponentDef | undefined,
 ): ExprNode {
-  if (root.kind === 'entity') {
+  if (root.kind === 'entity' || root.kind === 'function') {
     return buildSourceExpression(doc, root, resolveComponentDef)
   }
   return buildRenderTree(doc, root, resolveComponentDef)

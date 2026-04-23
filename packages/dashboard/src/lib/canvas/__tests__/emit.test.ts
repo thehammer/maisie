@@ -352,6 +352,84 @@ describe('emitEntity', () => {
   })
 })
 
+// ── Function placement helpers ────────────────────────────────────────────────
+
+function functionPlacement(id: string, targetName: string, config?: Record<string, unknown>): Placement {
+  return { id, kind: 'function', targetName, position: { x: 80, y: 0 }, config }
+}
+
+// ── Function placement composition ───────────────────────────────────────────
+
+describe('emitComponent — function placement in chain', () => {
+  it('entity → function → component produces apply node wrapping the entity ref', () => {
+    const entity = entityPlacement('e1', 'plex.recently_added')
+    const fn = functionPlacement('f1', 'std.limit', { n: 5 })
+    const comp = componentPlacement('c1', 'Strip')
+
+    const doc = makeDoc([entity, fn, comp], [
+      { id: 'w1', source: { placementId: 'e1' }, target: { placementId: 'f1' } },
+      { id: 'w2', source: { placementId: 'f1' }, target: { placementId: 'c1', slot: 'input' } },
+    ])
+
+    const result = emitComponent(doc, { name: 'LimitedStrip' }, resolveComponentDef)
+    expect(result.ok).toBe(true)
+    const render = result.artifact!.render!
+    expect(render.kind).toBe('layout-call')
+    if (render.kind === 'layout-call') {
+      const inputArg = render.args.input
+      expect(inputArg).toBeDefined()
+      // Should be an apply node for std.limit
+      expect(inputArg.kind).toBe('apply')
+      if (inputArg.kind === 'apply') {
+        expect(inputArg.fn).toBe('std.limit')
+        // First arg is the entity ref
+        expect(inputArg.args[0].kind).toBe('ref')
+        if (inputArg.args[0].kind === 'ref') {
+          expect(inputArg.args[0].name).toBe('plex.recently_added.result')
+        }
+        // Second arg is the n literal
+        expect(inputArg.args[1].kind).toBe('literal')
+        if (inputArg.args[1].kind === 'literal') {
+          expect(inputArg.args[1].value).toBe(5)
+        }
+      }
+    }
+  })
+
+  it('entity → two function hops → component produces nested apply nodes', () => {
+    const entity = entityPlacement('e1', 'plex.recently_added')
+    const fn1 = functionPlacement('f1', 'std.limit', { n: 10 })
+    const fn2 = functionPlacement('f2', 'std.limit', { n: 3 })
+    const comp = componentPlacement('c1', 'MovieTile')
+
+    const doc = makeDoc([entity, fn1, fn2, comp], [
+      { id: 'w1', source: { placementId: 'e1' }, target: { placementId: 'f1' } },
+      { id: 'w2', source: { placementId: 'f1' }, target: { placementId: 'f2' } },
+      { id: 'w3', source: { placementId: 'f2' }, target: { placementId: 'c1', slot: 'input' } },
+    ])
+
+    const result = emitComponent(doc, { name: 'DoubleLimitedStrip' }, resolveComponentDef)
+    expect(result.ok).toBe(true)
+    const render = result.artifact!.render!
+    expect(render.kind).toBe('component-call')
+    if (render.kind === 'component-call') {
+      const inputArg = render.args.input
+      // Outer: apply(std.limit, inner, 3)
+      expect(inputArg.kind).toBe('apply')
+      if (inputArg.kind === 'apply') {
+        expect(inputArg.fn).toBe('std.limit')
+        // Inner: apply(std.limit, ref, 10)
+        const innerArg = inputArg.args[0]
+        expect(innerArg.kind).toBe('apply')
+        if (innerArg.kind === 'apply') {
+          expect(innerArg.fn).toBe('std.limit')
+          expect(innerArg.args[0].kind).toBe('ref')
+        }
+      }
+    }
+  })
+})
+
 // ── Multi-level wire composition ──────────────────────────────────────────────
 
 describe('emitComponent — multi-level composition', () => {

@@ -4,6 +4,8 @@ import { emptyDocument, addPlacement, addWire } from '../document'
 import { setWireTransform } from '../document'
 import type { TypeExpr, MaisieValue, MaisieRecord } from '@maisie/shared'
 
+// ── Function placement chain tests ────────────────────────────────────────────
+
 // Build a minimal canvas document for testing
 function makeDoc() {
   let doc = emptyDocument()
@@ -328,5 +330,117 @@ describe('compilePreview — transform on wire', () => {
 
     // Scalars pass through unchanged
     expect(targets[0].input).toBe('just a string')
+  })
+})
+
+// ── Function placement chain tests ─────────────────────────────────────────────
+
+describe('compilePreview — function placement chains', () => {
+  it('entity → limit(n=2) → component resolves filtered collection to component', async () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'plex.movies', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'function', targetName: 'std.limit', position: { x: 150, y: 0 }, config: { n: 2 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'Strip', position: { x: 300, y: 0 } })
+    const [entity, fn, component] = doc.placements
+
+    // Wire entity → fn → component
+    doc = addWire(doc, { source: { placementId: entity.id }, target: { placementId: fn.id } })
+    doc = addWire(doc, { source: { placementId: fn.id }, target: { placementId: component.id } })
+
+    const movies: MaisieValue = [
+      { title: 'Movie A' },
+      { title: 'Movie B' },
+      { title: 'Movie C' },
+      { title: 'Movie D' },
+    ]
+
+    const targets = await compilePreview(
+      doc,
+      async (placementId) => placementId === entity.id ? movies : undefined,
+      () => undefined,
+    )
+
+    expect(targets).toHaveLength(1)
+    const target = targets[0]
+    expect(target.placementId).toBe(component.id)
+    expect(target.source).toBe('wired')
+    expect(Array.isArray(target.input)).toBe(true)
+    expect((target.input as MaisieRecord[]).length).toBe(2)
+    expect((target.input as MaisieRecord[])[0]).toEqual({ title: 'Movie A' })
+    expect((target.input as MaisieRecord[])[1]).toEqual({ title: 'Movie B' })
+  })
+
+  it('entity → two function hops → component applies functions in order', async () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'function', targetName: 'std.limit', position: { x: 150, y: 0 }, config: { n: 3 } })
+    doc = addPlacement(doc, { kind: 'function', targetName: 'std.limit', position: { x: 300, y: 0 }, config: { n: 1 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'Strip', position: { x: 450, y: 0 } })
+    const [entity, fn1, fn2, component] = doc.placements
+
+    doc = addWire(doc, { source: { placementId: entity.id }, target: { placementId: fn1.id } })
+    doc = addWire(doc, { source: { placementId: fn1.id }, target: { placementId: fn2.id } })
+    doc = addWire(doc, { source: { placementId: fn2.id }, target: { placementId: component.id } })
+
+    const items: MaisieValue = [
+      { id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 },
+    ]
+
+    const targets = await compilePreview(
+      doc,
+      async (placementId) => placementId === entity.id ? items : undefined,
+      () => undefined,
+    )
+
+    expect(targets).toHaveLength(1)
+    // limit(3) then limit(1) → 1 item
+    const result = targets[0].input as MaisieRecord[]
+    expect(Array.isArray(result)).toBe(true)
+    expect(result.length).toBe(1)
+    expect(result[0]).toEqual({ id: 1 })
+  })
+
+  it('function placement without upstream wire falls back to fixture for component', async () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'function', targetName: 'std.limit', position: { x: 0, y: 0 }, config: { n: 5 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'Strip', position: { x: 150, y: 0 } })
+    const [fn, component] = doc.placements
+
+    doc = addWire(doc, { source: { placementId: fn.id }, target: { placementId: component.id } })
+
+    const collectionType: TypeExpr = { kind: 'collection', element: { kind: 'any' } }
+
+    const targets = await compilePreview(
+      doc,
+      async () => undefined,
+      (placementId) => placementId === component.id ? collectionType : undefined,
+    )
+
+    expect(targets).toHaveLength(1)
+    // The function has no upstream source → falls back to fixture
+    expect(targets[0].source).toBe('fixture')
+    expect(Array.isArray(targets[0].input)).toBe(true)
+  })
+
+  it('function placements are not included as preview targets themselves', async () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'e', position: { x: 0, y: 0 } })
+    doc = addPlacement(doc, { kind: 'function', targetName: 'std.limit', position: { x: 150, y: 0 } })
+    doc = addPlacement(doc, { kind: 'component', targetName: 'Strip', position: { x: 300, y: 0 } })
+    const [entity, fn, comp] = doc.placements
+
+    doc = addWire(doc, { source: { placementId: entity.id }, target: { placementId: fn.id } })
+    doc = addWire(doc, { source: { placementId: fn.id }, target: { placementId: comp.id } })
+
+    const targets = await compilePreview(
+      doc,
+      async (pid) => pid === entity.id ? [{ x: 1 }] : undefined,
+      () => undefined,
+    )
+
+    // Only the component appears — not the entity or function
+    expect(targets).toHaveLength(1)
+    expect(targets[0].placementId).toBe(comp.id)
+    expect(targets[0].componentName).toBe('Strip')
   })
 })

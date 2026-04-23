@@ -6,9 +6,9 @@ interface PlacementProps {
   placement: PlacementType
   selected: boolean
   onSelect: () => void
-  /** Ref callback for the output port element (entities). */
+  /** Ref callback for the output port element (entities and functions). */
   outputPortRef?: (el: HTMLElement | null) => void
-  /** Ref callback for the input port element (components). */
+  /** Ref callback for the input port element (components and functions). */
   inputPortRef?: (el: HTMLElement | null) => void
 }
 
@@ -26,6 +26,11 @@ export function Placement({ placement, selected, onSelect, outputPortRef, inputP
     cursor: 'move',
   }
 
+  // Derive a short display label: for function placements, strip the 'std.' prefix
+  const displayName = placement.kind === 'function'
+    ? placement.targetName.replace(/^std\./, '')
+    : placement.targetName
+
   return (
     <div
       ref={setNodeRef}
@@ -38,16 +43,16 @@ export function Placement({ placement, selected, onSelect, outputPortRef, inputP
       {...attributes}
       {...listeners}
     >
-      {/* Output port — entities produce output on the right */}
-      {placement.kind === 'entity' && (
-        <OutputPort placementId={placement.id} portRef={outputPortRef} />
-      )}
-      {/* Input port — components consume input on the left */}
-      {placement.kind === 'component' && (
+      {/* Input port — components and functions consume input on the left */}
+      {(placement.kind === 'component' || placement.kind === 'function') && (
         <InputPort placementId={placement.id} portRef={inputPortRef} />
       )}
       <div className="canvas-placement-kind">{placement.kind}</div>
-      <div className="canvas-placement-name">{placement.targetName}</div>
+      <div className="canvas-placement-name">{displayName}</div>
+      {/* Output port — entities and functions produce output on the right */}
+      {(placement.kind === 'entity' || placement.kind === 'function') && (
+        <OutputPort placementId={placement.id} portRef={outputPortRef} />
+      )}
     </div>
   )
 }

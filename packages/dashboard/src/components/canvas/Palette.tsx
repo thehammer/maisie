@@ -1,5 +1,6 @@
 import { useDraggable } from '@dnd-kit/core'
 import { useApi } from '../../hooks/useApi'
+import { STD_FUNCTION_DESCRIPTORS } from '@maisie/shared'
 
 interface CatalogEntity { name: string; kind?: string; description?: string; section?: string }
 interface CatalogComponent { name: string; kind: 'base' | 'layout' | 'derived'; description?: string }
@@ -46,6 +47,23 @@ export function Palette() {
           </div>
         ))}
       </div>
+
+      <div className="canvas-palette-section canvas-palette-section-functions">
+        <div className="canvas-palette-title">Functions</div>
+        <div className="canvas-palette-group">
+          {STD_FUNCTION_DESCRIPTORS.map((fn) => (
+            <PaletteItem
+              key={fn.id}
+              id={`function:${fn.id}`}
+              kind="function"
+              targetName={fn.id}
+              label={fn.name}
+              sublabel={fn.description}
+            />
+          ))}
+        </div>
+      </div>
+
       <div className="canvas-palette-section">
         <div className="canvas-palette-title">Components</div>
         {(['derived', 'layout', 'base'] as const).map((kind) => (
@@ -72,7 +90,7 @@ export function Palette() {
 
 interface PaletteItemProps {
   id: string
-  kind: 'entity' | 'component'
+  kind: 'entity' | 'component' | 'function'
   targetName: string
   label: string
   sublabel?: string

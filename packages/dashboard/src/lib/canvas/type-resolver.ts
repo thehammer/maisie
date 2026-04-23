@@ -7,7 +7,7 @@
 
 import type { TypeExpr, ComponentDef } from '@maisie/shared'
 import type { EntityDef, DataFieldDef } from '@maisie/shared'
-import { dataFieldTypeExpr } from '@maisie/shared'
+import { dataFieldTypeExpr, getFunctionDescriptor } from '@maisie/shared'
 
 export interface PlacementPorts {
   /** Output type — the type this placement produces. Undefined if not applicable. */
@@ -55,6 +55,20 @@ export async function resolveComponentPorts(componentName: string): Promise<Plac
     }
   } catch {
     return null
+  }
+}
+
+/**
+ * Resolve ports for a function placement from the static FunctionDescriptor registry.
+ * Function placements have both an input port (left) and an output port (right).
+ * Returns null if the function id is unknown.
+ */
+export function resolveFunctionPorts(functionId: string): PlacementPorts | null {
+  const descriptor = getFunctionDescriptor(functionId)
+  if (!descriptor) return null
+  return {
+    input: descriptor.input,
+    output: descriptor.output,
   }
 }
 

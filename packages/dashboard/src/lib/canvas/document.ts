@@ -15,9 +15,10 @@ export interface CanvasDocument {
 
 export interface Placement {
   id: string
-  kind: 'entity' | 'component'
-  targetName: string           // entity.name or component.name
+  kind: 'entity' | 'component' | 'function'
+  targetName: string           // entity.name, component.name, or FunctionDescriptor.id
   position: { x: number; y: number }
+  /** Inline parameter values for function placements; optional component props. */
   config?: Record<string, unknown>
 }
 
@@ -121,6 +122,23 @@ export function getWireTransform(
   wireId: string,
 ): LinkExpr | undefined {
   return doc.wires.find((w) => w.id === wireId)?.transform
+}
+
+/**
+ * Update (merge) the config on a placement. Useful for saving inline
+ * parameter values on function placements from the inspector.
+ */
+export function updatePlacementConfig(
+  doc: CanvasDocument,
+  id: string,
+  config: Record<string, unknown>,
+): CanvasDocument {
+  return {
+    ...doc,
+    placements: doc.placements.map((p) =>
+      p.id === id ? { ...p, config: { ...p.config, ...config } } : p,
+    ),
+  }
 }
 
 function generateId(prefix: string): string {
