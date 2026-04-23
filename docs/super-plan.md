@@ -94,7 +94,7 @@ The plan is organized into a sequence of platform phases plus one evergreen stre
 Phase 0: Foundations              [COMPLETE]
 Phase 1: The Data Platform        [COMPLETE — 2026-04-22]
 Phase 2: The Presentation Platform [COMPLETE — 2026-04-23]
-Phase 3: Visual Authoring         [PLANNED]
+Phase 3: Visual Authoring         [CORE COMPLETE — 2026-04-23; 3f (self-hosting) ongoing]
 Phase 4: The Agent Platform       [PARTIAL]
 Phase 5: Distribution             [PLANNED]
 Phase 6: Alternative Clients      [DEFERRED]
@@ -236,9 +236,23 @@ Components as the unified unit of UI. Mirrors the data platform in structure: ba
 
 ## Phase 3 — Visual Authoring
 
-**Status: Planned.**
+**Status: Core complete (2026-04-23).** 1154 tests. Sub-phases 3a–3e shipped. 3f (self-hosting) is ongoing.
 
 The UX surface where entities and components are designed visually. The structural type system enables bidirectional authoring: start from data (bottom-up, see what component contracts you satisfy), start from design (top-down, derive the entity shape you need), or expand outward from any point. The tooling should support all three directions without privileging any.
+
+### What shipped
+
+5 sub-phases per `docs/visual-authoring-plan.md`:
+
+- **3a** — Canvas surface with palette (entities + components) + inspector; drag from palette to canvas; placement selection, movement, and deletion. @dnd-kit/core for drag-and-drop.
+- **3b** — Wires between placement ports. Structural validation via `satisfies` from Phase 2d. Color-coded wires: green (compatible), red (incompatible with error details), gray (unknown). SVG cubic bezier curves with fat invisible hit targets.
+- **3c** — Live preview drawer under the canvas. Each component placement renders via ComponentRenderer, using wired data when available or synthesized fixtures (from the component's declared input contract) otherwise. 250ms debounce.
+- **3d** — Link DSL for transforms: identity, pick, rename, compute, chain. Compiles to ExprNode lambdas via `compileLinkExpr`. Transform pill on wires; dedicated TransformEditor in the inspector with per-kind forms. `empty-record` primitive added.
+- **3e** — Save as Component / Save as Entity. `emitComponent` walks the wire graph inward from the root, building a nested component-call/layout-call render tree; `emitEntity` captures the composition as a derived entity. Inline save form with name + description. Catalog refresh on save.
+
+### What's ongoing (3f)
+
+Self-hosting — incrementally replacing hand-coded Studio pieces with authored components. Not time-bounded. Candidates: palette, inspector, canvas preview, placement node. Each replacement is its own 1–2 session iteration.
 
 ### Goals
 
