@@ -1,6 +1,8 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { DndContext, useDroppable, type DragEndEvent, type DragStartEvent, type DragMoveEvent } from '@dnd-kit/core'
-import { Palette } from './Palette'
+import { EntityPalette } from './EntityPalette'
+import { ComponentPalette } from './ComponentPalette'
+import { FunctionPalette } from './FunctionPalette'
 import { Placement } from './Placement'
 import { Inspector } from './Inspector'
 import { Wire } from './Wire'
@@ -97,6 +99,13 @@ export function Canvas() {
   // Cache of resolved ports per placement — avoid re-fetching on every render
   const portsCache = useRef<Map<string, PlacementPorts>>(new Map())
 
+  // Catalog-level type caches (entity name → output, component name → input)
+  // These are shared with the palette sub-components for compatibility highlighting.
+  const entityOutputCache = useRef<Map<string, TypeExpr>>(new Map())
+  const componentInputCache = useRef<Map<string, TypeExpr>>(new Map())
+  const [entityOutputTypes, setEntityOutputTypes] = useState<Map<string, TypeExpr>>(new Map())
+  const [componentInputTypes, setComponentInputTypes] = useState<Map<string, TypeExpr>>(new Map())
+
   // Fetch types for all placements
   useEffect(() => {
     const toFetch = canvas.doc.placements.filter((p) => !portsCache.current.has(p.id))
@@ -106,16 +115,24 @@ export function Canvas() {
       let ports: PlacementPorts | null
       if (p.kind === 'entity') {
         ports = await resolveEntityPorts(p.targetName)
+        if (ports?.output) {
+          entityOutputCache.current.set(p.targetName, ports.output)
+        }
       } else if (p.kind === 'function') {
         ports = resolveFunctionPorts(p.targetName)
       } else {
         ports = await resolveComponentPorts(p.targetName)
+        if (ports?.input) {
+          componentInputCache.current.set(p.targetName, ports.input)
+        }
       }
       if (ports) portsCache.current.set(p.id, ports)
     })
 
     Promise.all(fetches).then(() => {
       setPlacementPorts(new Map(portsCache.current))
+      setEntityOutputTypes(new Map(entityOutputCache.current))
+      setComponentInputTypes(new Map(componentInputCache.current))
     })
   }, [canvas.doc.placements])
 
@@ -250,6 +267,30 @@ export function Canvas() {
     ? canvas.doc.wires.find((w) => w.id === canvas.selectedId) ?? null
     : null
 
+  // Derive palette highlight targets from the selected placement.
+  //   entity selected  → highlight components that accept its output; functions that accept it
+  //   component selected → highlight entities that produce compatible output; functions whose output feeds it
+  //   function selected → highlight entities (fn input side) and components (fn output side)
+  const selectedPorts = selectedPlacement ? placementPorts.get(selectedPlacement.id) : undefined
+
+  // EntityPalette: highlight when a component or function is selected
+  const entityHighlightTarget: TypeExpr | undefined =
+    selectedPlacement?.kind === 'component' ? selectedPorts?.input
+    : selectedPlacement?.kind === 'function' ? selectedPorts?.input
+    : undefined
+
+  // ComponentPalette: highlight when an entity or function is selected
+  const componentHighlightTarget: TypeExpr | undefined =
+    selectedPlacement?.kind === 'entity' ? selectedPorts?.output
+    : selectedPlacement?.kind === 'function' ? selectedPorts?.output
+    : undefined
+
+  // FunctionPalette: highlight input side from entity output, output side from component input
+  const fnInputHighlight: TypeExpr | undefined =
+    selectedPlacement?.kind === 'entity' ? selectedPorts?.output : undefined
+  const fnOutputHighlight: TypeExpr | undefined =
+    selectedPlacement?.kind === 'component' ? selectedPorts?.input : undefined
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Delete' || e.key === 'Backspace') {
       if (!canvas.selectedId) return
@@ -304,33 +345,63 @@ export function Canvas() {
           canEmit={{ component: canEmitComponentError, entity: canEmitEntityError }}
           status={saveStatus}
         />
-        <div className="canvas-layout">
-          <Palette />
-          <CanvasSurface
-            canvasRef={canvasRef}
-            canvas={canvas}
-            pendingWire={pendingWire}
-            portPositions={portPositions}
-            placementPorts={placementPorts}
-            registerPort={registerPort}
-            updatePortPositions={updatePortPositions}
-            onKeyDown={handleKeyDown}
+        <div className="canvas-layout canvas-layout-split">
+          {/* Left: Entity palette */}
+          <EntityPalette
+            highlightTarget={entityHighlightTarget}
+            entityOutputTypes={entityOutputTypes}
           />
-          <Inspector
-            placement={selectedPlacement}
-            wire={selectedWire}
-            placementPorts={placementPorts}
-            placements={canvas.doc.placements}
-            onDeletePlacement={() => { if (canvas.selectedId) canvas.removePlacement(canvas.selectedId) }}
-            onDeleteWire={() => { if (canvas.selectedId) canvas.removeWire(canvas.selectedId) }}
-            onSetWireTransform={(transform) => {
-              if (canvas.selectedId) canvas.setWireTransform(canvas.selectedId, transform)
-            }}
-            onUpdatePlacementConfig={(config) => {
-              if (canvas.selectedId) canvas.updatePlacementConfig(canvas.selectedId, config)
-            }}
-          />
+
+          {/* Center: Canvas surface + function dock */}
+          <div className="canvas-center-column">
+            <CanvasSurface
+              canvasRef={canvasRef}
+              canvas={canvas}
+              pendingWire={pendingWire}
+              portPositions={portPositions}
+              placementPorts={placementPorts}
+              registerPort={registerPort}
+              updatePortPositions={updatePortPositions}
+              onKeyDown={handleKeyDown}
+            />
+            <FunctionPalette
+              highlightInputTarget={fnInputHighlight}
+              highlightOutputTarget={fnOutputHighlight}
+            />
+          </div>
+
+          {/* Right: Component palette or inspector overlay */}
+          <div className="canvas-right-column">
+            <ComponentPalette
+              highlightTarget={componentHighlightTarget}
+              componentInputTypes={componentInputTypes}
+            />
+            {(selectedPlacement || selectedWire) && (
+              <div className="canvas-inspector-overlay">
+                <Inspector
+                  placement={selectedPlacement}
+                  wire={selectedWire}
+                  placementPorts={placementPorts}
+                  placements={canvas.doc.placements}
+                  onDeletePlacement={() => { if (canvas.selectedId) canvas.removePlacement(canvas.selectedId) }}
+                  onDeleteWire={() => { if (canvas.selectedId) canvas.removeWire(canvas.selectedId) }}
+                  onSetWireTransform={(transform) => {
+                    if (canvas.selectedId) canvas.setWireTransform(canvas.selectedId, transform)
+                  }}
+                  onUpdatePlacementConfig={(config) => {
+                    if (canvas.selectedId) canvas.updatePlacementConfig(canvas.selectedId, config)
+                  }}
+                />
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Compatibility legend */}
+        {(entityHighlightTarget ?? componentHighlightTarget ?? fnInputHighlight ?? fnOutputHighlight) && (
+          <CompatLegend />
+        )}
+
         <div className={`canvas-preview-drawer${previewOpen ? '' : ' collapsed'}`}>
           <div className="canvas-preview-toolbar">
             <span className="canvas-preview-title">Preview</span>
@@ -477,6 +548,22 @@ function PlacementWithPorts({ placement, selected, onSelect, registerPort }: Pla
       outputPortRef={outputRef}
       inputPortRef={inputRef}
     />
+  )
+}
+
+// ── CompatLegend ──────────────────────────────────────────────────────────────
+
+function CompatLegend() {
+  return (
+    <div className="canvas-compat-legend">
+      <span className="canvas-compat-legend-label">Compatibility:</span>
+      <span className="canvas-compat-badge canvas-compat-badge-compatible">direct</span>
+      <span className="canvas-compat-legend-hint">direct match</span>
+      <span className="canvas-compat-badge canvas-compat-badge-chain">via fn</span>
+      <span className="canvas-compat-legend-hint">bridgeable with a function</span>
+      <span className="canvas-compat-badge canvas-compat-badge-incompatible">no match</span>
+      <span className="canvas-compat-legend-hint">incompatible</span>
+    </div>
   )
 }
 

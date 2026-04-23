@@ -453,20 +453,34 @@ The first round of canvas work proved the model but revealed a gap: most plugin 
 
 **Scope:** 1 session (estimated 3).
 
-### 3i — Split palette with compatibility highlighting
+### 3i — Split palette with compatibility highlighting ✓ COMPLETE 2026-04-13
 
 **Goal:** Entities on the left, components on the right, functions in a middle dock (collapsible). Selecting any placement highlights compatible items in the opposite palette.
 
 **What ships:**
-- Split palette layout: three vertical strips (entities | canvas | components) with a collapsible function dock
-- Compatibility badge per palette item:
-  - **Green**: direct `satisfies` match
-  - **Yellow**: compatible via a function chain (the system can auto-suggest)
-  - **Gray**: incompatible even with transforms
-- Sort within each group: green first, yellow next, gray below the fold
-- Selection drives highlighting in both directions (selecting an entity highlights compatible components, selecting a component highlights compatible entities)
+- Split palette layout: entity palette on left, canvas + function dock in center, component palette on right
+- `EntityPalette.tsx`, `ComponentPalette.tsx`, `FunctionPalette.tsx` — replaces monolithic `Palette.tsx`
+- `palette-sort.ts` — `classifyCompatibility`, `sortByCompatibility`, `annotateCompatibility` (pure functions)
+- Compatibility badge per palette item: green (direct), yellow (chain/bridgeable), gray (incompatible/unknown)
+- Sort within each group: compatible first, chain next, incompatible/unknown below
+- Selection drives highlighting in both directions:
+  - Entity selected → ComponentPalette highlights components that accept its output; FunctionPalette highlights functions that accept it as input
+  - Component selected → EntityPalette highlights entities whose output satisfies the input; FunctionPalette highlights functions whose output feeds it
+  - Function selected → EntityPalette shows functions-as-input, ComponentPalette shows functions-as-output
+- Inspector overlays the component palette column when a placement or wire is selected
+- Compatibility legend bar appears when any highlighting is active
+- FunctionPalette is a collapsible horizontal dock at the bottom of the canvas center column
+- Catalog-level type caches (`entityOutputTypes`, `componentInputTypes`) built from placement port resolution
 
-**Scope:** 2 sessions.
+**Deviations / notes:**
+- `any` TypeExpr returns `compatible` (not `chain`) because `satisfies(any, X)` is already ok — the chain heuristic only fires on same-kind structural mismatches (record↔record, collection↔collection with incompatible elements)
+- Inspector moved to an overlay on the right column rather than a permanent third pane; this keeps the component palette always visible and the inspector slides over it on selection
+- Palette.tsx preserved unchanged (backward compat); the three new palette components are imported directly in Canvas.tsx
+
+**Tests added:**
+- `packages/dashboard/src/lib/canvas/__tests__/palette-sort.test.ts` — 24 tests covering classifyCompatibility, sortByCompatibility, annotateCompatibility, and an integration sort scenario
+
+**Scope:** 1 session (estimated 2).
 
 ### 3j — Auto-suggest transform chains
 

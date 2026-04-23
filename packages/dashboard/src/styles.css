@@ -5350,6 +5350,48 @@ body {
   padding: 12px;
 }
 
+/* Split layout: entity palette | center column | component+inspector column */
+.canvas-layout-split {
+  grid-template-columns: 220px 1fr 240px;
+  padding: 0;
+}
+
+/* Center column: canvas surface + function dock stacked */
+.canvas-center-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.canvas-center-column .canvas-surface {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* Right column: component palette + optional inspector overlay */
+.canvas-right-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.canvas-right-column .canvas-palette-components {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* Inspector slides over the component palette when something is selected */
+.canvas-inspector-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  overflow-y: auto;
+}
+
 /* ---- Palette ---- */
 
 .canvas-palette {
@@ -5407,6 +5449,166 @@ body {
 
 .canvas-palette-item-component {
   border-left: 2px solid #ffb84a;
+}
+
+.canvas-palette-item-function {
+  border-left: 2px solid #a78bfa;
+}
+
+/* ---- Palette header ---- */
+
+.canvas-palette-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 2px 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+/* ---- Compatibility classes ---- */
+
+/* Compatible (green) — direct structural match */
+.canvas-palette-item-compat-compatible {
+  border-color: rgba(74, 222, 128, 0.4);
+  background: rgba(74, 222, 128, 0.05);
+}
+.canvas-palette-item-compat-compatible .canvas-palette-item-label {
+  color: #4ade80;
+}
+
+/* Chain (yellow) — needs a function to bridge */
+.canvas-palette-item-compat-chain {
+  border-color: rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.04);
+}
+.canvas-palette-item-compat-chain .canvas-palette-item-label {
+  color: #fbbf24;
+}
+
+/* Incompatible (gray/faded) */
+.canvas-palette-item-compat-incompatible {
+  opacity: 0.45;
+}
+
+/* Unknown (slightly faded) */
+.canvas-palette-item-compat-unknown {
+  opacity: 0.55;
+}
+
+/* ---- Compatibility badge ---- */
+
+.canvas-compat-badge {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 5px;
+  border-radius: 999px;
+  margin-top: 2px;
+}
+
+.canvas-compat-badge-compatible {
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+}
+
+.canvas-compat-badge-chain {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+
+.canvas-compat-badge-incompatible {
+  background: rgba(136, 136, 136, 0.12);
+  color: var(--text-muted);
+}
+
+.canvas-compat-badge-unknown {
+  background: rgba(136, 136, 136, 0.12);
+  color: var(--text-muted);
+}
+
+/* ---- Compatibility legend ---- */
+
+.canvas-compat-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}
+
+.canvas-compat-legend-label {
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.canvas-compat-legend-hint {
+  color: var(--text-muted);
+  margin-right: 8px;
+}
+
+/* ---- Function dock ---- */
+
+.canvas-function-dock {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: max-height 0.2s ease;
+}
+
+.canvas-function-dock.collapsed {
+  /* Just show the header */
+}
+
+.canvas-function-dock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.canvas-function-dock-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.canvas-function-dock-toggle {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.canvas-function-dock-toggle:hover {
+  color: var(--text);
+}
+
+.canvas-function-dock-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  max-height: 120px;
+  overflow-y: auto;
 }
 
 .canvas-palette-item-label {
@@ -5868,7 +6070,7 @@ body {
 .canvas-layout-outer {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   padding: 12px;
   height: calc(100vh - 120px);
 }
@@ -5878,6 +6080,17 @@ body {
   min-height: 0;
   padding: 0;
   height: auto;
+}
+
+/* In split mode the palette columns need full height */
+.canvas-layout-split .canvas-palette-entities,
+.canvas-layout-split .canvas-right-column {
+  height: 100%;
+  overflow: hidden;
+}
+
+.canvas-layout-split .canvas-palette-entities {
+  overflow-y: auto;
 }
 
 .canvas-preview-drawer {
