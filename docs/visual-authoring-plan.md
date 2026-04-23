@@ -514,22 +514,56 @@ The first round of canvas work proved the model but revealed a gap: most plugin 
 
 **Scope:** 1 session (estimated 2–3).
 
-### 3k — Views as first-class catalog entries
+### 3k — Views as first-class catalog entries ✓ COMPLETE 2026-04-13
 
 **Goal:** The composition of entity + function chain + component becomes a named catalog entry — a **View**.
 
 **What ships:**
-- `ViewDef` type: `{ name, description, source: { entity, fieldPath }, chain: FnCall[], component: componentName, componentProps }`
-- `views` SQLite table + `ViewStore` (save/loadAll/get/delete) + `viewRegistry`
-- `POST /api/views`, `GET /api/views`, `GET /api/views/:name`, `DELETE /api/views/:name`
-- Canvas "Save as View" action when the root binds both an entity source and a component
-- Views appear in the catalog alongside entities and components
-- Cards can bind a View directly — a card's `component` can point at a view name, which resolves to the full chain at render time
-- Views are addressable (`views.recent-movies-strip`) and queryable via MEL
+- `ViewDef` type + `ChainStep` type + `validateViewDef()` in `@maisie/shared` (`packages/shared/src/view.ts`)
+- `views` SQLite table in `schema.ts` + `CREATE TABLE` migration in `db.ts`
+- `ViewStore` (`createViewStore`) — save/loadAll/get/delete via Drizzle, mirroring derived-entity-store
+- `ViewRegistry` (`viewRegistry` singleton) — register/unregister/get/list, mirroring ComponentRegistry
+- `POST /api/views`, `GET /api/views`, `GET /api/views/:name`, `PUT /api/views/:name`, `DELETE /api/views/:name` — full CRUD via `createViewRouter`
+- `loadViewsIntoRegistry` boot loader — called in `agent/src/index.ts` after entity and component loaders
+- Canvas `canEmitView` + `emitView` — traces entity source through function placements to the component root, emits a `ViewDef` with ordered `ChainStep[]`
+- Canvas "Save as View" button in `SaveArtifactPanel` — enabled when `canEmitView` passes
+- `CardConfig.view?: string` on both `plugin-core/src/types.ts` and `dashboard/src/hooks/useLayout.ts`
+- `ViewCard` React component — resolves view at render time: fetches ViewDef → fetches entity field → applies chain via `/api/eval` → renders with ComponentRenderer
+- `App.tsx` default card case: when `widget.view` is set, renders `ViewCard` instead of `DynamicCard`
 
-**Vocabulary note:** the term "view" is now formal (see `docs/super-plan.md` vocabulary).
+**Files changed:**
+- `packages/shared/src/view.ts` — new
+- `packages/shared/src/index.ts` — exports view.ts
+- `packages/agent/src/services/schema.ts` — views table
+- `packages/agent/src/services/db.ts` — CREATE TABLE migration
+- `packages/agent/src/services/view-loader.ts` — new
+- `packages/agent/src/index.ts` — boot loader wired in
+- `packages/agent/src/api/index.ts` — view router mounted
+- `packages/plugin-core/src/view-store.ts` — new
+- `packages/plugin-core/src/view-registry.ts` — new
+- `packages/plugin-core/src/view-routes.ts` — new
+- `packages/plugin-core/src/index.ts` — ViewRegistry + createViewStore exported
+- `packages/plugin-core/src/types.ts` — CardConfig.view added
+- `packages/dashboard/src/lib/canvas/emit.ts` — canEmitView, emitView, findEntitySource, buildChainSteps
+- `packages/dashboard/src/components/canvas/Canvas.tsx` — Save as View button + handleSaveView
+- `packages/dashboard/src/components/ViewCard.tsx` — new
+- `packages/dashboard/src/hooks/useLayout.ts` — CardConfig.view added
+- `packages/dashboard/src/App.tsx` — ViewCard import + view branch in renderCard
 
-**Scope:** 2–3 sessions.
+**Tests added:**
+- `packages/shared/src/__tests__/view.test.ts` — 12 tests (validateViewDef: valid views, name validation, field validation)
+- `packages/plugin-core/src/__tests__/view-store.test.ts` — 11 tests (CRUD round-trips, upsert, chain/props preservation)
+- `packages/plugin-core/src/__tests__/view-routes.test.ts` — 13 tests (all CRUD endpoints, 400/404 error cases)
+- `packages/dashboard/src/lib/canvas/__tests__/emit.test.ts` — 11 new tests (canEmitView, emitView: direct, single-step chain, two-step chain, error cases)
+
+**Deviations / notes:**
+- `PUT /api/views/:name` was added (spec listed only GET/POST/DELETE); PUT follows the entity-routes pattern and is needed for updates
+- The spec mentioned cards can bind a view via `component` with a naming convention — the cleaner `view?: string` field from the spec's own "cleanest" option was used instead
+- Views are not yet exposed in the catalog palette (that would be 3l) — this is per-spec (catalog display is a future iteration)
+- MEL queryability (`views.recent-movies-strip`) is not implemented yet — deferred to when MEL address resolution is extended for views
+- Wizard "Use a View" option deferred as allowed by spec
+
+**Scope:** 1 session (estimated 2–3).
 
 ### 3l — Canvas persistence + round-trip editing
 

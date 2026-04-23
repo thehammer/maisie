@@ -29,6 +29,8 @@ import { createDerivedEntityStore } from "@maisie/plugin-core/src/derived-entity
 import { createComponentRouter } from "@maisie/plugin-core/src/component-routes";
 import { createDerivedComponentStore } from "@maisie/plugin-core/src/derived-component-store";
 import { createEvalRouter } from "@maisie/plugin-core/src/eval-routes";
+import { createViewRouter } from "@maisie/plugin-core/src/view-routes";
+import { createViewStore } from "@maisie/plugin-core/src/view-store";
 import { entityRegistry } from "@maisie/plugin-core";
 import type { Agent } from "../agent/index";
 import type { MaisiePlugin } from "@maisie/shared";
@@ -61,6 +63,11 @@ export function createApi(services: Services, agent?: Agent, plugins: MaisiePlug
     componentStore,
   })
   app.route("/api", proposalsRouter);
+
+  // View CRUD API (Phase 3k)
+  const viewStore = createViewStore(services.db as any)
+  const viewRouter = createViewRouter(viewStore)
+  app.route("/api", viewRouter);
 
   // MEL eval endpoint (Phase 4a) — evaluate expressions without saving
   const evalRouter = createEvalRouter({})

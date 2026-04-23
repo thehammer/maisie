@@ -54,5 +54,7 @@ export { validatePlugin, validateActionName, VERB_PREFIXES } from './validators'
 export { deriveHttpPath } from './registry'
 export { EntityRegistry, entityRegistry, synthesizeEntityFromAction, synthesizeEntitiesForPlugin } from './entity-registry'
 export { ComponentRegistry, componentRegistry } from './component-registry'
+export { ViewRegistry, viewRegistry } from './view-registry'
+export { createViewStore } from './view-store'
 export { createEvalRouter } from './eval-routes'
 export default plugin

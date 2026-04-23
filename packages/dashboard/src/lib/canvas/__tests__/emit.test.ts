@@ -3,8 +3,10 @@ import {
   findRoot,
   canEmitComponent,
   canEmitEntity,
+  canEmitView,
   emitComponent,
   emitEntity,
+  emitView,
 } from '../emit'
 import type { CanvasDocument, Placement } from '../document'
 import type { ComponentDef } from '@maisie/shared'
@@ -464,5 +466,126 @@ describe('emitComponent — multi-level composition', () => {
         }
       }
     }
+  })
+})
+
+// ── canEmitView ───────────────────────────────────────────────────────────────
+
+describe('canEmitView', () => {
+  it('fails on an empty canvas', () => {
+    const result = canEmitView(makeDoc([]))
+    expect(result.ok).toBe(false)
+    expect((result as { ok: false; error: string }).error).toMatch(/empty/)
+  })
+
+  it('fails when root is an entity (no component)', () => {
+    const p = entityPlacement('p1', 'plex.recently_added')
+    const result = canEmitView(makeDoc([p]))
+    expect(result.ok).toBe(false)
+    expect((result as { ok: false; error: string }).error).toMatch(/component/)
+  })
+
+  it('fails when component root has no entity source', () => {
+    const comp = componentPlacement('c1', 'Strip')
+    const result = canEmitView(makeDoc([comp]))
+    expect(result.ok).toBe(false)
+    expect((result as { ok: false; error: string }).error).toMatch(/entity source/)
+  })
+
+  it('succeeds with entity → component', () => {
+    const entity = entityPlacement('e1', 'plex.recently_added')
+    const comp = componentPlacement('c1', 'Strip')
+    const doc = makeDoc([entity, comp], [
+      { id: 'w1', source: { placementId: 'e1' }, target: { placementId: 'c1' } },
+    ])
+    expect(canEmitView(doc)).toEqual({ ok: true })
+  })
+
+  it('succeeds with entity → function → component', () => {
+    const entity = entityPlacement('e1', 'plex.recently_added')
+    const fn = functionPlacement('f1', 'std.limit', { n: 5 })
+    const comp = componentPlacement('c1', 'Strip')
+    const doc = makeDoc([entity, fn, comp], [
+      { id: 'w1', source: { placementId: 'e1' }, target: { placementId: 'f1' } },
+      { id: 'w2', source: { placementId: 'f1' }, target: { placementId: 'c1' } },
+    ])
+    expect(canEmitView(doc)).toEqual({ ok: true })
+  })
+})
+
+// ── emitView ──────────────────────────────────────────────────────────────────
+
+describe('emitView', () => {
+  it('returns an error when canvas is not emittable as view', () => {
+    const result = emitView(makeDoc([]), { name: 'my-view' })
+    expect(result.ok).toBe(false)
+  })
+
+  it('entity → component produces ViewDef with empty chain', () => {
+    const entity = entityPlacement('e1', 'plex.recently_added')
+    const comp = componentPlacement('c1', 'Strip')
+    const doc = makeDoc([entity, comp], [
+      { id: 'w1', source: { placementId: 'e1' }, target: { placementId: 'c1' } },
+    ])
+    const result = emitView(doc, { name: 'recent-strip' })
+    expect(result.ok).toBe(true)
+    const view = result.artifact!
+    expect(view.name).toBe('recent-strip')
+    expect(view.source.entity).toBe('plex.recently_added')
+    expect(view.source.field).toBe('result')
+    expect(view.chain).toEqual([])
+    expect(view.component).toBe('Strip')
+  })
+
+  it('entity → function → component produces ViewDef with single-step chain', () => {
+    const entity = entityPlacement('e1', 'plex.recently_added')
+    const fn = functionPlacement('f1', 'std.limit', { n: 5 })
+    const comp = componentPlacement('c1', 'Strip')
+    const doc = makeDoc([entity, fn, comp], [
+      { id: 'w1', source: { placementId: 'e1' }, target: { placementId: 'f1' } },
+      { id: 'w2', source: { placementId: 'f1' }, target: { placementId: 'c1' } },
+    ])
+    const result = emitView(doc, { name: 'limited-strip' })
+    expect(result.ok).toBe(true)
+    const view = result.artifact!
+    expect(view.chain).toHaveLength(1)
+    expect(view.chain[0].functionId).toBe('std.limit')
+    expect(view.chain[0].params).toEqual({ n: 5 })
+  })
+
+  it('entity → fn1 → fn2 → component produces two-step chain in correct order', () => {
+    const entity = entityPlacement('e1', 'plex.recently_added')
+    const fn1 = functionPlacement('f1', 'std.limit', { n: 10 })
+    const fn2 = functionPlacement('f2', 'std.sort', { field: 'title' })
+    const comp = componentPlacement('c1', 'Strip')
+    const doc = makeDoc([entity, fn1, fn2, comp], [
+      { id: 'w1', source: { placementId: 'e1' }, target: { placementId: 'f1' } },
+      { id: 'w2', source: { placementId: 'f1' }, target: { placementId: 'f2' } },
+      { id: 'w3', source: { placementId: 'f2' }, target: { placementId: 'c1' } },
+    ])
+    const result = emitView(doc, { name: 'sorted-strip' })
+    expect(result.ok).toBe(true)
+    const view = result.artifact!
+    expect(view.chain).toHaveLength(2)
+    // First step should be limit (first in the chain from source)
+    expect(view.chain[0].functionId).toBe('std.limit')
+    // Second step should be sort
+    expect(view.chain[1].functionId).toBe('std.sort')
+  })
+
+  it('fails when root has no entity source', () => {
+    const comp = componentPlacement('c1', 'Strip')
+    const result = emitView(makeDoc([comp]), { name: 'no-source-view' })
+    expect(result.ok).toBe(false)
+  })
+
+  it('includes description when provided', () => {
+    const entity = entityPlacement('e1', 'plex.recently_added')
+    const comp = componentPlacement('c1', 'Strip')
+    const doc = makeDoc([entity, comp], [
+      { id: 'w1', source: { placementId: 'e1' }, target: { placementId: 'c1' } },
+    ])
+    const result = emitView(doc, { name: 'recent-strip', description: 'A nice strip' })
+    expect(result.artifact!.description).toBe('A nice strip')
   })
 })

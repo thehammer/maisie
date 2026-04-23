@@ -310,6 +310,17 @@ function migrate(sqlite: Database) {
       created_at INTEGER NOT NULL,
       resolved_at INTEGER
     );
+
+    CREATE TABLE IF NOT EXISTS views (
+      name TEXT PRIMARY KEY,
+      description TEXT,
+      source TEXT NOT NULL,
+      chain TEXT NOT NULL,
+      component TEXT NOT NULL,
+      component_props TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `);
 
   // Column migrations — ALTER TABLE ADD COLUMN for columns added after initial release

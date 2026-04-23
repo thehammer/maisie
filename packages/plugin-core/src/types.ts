@@ -53,6 +53,13 @@ export interface CardConfig {
   component?: string
   /** Props passed to the component when `component` is set. */
   componentProps?: Record<string, unknown>
+  /**
+   * View name to use for rendering. When set, the card resolves the named view
+   * at render time — fetches the entity source, applies the function chain, and
+   * delegates to ComponentRenderer with the view's component and componentProps.
+   * Takes precedence over `component` when both are set.
+   */
+  view?: string
 }
 
 export interface PersonaConfig {

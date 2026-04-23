@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import type { ViewDef, ChainStep } from "@maisie/shared";
 
 export const devices = sqliteTable("devices", {
   mac: text("mac").primaryKey(),
@@ -285,6 +286,18 @@ export const proposals = sqliteTable('proposals', {
   status: text('status').notNull().default('pending'), // 'pending' | 'approved' | 'rejected'
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
   resolvedAt: integer('resolved_at', { mode: 'timestamp' }),
+})
+
+// User-authored views — named compositions of entity + function chain + component
+export const views = sqliteTable('views', {
+  name: text('name').primaryKey(),
+  description: text('description'),
+  source: text('source', { mode: 'json' }).$type<ViewDef['source']>().notNull(),
+  chain: text('chain', { mode: 'json' }).$type<ChainStep[]>().notNull(),
+  component: text('component').notNull(),
+  componentProps: text('component_props', { mode: 'json' }).$type<Record<string, unknown>>(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 })
 
 // Plugin configuration overrides (env vars, enabled/disabled)

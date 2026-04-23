@@ -29,6 +29,7 @@ import { DraggableDashboardGrid } from "./components/DraggableDashboardGrid";
 import { CardSlot } from "./components/CardSlot";
 import { useLayout } from "./hooks/useLayout";
 import { DynamicCard, type CardDescriptor } from "./components/DynamicCard";
+import { ViewCard } from "./components/ViewCard";
 import { AddCardPanel } from "./components/AddCardPanel";
 import { CardConfigurator } from "./components/CardConfigurator";
 import { CardWizard } from "./components/CardWizard";
@@ -525,6 +526,15 @@ export function App() {
         ) : null;
       }
       default: {
+        // View-bound card — resolves entity + chain + component at render time
+        if (widget.view) {
+          return (
+            <ViewCard
+              viewName={widget.view}
+              titleOverride={widget.title}
+            />
+          );
+        }
         // Fall back to auto-rendered card from the widget catalog
         const descriptor = (catalogApi.data ?? []).find((w) => w.id === id);
         if (descriptor) return (

@@ -8,6 +8,7 @@ import { createMqttClient } from "./services/mqtt";
 import { initDb } from "./services/db";
 import { loadDerivedEntities } from "./services/entity-loader";
 import { loadDerivedComponents } from "./services/component-loader";
+import { loadViewsIntoRegistry } from "./services/view-loader";
 import { loadPersonasIntoRegistry } from "./services/persona-loader";
 import { createApi } from "./api/index";
 import type { Services } from "./api/types";
@@ -78,6 +79,9 @@ async function main() {
 
   // Load persisted derived components into the component registry
   await loadDerivedComponents(db);
+
+  // Load persisted views into the view registry
+  await loadViewsIntoRegistry(db);
 
   // Connect to MQTT broker
   const mqtt = await createMqttClient();
