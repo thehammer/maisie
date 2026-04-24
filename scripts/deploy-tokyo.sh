@@ -39,6 +39,21 @@ rsync -av --delete \
 echo "==> Restoring Tokyo go2rtc config..."
 scp config/go2rtc.tokyo.yaml "${TOKYO}:${REMOTE_DIR}/config/go2rtc.yaml"
 
+# Prowlarr runs outside docker-compose (bind mount to /opt/docker/prowlarr).
+# Sync our custom Cardigann indexer definitions into its config directory
+# and restart the container so it picks up any additions/changes.
+if compgen -G "config/prowlarr-definitions/*.yml" > /dev/null; then
+  echo "==> Syncing Prowlarr custom indexer definitions..."
+  ssh "$TOKYO" "mkdir -p /tmp/maisie-prowlarr-defs"
+  scp config/prowlarr-definitions/*.yml "${TOKYO}:/tmp/maisie-prowlarr-defs/"
+  ssh "$TOKYO" "docker exec prowlarr mkdir -p /config/Definitions/Custom && \
+                for f in /tmp/maisie-prowlarr-defs/*.yml; do \
+                  docker cp \"\$f\" prowlarr:/config/Definitions/Custom/\$(basename \"\$f\"); \
+                done && \
+                docker restart prowlarr > /dev/null && \
+                rm -rf /tmp/maisie-prowlarr-defs"
+fi
+
 if $SYNC_ONLY; then
   echo "==> Sync complete (--sync mode, skipping rebuild)"
   exit 0
