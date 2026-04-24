@@ -576,6 +576,7 @@ function CanvasSurface({
               message={validation.message}
               transform={wire.transform}
               onClick={() => onWireClick(wire.id, midPos, chains)}
+              onDelete={() => canvas.removeWire(wire.id)}
             />
           )
         })}
@@ -598,6 +599,7 @@ function CanvasSurface({
           placement={p}
           selected={canvas.selectedId === p.id}
           onSelect={() => canvas.setSelectedId(p.id)}
+          onDelete={() => canvas.removePlacement(p.id)}
           registerPort={registerPort}
         />
       ))}
@@ -619,10 +621,11 @@ interface PlacementWithPortsProps {
   placement: PlacementType
   selected: boolean
   onSelect: () => void
+  onDelete: () => void
   registerPort: (key: string, el: HTMLElement | null) => void
 }
 
-function PlacementWithPorts({ placement, selected, onSelect, registerPort }: PlacementWithPortsProps) {
+function PlacementWithPorts({ placement, selected, onSelect, onDelete, registerPort }: PlacementWithPortsProps) {
   const outputRef = useCallback(
     (el: HTMLElement | null) => registerPort(`port:${placement.id}:output`, el),
     [placement.id, registerPort],
@@ -637,6 +640,7 @@ function PlacementWithPorts({ placement, selected, onSelect, registerPort }: Pla
       placement={placement}
       selected={selected}
       onSelect={onSelect}
+      onDelete={onDelete}
       outputPortRef={outputRef}
       inputPortRef={inputRef}
     />

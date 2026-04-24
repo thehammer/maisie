@@ -7,6 +7,7 @@ interface WireProps {
   status: WireStatus
   selected?: boolean
   onClick?: () => void
+  onDelete?: () => void
   message?: string
   transform?: LinkExpr
 }
@@ -18,7 +19,7 @@ const STATUS_COLOR: Record<WireStatus, string> = {
   unknown: 'var(--text-muted, #888)',
 }
 
-export function Wire({ from, to, status, selected, onClick, message, transform }: WireProps) {
+export function Wire({ from, to, status, selected, onClick, onDelete, message, transform }: WireProps) {
   // Cubic bezier — handles offset horizontally by half the distance
   const dx = Math.abs(to.x - from.x) * 0.5
   const path = `M ${from.x} ${from.y} C ${from.x + dx} ${from.y}, ${to.x - dx} ${to.y}, ${to.x} ${to.y}`
@@ -60,6 +61,26 @@ export function Wire({ from, to, status, selected, onClick, message, transform }
       )}
       {/* invisible thicker hit target for easier clicking */}
       <path d={path} fill="none" stroke="transparent" strokeWidth={12} style={{ cursor: 'pointer' }} />
+      {/* Delete affordance — shown when the wire is selected */}
+      {selected && onDelete && (
+        <foreignObject
+          x={midX - 10}
+          y={midY - 10}
+          width={20}
+          height={20}
+        >
+          <button
+            className="canvas-wire-delete"
+            title="Delete wire"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete()
+            }}
+          >
+            ×
+          </button>
+        </foreignObject>
+      )}
     </g>
   )
 }
