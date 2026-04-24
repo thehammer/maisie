@@ -290,6 +290,13 @@ function ParamEditor({ params, config, onUpdate }: ParamEditorProps) {
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  e.stopPropagation()
+                  // Cmd/Ctrl+Enter or Escape blurs the textarea (commits via onChange).
+                  if ((e.key === 'Enter' && (e.metaKey || e.ctrlKey)) || e.key === 'Escape') {
+                    (e.currentTarget as HTMLTextAreaElement).blur()
+                  }
+                }}
                 onChange={(e) => onUpdate(p.name, e.target.value)}
               />
             ) : (
@@ -301,6 +308,13 @@ function ParamEditor({ params, config, onUpdate }: ParamEditorProps) {
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  e.stopPropagation()
+                  // Enter or Escape blurs the input (commits via onChange).
+                  if (e.key === 'Enter' || e.key === 'Escape') {
+                    (e.currentTarget as HTMLInputElement).blur()
+                  }
+                }}
                 onChange={(e) => {
                   const value = isNumber ? Number(e.target.value) : e.target.value
                   onUpdate(p.name, value)
