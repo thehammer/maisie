@@ -393,7 +393,7 @@ export function MediaSearchPage({ onBack, initialTab }: { onBack: () => void; in
         <div className="bsp-section">
           <h3 className="bsp-section-title">Audiobooks</h3>
           <div className="bsp-grid">
-            {audiobookResults.slice(0, 20).map((item: any) => (
+            {audiobookResults.slice(0, 60).map((item: any) => (
               <div key={item.guid} className="bsp-card">
                 <div className="bsp-card-cover">
                   <div className="bsp-no-cover">Audio</div>

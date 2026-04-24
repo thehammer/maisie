@@ -12,7 +12,12 @@ export interface ProwlarrResult {
   seeders: number;
   leechers: number;
   indexer: string;
-  downloadUrl: string;
+  /** Torrent file download URL; some indexers (e.g. TPB) return magnetUrl instead. */
+  downloadUrl?: string;
+  /** Magnet link URL; preferred when downloadUrl is absent. */
+  magnetUrl?: string;
+  /** BitTorrent info-hash; present on some indexers for magnet construction. */
+  infoHash?: string;
   infoUrl: string;
   publishDate: string;
   categories: { id: number; name: string }[];

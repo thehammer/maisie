@@ -318,19 +318,50 @@ export function createMediaRouter(services: Pick<Services, "db" | "plex" | "rada
       );
 
       const prowlarrHost = process.env.PROWLARR_HOST || "localhost";
+      const fixHost = (url: string | undefined) =>
+        url ? url.replace("http://localhost:", `http://${prowlarrHost}:`) : "";
+
+      // Resolve a usable download target: prefer downloadUrl (torrent file),
+      // fall back to magnetUrl, then to the guid if it's itself a magnet.
+      const resolveDownload = (r: typeof prowlarrResults[number]) => {
+        if (r.downloadUrl) return fixHost(r.downloadUrl);
+        if (r.magnetUrl) return fixHost(r.magnetUrl);
+        if (r.guid && r.guid.startsWith("magnet:")) return r.guid;
+        return "";
+      };
+
+      // Interleave results by indexer so no single indexer starves the others
+      // when the UI caps the display list.
+      const byIndexer = new Map<string, typeof prowlarrResults>();
+      for (const r of prowlarrResults) {
+        const key = r.indexer || "?";
+        if (!byIndexer.has(key)) byIndexer.set(key, []);
+        byIndexer.get(key)!.push(r);
+      }
+      const interleaved: typeof prowlarrResults = [];
+      let hasMore = true;
+      for (let i = 0; hasMore; i++) {
+        hasMore = false;
+        for (const list of byIndexer.values()) {
+          if (i < list.length) {
+            interleaved.push(list[i]);
+            hasMore = true;
+          }
+        }
+      }
+
       return c.json({
-        results: prowlarrResults
-          .filter((r) => r.downloadUrl || r.guid) // drop indexer rows with no usable link
-          .map((r) => ({
+        results: interleaved
+          .map((r) => ({ r, url: resolveDownload(r) }))
+          .filter(({ url }) => url.length > 0) // drop entries with no downloadable link
+          .map(({ r, url }) => ({
             guid: r.guid,
             title: r.title,
             size: r.size,
             seeders: r.seeders,
             leechers: r.leechers,
             indexer: r.indexer,
-            downloadUrl: r.downloadUrl
-              ? r.downloadUrl.replace("http://localhost:", `http://${prowlarrHost}:`)
-              : "",
+            downloadUrl: url,
             infoUrl: r.infoUrl,
             publishDate: r.publishDate,
             inLibrary: absLibraryTitles.has(normalizeTitleForAudiobook(r.title)),
