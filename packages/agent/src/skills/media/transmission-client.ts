@@ -41,17 +41,25 @@ export function createTransmissionClient(config: TransmissionConfig) {
 
   return {
     async addTorrentUrl(url: string, downloadDir?: string): Promise<{ id: number; name: string }> {
-      // Fetch the torrent file ourselves, then send as base64
-      // This avoids Transmission needing to reach the URL (which may be blocked by VPN)
-      const torrentRes = await fetch(url, { signal: AbortSignal.timeout(30_000), redirect: "follow" });
-      if (!torrentRes.ok) {
-        throw new Error(`Failed to fetch torrent: ${torrentRes.status} ${torrentRes.statusText}`);
-      }
-      const torrentBuf = await torrentRes.arrayBuffer();
-      const b64 = Buffer.from(torrentBuf).toString("base64");
-
-      const args: Record<string, any> = { "metainfo": b64 };
+      const args: Record<string, any> = {};
       if (downloadDir) args["download-dir"] = downloadDir;
+
+      if (url.startsWith("magnet:")) {
+        // Magnet URIs have no HTTP backing — pass to Transmission as `filename`,
+        // which it handles natively (info-hash lookup via DHT/trackers).
+        args["filename"] = url;
+      } else {
+        // HTTP(S) torrent-file URL. Fetch it ourselves and forward as base64
+        // metainfo so Transmission doesn't need to reach the URL itself
+        // (which may be blocked by the container's VPN routing).
+        const torrentRes = await fetch(url, { signal: AbortSignal.timeout(30_000), redirect: "follow" });
+        if (!torrentRes.ok) {
+          throw new Error(`Failed to fetch torrent: ${torrentRes.status} ${torrentRes.statusText}`);
+        }
+        const torrentBuf = await torrentRes.arrayBuffer();
+        args["metainfo"] = Buffer.from(torrentBuf).toString("base64");
+      }
+
       const result = await rpc("torrent-add", args);
       const added = result["torrent-added"] || result["torrent-duplicate"];
       return { id: added?.id || 0, name: added?.name || "Unknown" };
