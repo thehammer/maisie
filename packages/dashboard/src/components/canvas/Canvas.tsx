@@ -754,20 +754,27 @@ function CanvasSurface({
       {canvas.doc.placements.length === 0 && (
         <div className="canvas-surface-empty">Drag items from the palette onto the canvas</div>
       )}
-      {canvas.doc.placements.map((p) => (
-        <PlacementWithPorts
-          key={p.id}
-          placement={p}
-          onContextMenu={(e) => onPlacementContextMenu(p.id, e)}
-          selected={canvas.selectedId === p.id}
-          onSelect={() => canvas.setSelectedId(p.id)}
-          onDelete={() => canvas.removePlacement(p.id)}
-          registerPort={registerPort}
-          outputType={inferredOutputs.get(p.id)}
-          inputType={placementPorts.get(p.id)?.input}
-          isWired={wiredInputs.has(p.id)}
-        />
-      ))}
+      {canvas.doc.placements.map((p) => {
+        const fnDescriptor = p.kind === 'function' ? getFunctionDescriptor(p.targetName) : undefined
+        return (
+          <PlacementWithPorts
+            key={p.id}
+            placement={p}
+            onContextMenu={(e) => onPlacementContextMenu(p.id, e)}
+            selected={canvas.selectedId === p.id}
+            onSelect={() => canvas.setSelectedId(p.id)}
+            onDelete={() => canvas.removePlacement(p.id)}
+            registerPort={registerPort}
+            outputType={inferredOutputs.get(p.id)}
+            inputType={placementPorts.get(p.id)?.input}
+            isWired={wiredInputs.has(p.id)}
+            inlineParams={fnDescriptor?.params}
+            onUpdateParam={(name, value) =>
+              canvas.updatePlacementConfig(p.id, { ...(p.config ?? {}), [name]: value })
+            }
+          />
+        )
+      })}
 
       {/* Chain suggestion popover — shown when an incompatible wire is clicked and chains exist */}
       {chainSuggestion && (
@@ -792,9 +799,11 @@ interface PlacementWithPortsProps {
   outputType?: TypeExpr
   inputType?: TypeExpr
   isWired?: boolean
+  inlineParams?: import('@maisie/shared').FunctionParamDecl[]
+  onUpdateParam?: (paramName: string, value: unknown) => void
 }
 
-function PlacementWithPorts({ placement, selected, onSelect, onDelete, onContextMenu, registerPort, outputType, inputType, isWired }: PlacementWithPortsProps) {
+function PlacementWithPorts({ placement, selected, onSelect, onDelete, onContextMenu, registerPort, outputType, inputType, isWired, inlineParams, onUpdateParam }: PlacementWithPortsProps) {
   const outputRef = useCallback(
     (el: HTMLElement | null) => registerPort(`port:${placement.id}:output`, el),
     [placement.id, registerPort],
@@ -816,6 +825,8 @@ function PlacementWithPorts({ placement, selected, onSelect, onDelete, onContext
       outputType={outputType}
       inputType={inputType}
       isWired={isWired}
+      inlineParams={inlineParams}
+      onUpdateParam={onUpdateParam}
     />
   )
 }

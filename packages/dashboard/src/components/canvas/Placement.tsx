@@ -1,6 +1,6 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import type { TypeExpr } from '@maisie/shared'
+import type { TypeExpr, FunctionParamDecl } from '@maisie/shared'
 import { formatType } from '@maisie/shared'
 import type { Placement as PlacementType } from '../../lib/canvas/document'
 
@@ -30,9 +30,19 @@ interface PlacementProps {
    * If false, schema panel shows a "wire an input" prompt instead.
    */
   isWired?: boolean
+  /**
+   * Inline parameter declarations for function placements.
+   * Each renders as an editable input on the node so users can configure
+   * parameters without opening the inspector.
+   */
+  inlineParams?: FunctionParamDecl[]
+  /**
+   * Update a single parameter's value in placement.config.
+   */
+  onUpdateParam?: (paramName: string, value: unknown) => void
 }
 
-export function Placement({ placement, selected, onSelect, onDelete, onContextMenu, outputPortRef, inputPortRef, outputType, inputType, isWired }: PlacementProps) {
+export function Placement({ placement, selected, onSelect, onDelete, onContextMenu, outputPortRef, inputPortRef, outputType, inputType, isWired, inlineParams, onUpdateParam }: PlacementProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: placement.id,
     data: { source: 'canvas', placementId: placement.id },
@@ -74,6 +84,10 @@ export function Placement({ placement, selected, onSelect, onDelete, onContextMe
       )}
       <div className="canvas-placement-kind">{placement.kind}</div>
       <div className="canvas-placement-name">{displayName}</div>
+      {/* Inline parameter editors — only for function placements with inline params */}
+      {placement.kind === 'function' && inlineParams && inlineParams.length > 0 && onUpdateParam && (
+        <ParamEditor params={inlineParams} config={placement.config ?? {}} onUpdate={onUpdateParam} />
+      )}
       {/* Schema panel — shows the type shape one level deep */}
       {placement.kind === 'entity' && outputType && (
         <SchemaPanel type={outputType} />
@@ -233,6 +247,69 @@ function SchemaPanelContent({ type }: { type: TypeExpr }) {
   return (
     <div className="canvas-placement-schema-field">
       <span className="canvas-placement-schema-type">{formatType(type)}</span>
+    </div>
+  )
+}
+
+// ── ParamEditor ──────────────────────────────────────────────────────────────
+
+interface ParamEditorProps {
+  params: FunctionParamDecl[]
+  config: Record<string, unknown>
+  onUpdate: (paramName: string, value: unknown) => void
+}
+
+/**
+ * Inline parameter inputs rendered directly on a function placement.
+ * Lets the user set required parameters (like `field` for `get`/`pluck`)
+ * without opening the inspector.
+ *
+ * Only renders the params marked `inline: true` in the descriptor.
+ * Each input stops pointer/mouse propagation so @dnd-kit doesn't interpret
+ * typing as drag-start.
+ */
+function ParamEditor({ params, config, onUpdate }: ParamEditorProps) {
+  const inlineDecls = params.filter((p) => p.inline)
+  if (inlineDecls.length === 0) return null
+
+  return (
+    <div className="canvas-placement-params">
+      {inlineDecls.map((p) => {
+        const current = (config[p.name] ?? p.default ?? '') as string | number
+        const isNumber = p.type.kind === 'scalar' && p.type.type === 'number'
+        const isFunction = p.type.kind === 'function'
+        return (
+          <div key={p.name} className="canvas-placement-param">
+            <label className="canvas-placement-param-label">{p.name}</label>
+            {isFunction ? (
+              <textarea
+                className="canvas-placement-param-input canvas-placement-param-lambda"
+                value={String(current ?? '')}
+                placeholder={p.description ?? '(item) => ...'}
+                rows={2}
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => onUpdate(p.name, e.target.value)}
+              />
+            ) : (
+              <input
+                className="canvas-placement-param-input"
+                type={isNumber ? 'number' : 'text'}
+                value={String(current ?? '')}
+                placeholder={p.description}
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  const value = isNumber ? Number(e.target.value) : e.target.value
+                  onUpdate(p.name, value)
+                }}
+              />
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
