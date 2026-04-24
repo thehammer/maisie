@@ -321,12 +321,15 @@ export function createMediaRouter(services: Pick<Services, "db" | "plex" | "rada
       const fixHost = (url: string | undefined) =>
         url ? url.replace("http://localhost:", `http://${prowlarrHost}:`) : "";
 
-      // Resolve a usable download target: prefer downloadUrl (torrent file),
-      // fall back to magnetUrl, then to the guid if it's itself a magnet.
+      // Resolve a usable download target. Order of preference:
+      // 1. Raw magnet URI in guid — most robust, bypasses Prowlarr's proxy
+      // 2. downloadUrl (a torrent-file link, usually Prowlarr proxy)
+      // 3. magnetUrl (Prowlarr's magnet proxy — fragile; its encrypted `link`
+      //    param can fail with "Failed to normalize provided link")
       const resolveDownload = (r: typeof prowlarrResults[number]) => {
+        if (r.guid && r.guid.startsWith("magnet:")) return r.guid;
         if (r.downloadUrl) return fixHost(r.downloadUrl);
         if (r.magnetUrl) return fixHost(r.magnetUrl);
-        if (r.guid && r.guid.startsWith("magnet:")) return r.guid;
         return "";
       };
 
