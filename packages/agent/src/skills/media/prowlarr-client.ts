@@ -36,11 +36,12 @@ export function createProwlarrClient(config: ProwlarrConfig) {
 
   return {
     async searchAudiobooks(query: string): Promise<ProwlarrResult[]> {
-      // Category 3030 = Audio/Audiobook
-      // Only query 1337x (id:1) for speed — it has the best audiobook selection
+      // Category 3030 = Audio/Audiobook. Querying all enabled indexers;
+      // specialized audiobook trackers (e.g. AudioBookBay) should be
+      // configured in Prowlarr to benefit this search.
       const q = query.toLowerCase().includes("audiobook") ? query : `${query} audiobook`;
       const results = await request(
-        `/search?query=${encodeURIComponent(q)}&categories=3030&type=search&limit=20&indexerIds=1`
+        `/search?query=${encodeURIComponent(q)}&categories=3030&type=search&limit=50`
       );
       return results;
     },

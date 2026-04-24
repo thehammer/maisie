@@ -319,18 +319,22 @@ export function createMediaRouter(services: Pick<Services, "db" | "plex" | "rada
 
       const prowlarrHost = process.env.PROWLARR_HOST || "localhost";
       return c.json({
-        results: prowlarrResults.map((r) => ({
-          guid: r.guid,
-          title: r.title,
-          size: r.size,
-          seeders: r.seeders,
-          leechers: r.leechers,
-          indexer: r.indexer,
-          downloadUrl: r.downloadUrl.replace("http://localhost:", `http://${prowlarrHost}:`),
-          infoUrl: r.infoUrl,
-          publishDate: r.publishDate,
-          inLibrary: absLibraryTitles.has(normalizeTitleForAudiobook(r.title)),
-        })),
+        results: prowlarrResults
+          .filter((r) => r.downloadUrl || r.guid) // drop indexer rows with no usable link
+          .map((r) => ({
+            guid: r.guid,
+            title: r.title,
+            size: r.size,
+            seeders: r.seeders,
+            leechers: r.leechers,
+            indexer: r.indexer,
+            downloadUrl: r.downloadUrl
+              ? r.downloadUrl.replace("http://localhost:", `http://${prowlarrHost}:`)
+              : "",
+            infoUrl: r.infoUrl,
+            publishDate: r.publishDate,
+            inLibrary: absLibraryTitles.has(normalizeTitleForAudiobook(r.title)),
+          })),
       });
     } catch (err) {
       console.error("[audiobook] Search error:", err);

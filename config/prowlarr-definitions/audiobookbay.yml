@@ -1,0 +1,123 @@
+---
+id: audiobookbay
+name: AudioBookBay
+description: "AudioBookBay (ABB) is a Public torrent tracker for AUDIOBOOKS"
+language: en-US
+type: public
+encoding: UTF-8
+requestDelay: 2
+links:
+  - https://audiobookbay.lu/
+legacylinks:
+  - https://audiobookbay.li/
+  - https://audiobookbay.is/
+  - https://audiobookbay.fi/
+  - https://audiobookbay.se/
+
+caps:
+  categorymappings:
+    - {id: "Audiobook", cat: Audio/Audiobook, desc: "Audiobook"}
+
+  modes:
+    search: [q]
+    book-search: [q]
+  allowrawsearch: true
+
+settings:
+  - name: username
+    type: text
+    label: Username
+  - name: password
+    type: password
+    label: Password
+  - name: info
+    type: info
+    label: Note
+    default: "Username/password are optional. The site is accessible anonymously for search & info hash extraction; credentials only enable extra features (comments, .torrent downloads) but are not required for Prowlarr to work."
+
+login:
+  method: form
+  path: member/login.php
+  form: form[name=entryform]
+  inputs:
+    username: "{{ .Config.username }}"
+    password: "{{ .Config.password }}"
+  error:
+    - selector: "div.errorMessage, div.wrongPwd, div.error"
+  test:
+    path: /
+    selector: "a[href*='logout'], a[href*='/member/logout']"
+
+download:
+  infohash:
+    hash:
+      selector: "td:contains(\"Info Hash:\") + td"
+      filters:
+        - name: regexp
+          args: "([A-Fa-f0-9]{40})"
+    title:
+      selector: "div.postTitle h1"
+      filters:
+        - name: trim
+        - name: validfilename
+
+search:
+  # ABB redirects any query containing uppercase letters to the home page.
+  # Force lowercase before search to avoid the 301.
+  keywordsfilters:
+    - name: tolower
+
+  paths:
+    - path: "/"
+    - path: "page/2/"
+    - path: "page/3/"
+  inputs:
+    s: "{{ .Keywords }}"
+
+  headers:
+    User-Agent: ["Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"]
+
+  rows:
+    selector: "div.post:has(div.postTitle h2 a)"
+
+  fields:
+    category:
+      text: "Audiobook"
+    title:
+      selector: "div.postTitle h2 a"
+    details:
+      selector: "div.postTitle h2 a"
+      attribute: href
+    download:
+      selector: "div.postTitle h2 a"
+      attribute: href
+    poster:
+      selector: "div.postContent img[src^='http']"
+      attribute: src
+      optional: true
+    date:
+      selector: "div.postContent"
+      optional: true
+      filters:
+        - name: regexp
+          args: "Posted:\\s*([0-9]{1,2}\\s+[A-Za-z]+\\s+[0-9]{4})"
+        - name: dateparse
+          args: "2 Jan 2006"
+    size:
+      selector: "div.postContent"
+      optional: true
+      default: "0 B"
+      filters:
+        - name: regexp
+          args: "File Size:\\s*(?:<[^>]+>)?\\s*([0-9.]+)\\s*(?:<[^>]+>)?\\s*([KMGTP]?B?s?)"
+        - name: re_replace
+          args: ["(?i)Bs", "B"]
+    seeders:
+      text: 1
+    leechers:
+      text: 1
+    downloadvolumefactor:
+      text: 0
+    uploadvolumefactor:
+      text: 1
+# WordPress 2.5
