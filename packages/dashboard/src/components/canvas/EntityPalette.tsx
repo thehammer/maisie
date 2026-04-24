@@ -32,9 +32,13 @@ interface EntityPaletteProps {
    * Populated by Canvas from the API + resolveEntityPorts cache.
    */
   entityOutputTypes?: Map<string, TypeExpr>
+  /**
+   * Called when an item is right-clicked. Receives kind, name, and client-space position.
+   */
+  onItemContextMenu?: (kind: 'entity', name: string, position: { x: number; y: number }) => void
 }
 
-export function EntityPalette({ highlightTarget, entityOutputTypes }: EntityPaletteProps) {
+export function EntityPalette({ highlightTarget, entityOutputTypes, onItemContextMenu }: EntityPaletteProps) {
   const entitiesApi = useApi<CatalogEntity[]>('/api/entities', 0)
   const entities = entitiesApi.data ?? []
 
@@ -72,6 +76,7 @@ export function EntityPalette({ highlightTarget, entityOutputTypes }: EntityPale
                   key={e.name}
                   entity={e}
                   compatibilityStatus={highlightTarget ? e.compatibilityStatus : undefined}
+                  onContextMenu={onItemContextMenu ? (pos) => onItemContextMenu('entity', e.name, pos) : undefined}
                 />
               ))}
             </div>
@@ -87,9 +92,10 @@ export function EntityPalette({ highlightTarget, entityOutputTypes }: EntityPale
 interface EntityPaletteItemProps {
   entity: CatalogEntity
   compatibilityStatus?: 'compatible' | 'chain' | 'incompatible' | 'unknown'
+  onContextMenu?: (position: { x: number; y: number }) => void
 }
 
-function EntityPaletteItem({ entity, compatibilityStatus }: EntityPaletteItemProps) {
+function EntityPaletteItem({ entity, compatibilityStatus, onContextMenu }: EntityPaletteItemProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `entity:${entity.name}`,
     data: { kind: 'entity', targetName: entity.name, source: 'palette' },
@@ -103,6 +109,10 @@ function EntityPaletteItem({ entity, compatibilityStatus }: EntityPaletteItemPro
     <div
       ref={setNodeRef}
       className={`canvas-palette-item canvas-palette-item-entity ${compatClass} ${isDragging ? 'dragging' : ''}`}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onContextMenu?.({ x: e.clientX, y: e.clientY })
+      }}
       {...attributes}
       {...listeners}
     >

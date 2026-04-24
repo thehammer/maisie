@@ -8,6 +8,7 @@ interface WireProps {
   selected?: boolean
   onClick?: () => void
   onDelete?: () => void
+  onContextMenu?: (e: React.MouseEvent) => void
   message?: string
   transform?: LinkExpr
 }
@@ -19,7 +20,7 @@ const STATUS_COLOR: Record<WireStatus, string> = {
   unknown: 'var(--text-muted, #888)',
 }
 
-export function Wire({ from, to, status, selected, onClick, onDelete, message, transform }: WireProps) {
+export function Wire({ from, to, status, selected, onClick, onDelete, onContextMenu, message, transform }: WireProps) {
   // Cubic bezier — handles offset horizontally by half the distance
   const dx = Math.abs(to.x - from.x) * 0.5
   const path = `M ${from.x} ${from.y} C ${from.x + dx} ${from.y}, ${to.x - dx} ${to.y}, ${to.x} ${to.y}`
@@ -28,13 +29,18 @@ export function Wire({ from, to, status, selected, onClick, onDelete, message, t
     e.stopPropagation()
     onClick?.()
   }
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onContextMenu?.(e)
+  }
 
   const midX = (from.x + to.x) / 2
   const midY = (from.y + to.y) / 2
   const hasTransform = transform && transform.kind !== 'identity'
 
   return (
-    <g className={`canvas-wire ${selected ? 'selected' : ''}`} onClick={handleClick}>
+    <g className={`canvas-wire ${selected ? 'selected' : ''}`} onClick={handleClick} onContextMenu={handleContextMenu}>
       <path d={path} fill="none" stroke={color} strokeWidth={selected ? 3 : 2} />
       {selected && message && (
         <foreignObject

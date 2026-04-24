@@ -6262,3 +6262,44 @@ body {
   flex-shrink: 0;
 }
 .chain-suggestion-apply:hover { opacity: 0.85; }
+
+
+/* ── Canvas context menu ────────────────────────────────────────────────────── */
+.canvas-context-menu {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.canvas-context-menu-item {
+  background: transparent;
+  border: none;
+  padding: 6px 12px;
+  text-align: left;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 4px;
+  width: 100%;
+}
+.canvas-context-menu-item:hover:not(.disabled):not(:disabled) {
+  background: var(--accent);
+  color: var(--bg);
+}
+.canvas-context-menu-item.danger {
+  color: var(--status-err, #f87171);
+}
+.canvas-context-menu-item.danger:hover:not(.disabled):not(:disabled) {
+  background: var(--status-err, #f87171);
+  color: white;
+}
+.canvas-context-menu-item.disabled,
+.canvas-context-menu-item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

@@ -374,6 +374,52 @@ Sub-phases 3a–3e shipped on 2026-04-23.
 
 ---
 
+## Extension — Canvas Polish (Sub-phase 3m) ✓ COMPLETE 2026-04-13
+
+*Added 2026-04-24.*
+
+### 3m — Right-click context menus
+
+**Goal:** Custom context menus replace the browser's native right-click menu on canvas surfaces, providing target-appropriate actions at the cursor.
+
+**What ships:**
+- A `ContextMenu` React component rendered at the cursor position with flat action lists
+- `onContextMenu` handlers on placements, wires, canvas surface, and palette items — each calls `preventDefault()` and sets a single context-menu state in the Canvas
+- Click outside or Escape dismisses
+
+**Actions per target:**
+- **Placement** — Delete, Duplicate, Reset parameters (function placements only), Copy name, Open in Studio editor (entity/component)
+- **Wire** — Delete, Add/Edit transform (selects wire, inspector opens), Suggest chains (re-uses ChainSuggestionPopover)
+- **Canvas surface (empty area)** — Clear canvas, Save as Component / Entity / View
+- **Palette item** — Add to canvas at center, Open in Studio editor (entity/component only), Copy address
+
+**Files created/modified:**
+- `packages/dashboard/src/components/canvas/ContextMenu.tsx` — reusable menu component (new)
+- `packages/dashboard/src/lib/canvas/context-actions.ts` — pure menu-builder functions per target kind (new)
+- `packages/dashboard/src/lib/canvas/document.ts` — added `duplicatePlacement`, `resetPlacementConfig`
+- `packages/dashboard/src/hooks/useCanvasDocument.ts` — exposed both new helpers
+- `packages/dashboard/src/components/canvas/Canvas.tsx` — context menu state, handlers, render
+- `packages/dashboard/src/components/canvas/Placement.tsx` — `onContextMenu` prop
+- `packages/dashboard/src/components/canvas/Wire.tsx` — `onContextMenu` prop
+- `packages/dashboard/src/components/canvas/EntityPalette.tsx` — `onItemContextMenu` prop
+- `packages/dashboard/src/components/canvas/ComponentPalette.tsx` — `onItemContextMenu` prop
+- `packages/dashboard/src/components/canvas/FunctionPalette.tsx` — `onItemContextMenu` prop
+- `packages/dashboard/src/styles.css` — `.canvas-context-menu` styles
+
+**Tests added:**
+- `packages/dashboard/src/lib/canvas/__tests__/context-actions.test.ts` — 31 unit tests (all menu builder variants)
+- `packages/dashboard/src/lib/canvas/__tests__/document.test.ts` — 13 new tests for `duplicatePlacement` and `resetPlacementConfig`
+
+**Deviations:**
+- "Open in Studio editor" is stubbed with a status message (TODO for future session); the canvas's other actions are more impactful
+- "Swap endpoints" on wire menu (bidirectional wires only) deferred — no structural need yet
+- `suggestChains` via context menu uses a rough center position for the popover anchor rather than the exact port midpoint (exact positions require port DOM refs at the time of click)
+- `SaveArtifactPanel` gains an `onRequestOpen` ref-callback prop so the context menu can trigger the save form externally without lifting full state
+
+**Scope:** 1 session.
+
+---
+
 ## Extension — Deep Composition (Sub-phases 3g–3l)
 
 *Added 2026-04-23 after hands-on use of the canvas shipped in 3a–3e.*

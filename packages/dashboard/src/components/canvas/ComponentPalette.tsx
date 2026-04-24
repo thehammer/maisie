@@ -29,9 +29,13 @@ interface ComponentPaletteProps {
    * Populated by Canvas from the API + resolveComponentPorts cache.
    */
   componentInputTypes?: Map<string, TypeExpr>
+  /**
+   * Called when an item is right-clicked. Receives kind, name, and client-space position.
+   */
+  onItemContextMenu?: (kind: 'component', name: string, position: { x: number; y: number }) => void
 }
 
-export function ComponentPalette({ highlightTarget, componentInputTypes }: ComponentPaletteProps) {
+export function ComponentPalette({ highlightTarget, componentInputTypes, onItemContextMenu }: ComponentPaletteProps) {
   const componentsApi = useApi<CatalogComponent[]>('/api/components', 0)
   const components = componentsApi.data ?? []
 
@@ -68,6 +72,7 @@ export function ComponentPalette({ highlightTarget, componentInputTypes }: Compo
                   key={c.name}
                   component={c}
                   compatibilityStatus={highlightTarget ? c.compatibilityStatus : undefined}
+                  onContextMenu={onItemContextMenu ? (pos) => onItemContextMenu('component', c.name, pos) : undefined}
                 />
               ))}
             </div>
@@ -83,9 +88,10 @@ export function ComponentPalette({ highlightTarget, componentInputTypes }: Compo
 interface ComponentPaletteItemProps {
   component: CatalogComponent
   compatibilityStatus?: 'compatible' | 'chain' | 'incompatible' | 'unknown'
+  onContextMenu?: (position: { x: number; y: number }) => void
 }
 
-function ComponentPaletteItem({ component, compatibilityStatus }: ComponentPaletteItemProps) {
+function ComponentPaletteItem({ component, compatibilityStatus, onContextMenu }: ComponentPaletteItemProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `component:${component.name}`,
     data: { kind: 'component', targetName: component.name, source: 'palette' },
@@ -99,6 +105,10 @@ function ComponentPaletteItem({ component, compatibilityStatus }: ComponentPalet
     <div
       ref={setNodeRef}
       className={`canvas-palette-item canvas-palette-item-component ${compatClass} ${isDragging ? 'dragging' : ''}`}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onContextMenu?.({ x: e.clientX, y: e.clientY })
+      }}
       {...attributes}
       {...listeners}
     >

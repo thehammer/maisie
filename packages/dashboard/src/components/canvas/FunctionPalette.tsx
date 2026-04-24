@@ -33,6 +33,10 @@ interface FunctionPaletteProps {
    * Set when a component is selected (function output → component input).
    */
   highlightOutputTarget?: TypeExpr
+  /**
+   * Called when an item is right-clicked. Receives kind, name, and client-space position.
+   */
+  onItemContextMenu?: (kind: 'function', name: string, position: { x: number; y: number }) => void
 }
 
 const STATUS_RANK: Record<CompatibilityStatus, number> = {
@@ -46,7 +50,7 @@ function betterStatus(a: CompatibilityStatus, b: CompatibilityStatus): Compatibi
   return STATUS_RANK[a] <= STATUS_RANK[b] ? a : b
 }
 
-export function FunctionPalette({ highlightInputTarget, highlightOutputTarget }: FunctionPaletteProps) {
+export function FunctionPalette({ highlightInputTarget, highlightOutputTarget, onItemContextMenu }: FunctionPaletteProps) {
   const [collapsed, setCollapsed] = useState(false)
 
   const hasHighlight = !!(highlightInputTarget ?? highlightOutputTarget)
@@ -94,6 +98,7 @@ export function FunctionPalette({ highlightInputTarget, highlightOutputTarget }:
               key={fn.id}
               fn={fn}
               compatibilityStatus={hasHighlight ? fn.compatibilityStatus : undefined}
+              onContextMenu={onItemContextMenu ? (pos) => onItemContextMenu('function', fn.id, pos) : undefined}
             />
           ))}
         </div>
@@ -107,9 +112,10 @@ export function FunctionPalette({ highlightInputTarget, highlightOutputTarget }:
 interface FunctionPaletteItemProps {
   fn: FunctionDescriptor
   compatibilityStatus?: CompatibilityStatus
+  onContextMenu?: (position: { x: number; y: number }) => void
 }
 
-function FunctionPaletteItem({ fn, compatibilityStatus }: FunctionPaletteItemProps) {
+function FunctionPaletteItem({ fn, compatibilityStatus, onContextMenu }: FunctionPaletteItemProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `function:${fn.id}`,
     data: { kind: 'function', targetName: fn.id, source: 'palette' },
@@ -123,6 +129,10 @@ function FunctionPaletteItem({ fn, compatibilityStatus }: FunctionPaletteItemPro
     <div
       ref={setNodeRef}
       className={`canvas-palette-item canvas-palette-item-function ${compatClass} ${isDragging ? 'dragging' : ''}`}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onContextMenu?.({ x: e.clientX, y: e.clientY })
+      }}
       {...attributes}
       {...listeners}
     >

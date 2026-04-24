@@ -224,6 +224,31 @@ export function applyChain(
   return next
 }
 
+/**
+ * Duplicate a placement, offsetting the copy by 32px so it is visible.
+ */
+export function duplicatePlacement(doc: CanvasDocument, id: string): CanvasDocument {
+  const original = doc.placements.find((p) => p.id === id)
+  if (!original) return doc
+  const dup: Omit<Placement, 'id'> = {
+    kind: original.kind,
+    targetName: original.targetName,
+    position: { x: original.position.x + 32, y: original.position.y + 32 },
+    config: original.config ? { ...original.config } : undefined,
+  }
+  return addPlacement(doc, dup)
+}
+
+/**
+ * Clear the config on a placement (e.g. reset all function parameters).
+ */
+export function resetPlacementConfig(doc: CanvasDocument, id: string): CanvasDocument {
+  return {
+    ...doc,
+    placements: doc.placements.map((p) => (p.id === id ? { ...p, config: undefined } : p)),
+  }
+}
+
 function generateId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }

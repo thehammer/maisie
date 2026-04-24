@@ -8,6 +8,7 @@ import { Inspector } from './Inspector'
 import { Wire } from './Wire'
 import { Preview } from './Preview'
 import { ChainSuggestionPopover } from './ChainSuggestionPopover'
+import { ContextMenu } from './ContextMenu'
 import { useCanvasDocument } from '../../hooks/useCanvasDocument'
 import { hasWire, applyChain } from '../../lib/canvas/document'
 import { validateWire, type WireStatus } from '../../lib/canvas/wire-validator'
@@ -15,6 +16,7 @@ import { resolveEntityPorts, resolveComponentPorts, resolveFunctionPorts, type P
 import { canEmitComponent, canEmitEntity, canEmitView, emitComponent, emitEntity, emitView } from '../../lib/canvas/emit'
 import { resolveComponent, refreshComponents } from '../../lib/components/resolver'
 import { refreshCompletionCatalog } from '../../lib/editor/mel-completion'
+import { placementMenu, wireMenu, surfaceMenu, paletteItemMenu } from '../../lib/canvas/context-actions'
 import type { Placement as PlacementType } from '../../lib/canvas/document'
 import type { BridgingChain } from '../../lib/canvas/chain-search'
 import type { MaisieValue, TypeExpr, ComponentDef } from '@maisie/shared'
@@ -45,6 +47,20 @@ export function Canvas() {
     chains: BridgingChain[]
     anchorPos: { x: number; y: number }
   } | null>(null)
+
+  // Context menu state
+  interface ContextMenuState {
+    position: { x: number; y: number }
+    target:
+      | { kind: 'placement'; id: string }
+      | { kind: 'wire'; id: string }
+      | { kind: 'surface' }
+      | { kind: 'palette-item'; itemKind: 'entity' | 'component' | 'function'; name: string }
+  }
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+
+  // Ref for SaveArtifactPanel external open trigger
+  const saveArtifactOpenRef = useRef<((kind: 'component' | 'entity' | 'view') => void) | null>(null)
 
   // Compute emit availability from the current doc
   const componentCheck = canEmitComponent(canvas.doc)
@@ -397,6 +413,49 @@ export function Canvas() {
     }
   }, [canvas])
 
+  // ── Context menu handlers ──────────────────────────────────────────────────
+
+  const contextHandlers = {
+    removePlacement: (id: string) => canvas.removePlacement(id),
+    removeWire: (id: string) => canvas.removeWire(id),
+    duplicatePlacement: (id: string) => canvas.duplicatePlacement(id),
+    resetPlacementConfig: (id: string) => canvas.resetPlacementConfig(id),
+    openTransformEditor: (wireId: string) => {
+      canvas.setSelectedId(wireId)
+      // Inspector opens automatically when a wire is selected
+    },
+    suggestChains: (wireId: string) => {
+      // Trigger the chain suggestion popover by simulating a wire click at the midpoint
+      const wire = canvas.doc.wires.find((w) => w.id === wireId)
+      if (!wire) return
+      const srcPorts = placementPorts.get(wire.source.placementId)
+      const tgtPorts = placementPorts.get(wire.target.placementId)
+      const validation = validateWire(srcPorts?.output, tgtPorts?.input)
+      const chains = validation.suggestedChains ?? []
+      // Use a rough center position — exact port positions not critical here
+      const srcPos = { x: 200, y: 200 }
+      handleWireClick(wireId, srcPos, chains)
+    },
+    addFromPalette: (kind: 'entity' | 'component' | 'function', targetName: string) => {
+      // Place near the center of the visible canvas
+      canvas.addPlacement({ kind, targetName, position: { x: 200, y: 200 } })
+    },
+    openInStudio: (_kind: 'entity' | 'component', _name: string) => {
+      // TODO (Phase 3m follow-up): switch to Studio editor tab with artifact loaded
+      setSaveStatus(`Open in Studio: not yet implemented`)
+      setTimeout(() => setSaveStatus(null), 3000)
+    },
+    copyToClipboard: (text: string) => {
+      navigator.clipboard?.writeText(text).catch(() => {})
+    },
+    clearCanvas: () => {
+      void handleClearCanvas()
+    },
+    openSaveAs: (kind: 'component' | 'entity' | 'view') => {
+      saveArtifactOpenRef.current?.(kind)
+    },
+  }
+
   if (canvas.restoring) {
     return <div className="canvas-layout-outer canvas-restoring">Restoring canvas…</div>
   }
@@ -412,12 +471,16 @@ export function Canvas() {
           canEmit={{ component: canEmitComponentError, entity: canEmitEntityError, view: canEmitViewError }}
           status={saveStatus}
           isEmpty={canvas.doc.placements.length === 0}
+          onRequestOpen={(fn) => { saveArtifactOpenRef.current = fn }}
         />
         <div className="canvas-layout canvas-layout-split">
           {/* Left: Entity palette */}
           <EntityPalette
             highlightTarget={entityHighlightTarget}
             entityOutputTypes={entityOutputTypes}
+            onItemContextMenu={(kind, name, position) =>
+              setContextMenu({ position, target: { kind: 'palette-item', itemKind: kind, name } })
+            }
           />
 
           {/* Center: Canvas surface + function dock */}
@@ -435,10 +498,22 @@ export function Canvas() {
               onWireClick={handleWireClick}
               onApplyChain={handleApplyChain}
               onDismissChain={() => setChainSuggestion(null)}
+              onSurfaceContextMenu={(e) =>
+                setContextMenu({ position: { x: e.clientX, y: e.clientY }, target: { kind: 'surface' } })
+              }
+              onPlacementContextMenu={(id, e) =>
+                setContextMenu({ position: { x: e.clientX, y: e.clientY }, target: { kind: 'placement', id } })
+              }
+              onWireContextMenu={(id, e) =>
+                setContextMenu({ position: { x: e.clientX, y: e.clientY }, target: { kind: 'wire', id } })
+              }
             />
             <FunctionPalette
               highlightInputTarget={fnInputHighlight}
               highlightOutputTarget={fnOutputHighlight}
+              onItemContextMenu={(kind, name, position) =>
+                setContextMenu({ position, target: { kind: 'palette-item', itemKind: kind, name } })
+              }
             />
           </div>
 
@@ -447,6 +522,9 @@ export function Canvas() {
             <ComponentPalette
               highlightTarget={componentHighlightTarget}
               componentInputTypes={componentInputTypes}
+              onItemContextMenu={(kind, name, position) =>
+                setContextMenu({ position, target: { kind: 'palette-item', itemKind: kind, name } })
+              }
             />
             {(selectedPlacement || selectedWire) && (
               <div className="canvas-inspector-overlay">
@@ -493,6 +571,41 @@ export function Canvas() {
           )}
         </div>
       </div>
+      {/* Context menu — rendered at cursor position; dismissed on outside click or Escape */}
+      {contextMenu && (() => {
+        const items =
+          contextMenu.target.kind === 'placement'
+            ? (() => {
+                const target = contextMenu.target as { kind: 'placement'; id: string }
+                const p = canvas.doc.placements.find((pl) => pl.id === target.id)
+                return p ? placementMenu(p, contextHandlers) : []
+              })()
+            : contextMenu.target.kind === 'wire'
+            ? (() => {
+                const w = canvas.doc.wires.find((wi) => wi.id === (contextMenu.target as { kind: 'wire'; id: string }).id)
+                if (!w) return []
+                const srcPorts = placementPorts.get(w.source.placementId)
+                const tgtPorts = placementPorts.get(w.target.placementId)
+                const validation = validateWire(srcPorts?.output, tgtPorts?.input)
+                const hasChains = (validation.suggestedChains?.length ?? 0) > 0
+                return wireMenu(w, contextHandlers, hasChains)
+              })()
+            : contextMenu.target.kind === 'surface'
+            ? surfaceMenu(contextHandlers)
+            : paletteItemMenu(
+                (contextMenu.target as { kind: 'palette-item'; itemKind: 'entity' | 'component' | 'function'; name: string }).itemKind,
+                (contextMenu.target as { kind: 'palette-item'; itemKind: 'entity' | 'component' | 'function'; name: string }).name,
+                contextHandlers,
+              )
+        return (
+          <ContextMenu
+            position={contextMenu.position}
+            items={items}
+            onDismiss={() => setContextMenu(null)}
+          />
+        )
+      })()}
+
       {/* Toggle button in the bottom-right of the canvas area, visible when drawer is closed */}
       {!previewOpen && (
         <div className="canvas-preview-fab">
@@ -516,6 +629,9 @@ interface SurfaceProps {
   onWireClick: (wireId: string, pos: { x: number; y: number }, chains: BridgingChain[]) => void
   onApplyChain: (chain: BridgingChain) => void
   onDismissChain: () => void
+  onSurfaceContextMenu: (e: React.MouseEvent) => void
+  onPlacementContextMenu: (id: string, e: React.MouseEvent) => void
+  onWireContextMenu: (id: string, e: React.MouseEvent) => void
 }
 
 function CanvasSurface({
@@ -531,6 +647,9 @@ function CanvasSurface({
   onWireClick,
   onApplyChain,
   onDismissChain,
+  onSurfaceContextMenu,
+  onPlacementContextMenu,
+  onWireContextMenu,
 }: SurfaceProps) {
   const { setNodeRef, isOver } = useDroppable({ id: 'canvas-surface' })
 
@@ -553,6 +672,10 @@ function CanvasSurface({
       className={`canvas-surface ${isOver ? 'drop-active' : ''}`}
       onClick={() => canvas.setSelectedId(null)}
       onKeyDown={onKeyDown}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onSurfaceContextMenu(e)
+      }}
       tabIndex={0}
     >
       {/* SVG layer for wires — sits behind placements but above background */}
@@ -577,6 +700,7 @@ function CanvasSurface({
               transform={wire.transform}
               onClick={() => onWireClick(wire.id, midPos, chains)}
               onDelete={() => canvas.removeWire(wire.id)}
+              onContextMenu={(e) => onWireContextMenu(wire.id, e)}
             />
           )
         })}
@@ -597,6 +721,7 @@ function CanvasSurface({
         <PlacementWithPorts
           key={p.id}
           placement={p}
+          onContextMenu={(e) => onPlacementContextMenu(p.id, e)}
           selected={canvas.selectedId === p.id}
           onSelect={() => canvas.setSelectedId(p.id)}
           onDelete={() => canvas.removePlacement(p.id)}
@@ -622,10 +747,11 @@ interface PlacementWithPortsProps {
   selected: boolean
   onSelect: () => void
   onDelete: () => void
+  onContextMenu?: (e: React.MouseEvent) => void
   registerPort: (key: string, el: HTMLElement | null) => void
 }
 
-function PlacementWithPorts({ placement, selected, onSelect, onDelete, registerPort }: PlacementWithPortsProps) {
+function PlacementWithPorts({ placement, selected, onSelect, onDelete, onContextMenu, registerPort }: PlacementWithPortsProps) {
   const outputRef = useCallback(
     (el: HTMLElement | null) => registerPort(`port:${placement.id}:output`, el),
     [placement.id, registerPort],
@@ -641,6 +767,7 @@ function PlacementWithPorts({ placement, selected, onSelect, onDelete, registerP
       selected={selected}
       onSelect={onSelect}
       onDelete={onDelete}
+      onContextMenu={onContextMenu}
       outputPortRef={outputRef}
       inputPortRef={inputRef}
     />
@@ -673,6 +800,8 @@ interface SaveArtifactPanelProps {
   canEmit: { component: string | null; entity: string | null; view: string | null }
   status: string | null
   isEmpty: boolean
+  /** Called once on mount with a function the parent can use to externally trigger open. */
+  onRequestOpen?: (fn: (kind: 'component' | 'entity' | 'view') => void) => void
 }
 
 function SaveArtifactPanel({
@@ -683,6 +812,7 @@ function SaveArtifactPanel({
   canEmit,
   status,
   isEmpty,
+  onRequestOpen,
 }: SaveArtifactPanelProps) {
   const [open, setOpen] = useState<'component' | 'entity' | 'view' | null>(null)
   const [name, setName] = useState('')
@@ -694,6 +824,12 @@ function SaveArtifactPanel({
     setDescription('')
     setOpen(kind)
   }
+
+  // Expose open trigger to parent (used by context menu)
+  useEffect(() => {
+    onRequestOpen?.(handleOpen)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onRequestOpen])
 
   const handleSave = async () => {
     if (!name.trim() || !open) return

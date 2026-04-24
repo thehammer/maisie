@@ -7,13 +7,15 @@ interface PlacementProps {
   selected: boolean
   onSelect: () => void
   onDelete: () => void
+  /** Called with client-space position when the placement is right-clicked. */
+  onContextMenu?: (e: React.MouseEvent) => void
   /** Ref callback for the output port element (entities and functions). */
   outputPortRef?: (el: HTMLElement | null) => void
   /** Ref callback for the input port element (components and functions). */
   inputPortRef?: (el: HTMLElement | null) => void
 }
 
-export function Placement({ placement, selected, onSelect, onDelete, outputPortRef, inputPortRef }: PlacementProps) {
+export function Placement({ placement, selected, onSelect, onDelete, onContextMenu, outputPortRef, inputPortRef }: PlacementProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: placement.id,
     data: { source: 'canvas', placementId: placement.id },
@@ -41,6 +43,11 @@ export function Placement({ placement, selected, onSelect, onDelete, outputPortR
         e.stopPropagation()
         onSelect()
       }}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        onContextMenu?.(e)
+      }}
       {...attributes}
       {...listeners}
     >
@@ -54,10 +61,13 @@ export function Placement({ placement, selected, onSelect, onDelete, outputPortR
       {(placement.kind === 'entity' || placement.kind === 'function') && (
         <OutputPort placementId={placement.id} portRef={outputPortRef} />
       )}
-      {/* Delete affordance — small × shown on hover/selected, top-right */}
+      {/* Delete affordance — small × shown on hover/selected, top-right.
+          stopPropagation on pointerDown AND mouseDown so @dnd-kit's pointer
+          sensor doesn't interpret the click as a drag-start. */}
       <button
         className="canvas-placement-delete"
         title="Delete placement"
+        onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation()

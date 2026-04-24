@@ -13,6 +13,8 @@ import {
   getWireTransform,
   updatePlacementConfig,
   applyChain,
+  duplicatePlacement,
+  resetPlacementConfig,
   type CanvasDocument,
 } from '../document'
 import type { BridgingChain } from '../chain-search'
@@ -626,5 +628,138 @@ describe('applyChain', () => {
     applyChain(doc, makeCountChain(), wire.id)
     expect(doc.placements).toHaveLength(originalPlacementCount)
     expect(doc.wires).toHaveLength(originalWireCount)
+  })
+})
+
+// ── duplicatePlacement ────────────────────────────────────────────────────────
+
+describe('duplicatePlacement', () => {
+  it('creates a second placement with the same kind and targetName', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'plex.movies', position: { x: 10, y: 20 } })
+    const [original] = doc.placements
+    const next = duplicatePlacement(doc, original.id)
+    expect(next.placements).toHaveLength(2)
+    const dup = next.placements[1]
+    expect(dup.kind).toBe('entity')
+    expect(dup.targetName).toBe('plex.movies')
+  })
+
+  it('offsets the duplicate by 32px in each axis', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 100, y: 200 } })
+    const [original] = doc.placements
+    const next = duplicatePlacement(doc, original.id)
+    const dup = next.placements[1]
+    expect(dup.position).toEqual({ x: 132, y: 232 })
+  })
+
+  it('assigns a new unique id to the duplicate', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    const [original] = doc.placements
+    const next = duplicatePlacement(doc, original.id)
+    expect(next.placements[0].id).not.toBe(next.placements[1].id)
+  })
+
+  it('copies config shallowly', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, {
+      kind: 'function',
+      targetName: 'std.limit',
+      position: { x: 0, y: 0 },
+      config: { n: 5 },
+    })
+    const [original] = doc.placements
+    const next = duplicatePlacement(doc, original.id)
+    const dup = next.placements[1]
+    expect(dup.config).toEqual({ n: 5 })
+    // Shallow copy — mutation does not affect original
+    expect(dup.config).not.toBe(original.config)
+  })
+
+  it('produces undefined config when original has none', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    const [original] = doc.placements
+    const next = duplicatePlacement(doc, original.id)
+    expect(next.placements[1].config).toBeUndefined()
+  })
+
+  it('does not mutate the original document', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    const [original] = doc.placements
+    duplicatePlacement(doc, original.id)
+    expect(doc.placements).toHaveLength(1)
+  })
+
+  it('returns the document unchanged when id is not found', () => {
+    const doc = emptyDocument()
+    const next = duplicatePlacement(doc, 'nonexistent')
+    expect(next).toBe(doc)
+  })
+})
+
+// ── resetPlacementConfig ──────────────────────────────────────────────────────
+
+describe('resetPlacementConfig', () => {
+  it('clears the config on the target placement', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, {
+      kind: 'function',
+      targetName: 'std.limit',
+      position: { x: 0, y: 0 },
+      config: { n: 10 },
+    })
+    const [p] = doc.placements
+    const next = resetPlacementConfig(doc, p.id)
+    expect(next.placements[0].config).toBeUndefined()
+  })
+
+  it('does not affect other placements', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, {
+      kind: 'function',
+      targetName: 'std.limit',
+      position: { x: 0, y: 0 },
+      config: { n: 10 },
+    })
+    doc = addPlacement(doc, {
+      kind: 'function',
+      targetName: 'std.filter',
+      position: { x: 100, y: 0 },
+      config: { field: 'title' },
+    })
+    const [p1] = doc.placements
+    const next = resetPlacementConfig(doc, p1.id)
+    expect(next.placements[1].config).toEqual({ field: 'title' })
+  })
+
+  it('does not mutate the original document', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, {
+      kind: 'function',
+      targetName: 'std.limit',
+      position: { x: 0, y: 0 },
+      config: { n: 5 },
+    })
+    const [p] = doc.placements
+    resetPlacementConfig(doc, p.id)
+    expect(doc.placements[0].config).toEqual({ n: 5 })
+  })
+
+  it('is a no-op when id is not found', () => {
+    const doc = emptyDocument()
+    const next = resetPlacementConfig(doc, 'nonexistent')
+    expect(next.placements).toHaveLength(0)
+  })
+
+  it('is safe when config is already undefined', () => {
+    let doc = emptyDocument()
+    doc = addPlacement(doc, { kind: 'entity', targetName: 'src', position: { x: 0, y: 0 } })
+    const [p] = doc.placements
+    const next = resetPlacementConfig(doc, p.id)
+    expect(next.placements[0].config).toBeUndefined()
   })
 })
