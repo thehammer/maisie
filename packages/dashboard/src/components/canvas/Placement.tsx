@@ -1,5 +1,7 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
+import type { TypeExpr } from '@maisie/shared'
+import { formatType } from '@maisie/shared'
 import type { Placement as PlacementType } from '../../lib/canvas/document'
 
 interface PlacementProps {
@@ -13,9 +15,24 @@ interface PlacementProps {
   outputPortRef?: (el: HTMLElement | null) => void
   /** Ref callback for the input port element (components and functions). */
   inputPortRef?: (el: HTMLElement | null) => void
+  /**
+   * The inferred or declared output TypeExpr for this placement.
+   * Provided by Canvas after resolving ports + wires + inline params.
+   */
+  outputType?: TypeExpr
+  /**
+   * The declared input TypeExpr for component placements.
+   * Shows what shape the component expects.
+   */
+  inputType?: TypeExpr
+  /**
+   * True when this function placement's input port is wired.
+   * If false, schema panel shows a "wire an input" prompt instead.
+   */
+  isWired?: boolean
 }
 
-export function Placement({ placement, selected, onSelect, onDelete, onContextMenu, outputPortRef, inputPortRef }: PlacementProps) {
+export function Placement({ placement, selected, onSelect, onDelete, onContextMenu, outputPortRef, inputPortRef, outputType, inputType, isWired }: PlacementProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: placement.id,
     data: { source: 'canvas', placementId: placement.id },
@@ -57,6 +74,20 @@ export function Placement({ placement, selected, onSelect, onDelete, onContextMe
       )}
       <div className="canvas-placement-kind">{placement.kind}</div>
       <div className="canvas-placement-name">{displayName}</div>
+      {/* Schema panel — shows the type shape one level deep */}
+      {placement.kind === 'entity' && outputType && (
+        <SchemaPanel type={outputType} />
+      )}
+      {placement.kind === 'function' && (
+        isWired && outputType
+          ? <SchemaPanel type={outputType} />
+          : <div className="canvas-placement-schema">
+              <span className="canvas-placement-schema-prompt">wire an input to see output shape</span>
+            </div>
+      )}
+      {placement.kind === 'component' && inputType && (
+        <SchemaPanel type={inputType} label="expects" />
+      )}
       {/* Output port — entities and functions produce output on the right */}
       {(placement.kind === 'entity' || placement.kind === 'function') && (
         <OutputPort placementId={placement.id} portRef={outputPortRef} />
@@ -131,4 +162,94 @@ function InputPort({ placementId, portRef }: InputPortProps) {
       className={`canvas-port canvas-port-input ${isOver ? 'drop-target' : ''}`}
     />
   )
+}
+
+// ── SchemaPanel ──────────────────────────────────────────────────────────────
+
+interface SchemaPanelProps {
+  type: TypeExpr
+  /** Optional prefix label (e.g. "expects") shown before type rows. */
+  label?: string
+}
+
+/**
+ * Renders a shallow (one-level-deep) type panel below the placement name.
+ *
+ * Scalars: a single row showing the type name.
+ * Records: each field as "name: type" (nested composites shown as their kind word).
+ * Collections: "collection<elementKind>" — no drilling into the element.
+ * Any other TypeExpr: formatted inline via formatType().
+ */
+function SchemaPanel({ type, label }: SchemaPanelProps) {
+  return (
+    <div className="canvas-placement-schema">
+      {label && <div className="canvas-placement-schema-label">{label}</div>}
+      <SchemaPanelContent type={type} />
+    </div>
+  )
+}
+
+function SchemaPanelContent({ type }: { type: TypeExpr }) {
+  if (type.kind === 'scalar') {
+    return (
+      <div className="canvas-placement-schema-field">
+        <span className="canvas-placement-schema-type">{type.type}</span>
+      </div>
+    )
+  }
+
+  if (type.kind === 'record') {
+    const entries = Object.entries(type.fields)
+    if (entries.length === 0) {
+      return (
+        <div className="canvas-placement-schema-field">
+          <span className="canvas-placement-schema-type">record</span>
+        </div>
+      )
+    }
+    return (
+      <>
+        {entries.map(([name, fieldType]) => (
+          <div key={name} className="canvas-placement-schema-field">
+            <span className="canvas-placement-schema-name">{name}</span>
+            <span className="canvas-placement-schema-type">{shallowTypeName(fieldType)}</span>
+          </div>
+        ))}
+      </>
+    )
+  }
+
+  if (type.kind === 'collection') {
+    return (
+      <div className="canvas-placement-schema-field">
+        <span className="canvas-placement-schema-type">
+          collection&lt;{shallowTypeName(type.element)}&gt;
+        </span>
+      </div>
+    )
+  }
+
+  // any, function, component, optional, union — format inline
+  return (
+    <div className="canvas-placement-schema-field">
+      <span className="canvas-placement-schema-type">{formatType(type)}</span>
+    </div>
+  )
+}
+
+/**
+ * One-word description of a TypeExpr for use as a nested type label.
+ * Does not recurse into collections or records.
+ */
+function shallowTypeName(type: TypeExpr): string {
+  switch (type.kind) {
+    case 'scalar': return type.type
+    case 'record': return 'record'
+    case 'collection': return `collection<${shallowTypeName(type.element)}>`
+    case 'any': return 'any'
+    case 'function': return 'function'
+    case 'component': return 'component'
+    case 'optional': return `${shallowTypeName(type.inner)}?`
+    case 'union': return type.members.map(shallowTypeName).join(' | ')
+  }
 }

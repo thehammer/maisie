@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test'
-import { findBridgingChains, inferFunctionOutput } from '../chain-search'
-import { getFunctionDescriptor } from '@maisie/shared'
+import { findBridgingChains } from '../chain-search'
+import { getFunctionDescriptor, inferFunctionOutput } from '@maisie/shared'
 import type { TypeExpr } from '@maisie/shared'
 
 // ── TypeExpr fixtures ──────────────────────────────────────────────────────────
@@ -153,48 +153,68 @@ describe('findBridgingChains — deduplication', () => {
 })
 
 // ── inferFunctionOutput ────────────────────────────────────────────────────────
+// Note: inferFunctionOutput is now from @maisie/shared with signature
+// (descriptor, upstreamType, params) — the shared generalized inferencer.
 
 describe('inferFunctionOutput', () => {
   it('preserves element type for filter (collection<T> → collection<T>)', () => {
     const desc = getFunctionDescriptor('std.filter')!
     const inputType: TypeExpr = { kind: 'collection', element: recordNameState }
-    const output = inferFunctionOutput(desc, inputType)
+    const output = inferFunctionOutput(desc, inputType, {})
     expect(output).toEqual({ kind: 'collection', element: recordNameState })
   })
 
   it('preserves element type for sort', () => {
     const desc = getFunctionDescriptor('std.sort')!
     const inputType: TypeExpr = { kind: 'collection', element: numberType }
-    const output = inferFunctionOutput(desc, inputType)
+    const output = inferFunctionOutput(desc, inputType, {})
     expect(output).toEqual({ kind: 'collection', element: numberType })
   })
 
   it('preserves element type for limit', () => {
     const desc = getFunctionDescriptor('std.limit')!
     const inputType: TypeExpr = { kind: 'collection', element: stringType }
-    const output = inferFunctionOutput(desc, inputType)
+    const output = inferFunctionOutput(desc, inputType, {})
     expect(output).toEqual({ kind: 'collection', element: stringType })
   })
 
   it('returns declared output for count (no polymorphism)', () => {
     const desc = getFunctionDescriptor('std.count')!
-    const output = inferFunctionOutput(desc, collectionAny)
+    const output = inferFunctionOutput(desc, collectionAny, {})
     expect(output).toEqual({ kind: 'scalar', type: 'number' })
   })
 
-  it('returns collection<any> for pluck (field name unknown at search time)', () => {
+  it('returns collection<any> for pluck when field name not known', () => {
     const desc = getFunctionDescriptor('std.pluck')!
-    const output = inferFunctionOutput(desc, collectionRecordNameState)
-    // pluck output is collection<any> — element type not known without field name
+    const output = inferFunctionOutput(desc, collectionRecordNameState, {})
     expect(output.kind).toBe('collection')
     if (output.kind === 'collection') {
       expect(output.element.kind).toBe('any')
     }
   })
 
-  it('returns any for first (scalar result)', () => {
+  it('returns collection<fieldType> for pluck when field name is known', () => {
+    const desc = getFunctionDescriptor('std.pluck')!
+    const output = inferFunctionOutput(desc, collectionRecordNameState, { field: 'name' })
+    expect(output).toEqual({ kind: 'collection', element: stringType })
+  })
+
+  it('returns element type for first (element_of)', () => {
     const desc = getFunctionDescriptor('std.first')!
-    const output = inferFunctionOutput(desc, collectionRecordNameState)
+    const output = inferFunctionOutput(desc, collectionRecordNameState, {})
+    // first unwraps collection<record{name, state}> → record{name, state}
+    expect(output).toEqual(recordNameState)
+  })
+
+  it('returns any for first when upstream is not a collection', () => {
+    const desc = getFunctionDescriptor('std.first')!
+    const output = inferFunctionOutput(desc, stringType, {})
+    expect(output).toEqual({ kind: 'any' })
+  })
+
+  it('returns any for first when upstream is undefined', () => {
+    const desc = getFunctionDescriptor('std.first')!
+    const output = inferFunctionOutput(desc, undefined, {})
     expect(output).toEqual({ kind: 'any' })
   })
 })

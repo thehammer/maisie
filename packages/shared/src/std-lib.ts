@@ -370,6 +370,23 @@ export const DEF_GROUP: FunctionDef = {
   },
 }
 
+// ── Get ───────────────────────────────────────────────────────────────────────
+
+/** get(record, field) — extract one field from a record. */
+export const DEF_GET: FunctionDef = {
+  id: 'std.get', name: 'get',
+  description: 'Extract one field from a record',
+  params: ['record', 'field'],
+  inputSchema: 'record' as MaisieSchemaType,
+  outputSchema: 'any' as MaisieSchemaType,
+  body: {
+    kind: 'apply', fn: 'get', args: [
+      { kind: 'ref', name: 'record' },
+      { kind: 'ref', name: 'field' },
+    ],
+  },
+}
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 /**
@@ -390,6 +407,7 @@ export const STD_LIB: Record<string, FunctionDef> = {
   [DEF_FIRST.id]:  DEF_FIRST,
   [DEF_LAST.id]:   DEF_LAST,
   [DEF_UNIQUE.id]: DEF_UNIQUE,
+  [DEF_GET.id]:    DEF_GET,
 }
 
 /** All standard library FunctionDefs as an array (for catalog/UI listing). */

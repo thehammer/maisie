@@ -7,7 +7,7 @@
 
 import type { TypeExpr, ComponentDef } from '@maisie/shared'
 import type { EntityDef, DataFieldDef } from '@maisie/shared'
-import { dataFieldTypeExpr, getFunctionDescriptor } from '@maisie/shared'
+import { dataFieldTypeExpr, getFunctionDescriptor, inferFunctionOutput } from '@maisie/shared'
 
 export interface PlacementPorts {
   /** Output type — the type this placement produces. Undefined if not applicable. */
@@ -62,13 +62,20 @@ export async function resolveComponentPorts(componentName: string): Promise<Plac
  * Resolve ports for a function placement from the static FunctionDescriptor registry.
  * Function placements have both an input port (left) and an output port (right).
  * Returns null if the function id is unknown.
+ *
+ * The output type here is the static fallback (no upstream or params known).
+ * Canvas.tsx computes the refined inferred output via inferFunctionOutput when
+ * the input port is wired.
  */
 export function resolveFunctionPorts(functionId: string): PlacementPorts | null {
   const descriptor = getFunctionDescriptor(functionId)
   if (!descriptor) return null
+  // Resolve static output (no upstream, no params) as the port's declared type.
+  // The inferencer returns any/collection<any> for input-relative specs without context.
+  const staticOutput = inferFunctionOutput(descriptor, undefined, {})
   return {
     input: descriptor.input,
-    output: descriptor.output,
+    output: staticOutput,
   }
 }
 

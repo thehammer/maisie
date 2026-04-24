@@ -5733,6 +5733,36 @@ body {
   border-color: var(--status-err, #f87171);
 }
 
+/* ---- Schema panel (output/input type display on placement nodes) ---- */
+
+.canvas-placement-schema {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+  font-family: 'SF Mono', Menlo, Monaco, monospace;
+  max-width: 220px;
+}
+.canvas-placement-schema-label {
+  font-style: italic;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+  font-size: 0.65rem;
+}
+.canvas-placement-schema-field {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 1px 0;
+}
+.canvas-placement-schema-name { color: var(--text); }
+.canvas-placement-schema-type { color: var(--accent); }
+.canvas-placement-schema-prompt {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
 /* Delete button on wires — × at the wire midpoint when selected. */
 .canvas-wire-delete {
   width: 20px;

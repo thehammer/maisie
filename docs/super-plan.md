@@ -95,7 +95,7 @@ The plan is organized into a sequence of platform phases plus one evergreen stre
 Phase 0: Foundations              [COMPLETE]
 Phase 1: The Data Platform        [COMPLETE — 2026-04-22]
 Phase 2: The Presentation Platform [COMPLETE — 2026-04-23]
-Phase 3: Visual Authoring         [3a-3e + 3g-3l COMPLETE — 2026-04-23; 3m PLANNED; 3f ongoing]
+Phase 3: Visual Authoring         [3a-3e + 3g-3m COMPLETE; 3n PLANNED; 3f ongoing]
 Phase 4: The Agent Platform       [CORE COMPLETE — 2026-04-23; 4e autonomous loop deferred]
 Phase 5: Distribution             [PLANNED]
 Phase 6: Alternative Clients      [DEFERRED]

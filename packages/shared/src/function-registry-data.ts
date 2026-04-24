@@ -27,6 +27,28 @@ export interface FunctionParamDecl {
   description?: string
 }
 
+/**
+ * Discriminated union describing the output type of a function.
+ *
+ * A FunctionOutputSpec is either a concrete TypeExpr (static output) or a
+ * descriptor that references the function's input type or its inline params.
+ *
+ * Input-relative specs:
+ *   element_of            — T from collection<T>
+ *   field_of              — the type of record[field] where field is an inline param
+ *   collection_of_field_of — pluck: collection<record<{F:V}>> → collection<V>
+ *   group_of              — group: produces a grouped collection (simplified as collection<any> for 3n)
+ *
+ * For runtime-param-dependent outputs where the param is NOT a string literal
+ * at design time, the inferencer falls back to ANY.
+ */
+export type FunctionOutputSpec =
+  | TypeExpr
+  | { kind: 'element_of'; ref: 'input' }
+  | { kind: 'field_of'; ref: 'input'; fieldParam: string }
+  | { kind: 'collection_of_field_of'; ref: 'input'; fieldParam: string }
+  | { kind: 'group_of'; ref: 'input'; fieldParam: string }
+
 export interface FunctionDescriptor {
   /** Standard library id (e.g. 'std.filter'). Must match FunctionDef.id. */
   id: string
@@ -36,8 +58,8 @@ export interface FunctionDescriptor {
   description: string
   /** TypeExpr for the primary collection or scalar input port. */
   input: TypeExpr
-  /** TypeExpr for the output port. */
-  output: TypeExpr
+  /** Output type spec — static TypeExpr or input-relative descriptor. */
+  output: FunctionOutputSpec
   /** Additional parameters the user configures in the inspector (not wired). */
   params?: FunctionParamDecl[]
 }
@@ -139,7 +161,7 @@ export const STD_FUNCTION_DESCRIPTORS: FunctionDescriptor[] = [
     name: 'pluck',
     description: 'Extract one field from each element',
     input: ANY_COLLECTION,
-    output: ANY_COLLECTION,
+    output: { kind: 'collection_of_field_of', ref: 'input', fieldParam: 'field' },
     params: [
       {
         name: 'field',
@@ -154,7 +176,7 @@ export const STD_FUNCTION_DESCRIPTORS: FunctionDescriptor[] = [
     name: 'group',
     description: 'Group elements by a field value',
     input: ANY_COLLECTION,
-    output: ANY_COLLECTION,
+    output: { kind: 'group_of', ref: 'input', fieldParam: 'field' },
     params: [
       {
         name: 'field',
@@ -221,14 +243,29 @@ export const STD_FUNCTION_DESCRIPTORS: FunctionDescriptor[] = [
     name: 'first',
     description: 'Return the first element or null',
     input: ANY_COLLECTION,
-    output: ANY,
+    output: { kind: 'element_of', ref: 'input' },
   },
   {
     id: 'std.last',
     name: 'last',
     description: 'Return the last element or null',
     input: ANY_COLLECTION,
-    output: ANY,
+    output: { kind: 'element_of', ref: 'input' },
+  },
+  {
+    id: 'std.get',
+    name: 'get',
+    description: 'Extract one field from a record',
+    input: { kind: 'record', fields: {} },
+    output: { kind: 'field_of', ref: 'input', fieldParam: 'field' },
+    params: [
+      {
+        name: 'field',
+        type: SCALAR_STRING,
+        inline: true,
+        description: 'Field name to extract',
+      },
+    ],
   },
   {
     id: 'std.unique',

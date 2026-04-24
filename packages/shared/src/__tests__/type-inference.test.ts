@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'bun:test'
-import { inferType } from '../type-inference'
+import { inferType, inferFunctionOutput } from '../type-inference'
+import { getFunctionDescriptor } from '../function-registry-data'
 import type { TypeExpr } from '../component'
 
 // ── Scalars ───────────────────────────────────────────────────────────────────
@@ -150,5 +151,203 @@ describe('type-inference — functions', () => {
       expect(t.params).toHaveLength(0)
       expect(t.returns).toEqual({ kind: 'any' })
     }
+  })
+})
+
+// ── inferFunctionOutput ────────────────────────────────────────────────────────
+
+const ANY: TypeExpr = { kind: 'any' }
+const STRING: TypeExpr = { kind: 'scalar', type: 'string' }
+const NUMBER: TypeExpr = { kind: 'scalar', type: 'number' }
+const BOOLEAN: TypeExpr = { kind: 'scalar', type: 'boolean' }
+
+const recordPerson: TypeExpr = {
+  kind: 'record',
+  fields: { name: STRING, age: NUMBER },
+}
+const collectionPerson: TypeExpr = { kind: 'collection', element: recordPerson }
+const collectionString: TypeExpr = { kind: 'collection', element: STRING }
+const collectionAny: TypeExpr = { kind: 'collection', element: ANY }
+
+describe('inferFunctionOutput — element_of (first, last)', () => {
+  it('first on collection<record> returns the record type', () => {
+    const desc = getFunctionDescriptor('std.first')!
+    const out = inferFunctionOutput(desc, collectionPerson, {})
+    expect(out).toEqual(recordPerson)
+  })
+
+  it('first on collection<string> returns string', () => {
+    const desc = getFunctionDescriptor('std.first')!
+    const out = inferFunctionOutput(desc, collectionString, {})
+    expect(out).toEqual(STRING)
+  })
+
+  it('last mirrors first behavior', () => {
+    const desc = getFunctionDescriptor('std.last')!
+    const out = inferFunctionOutput(desc, collectionPerson, {})
+    expect(out).toEqual(recordPerson)
+  })
+
+  it('returns any when upstream is not a collection', () => {
+    const desc = getFunctionDescriptor('std.first')!
+    expect(inferFunctionOutput(desc, STRING, {})).toEqual(ANY)
+    expect(inferFunctionOutput(desc, recordPerson, {})).toEqual(ANY)
+  })
+
+  it('returns any when upstream is undefined', () => {
+    const desc = getFunctionDescriptor('std.first')!
+    expect(inferFunctionOutput(desc, undefined, {})).toEqual(ANY)
+  })
+})
+
+describe('inferFunctionOutput — field_of (std.get)', () => {
+  it('returns field type when upstream is a record and field exists', () => {
+    const desc = getFunctionDescriptor('std.get')!
+    const out = inferFunctionOutput(desc, recordPerson, { field: 'name' })
+    expect(out).toEqual(STRING)
+  })
+
+  it('returns different field type for different field param', () => {
+    const desc = getFunctionDescriptor('std.get')!
+    const out = inferFunctionOutput(desc, recordPerson, { field: 'age' })
+    expect(out).toEqual(NUMBER)
+  })
+
+  it('returns any when field does not exist in record', () => {
+    const desc = getFunctionDescriptor('std.get')!
+    const out = inferFunctionOutput(desc, recordPerson, { field: 'email' })
+    expect(out).toEqual(ANY)
+  })
+
+  it('returns any when field param is not a string', () => {
+    const desc = getFunctionDescriptor('std.get')!
+    expect(inferFunctionOutput(desc, recordPerson, { field: 42 })).toEqual(ANY)
+    expect(inferFunctionOutput(desc, recordPerson, {})).toEqual(ANY)
+  })
+
+  it('returns any when upstream is not a record', () => {
+    const desc = getFunctionDescriptor('std.get')!
+    expect(inferFunctionOutput(desc, collectionPerson, { field: 'name' })).toEqual(ANY)
+    expect(inferFunctionOutput(desc, STRING, { field: 'name' })).toEqual(ANY)
+  })
+
+  it('returns any when upstream is undefined', () => {
+    const desc = getFunctionDescriptor('std.get')!
+    expect(inferFunctionOutput(desc, undefined, { field: 'name' })).toEqual(ANY)
+  })
+})
+
+describe('inferFunctionOutput — collection_of_field_of (std.pluck)', () => {
+  it('returns collection<string> when plucking a string field', () => {
+    const desc = getFunctionDescriptor('std.pluck')!
+    const out = inferFunctionOutput(desc, collectionPerson, { field: 'name' })
+    expect(out).toEqual(collectionString)
+  })
+
+  it('returns collection<number> when plucking a number field', () => {
+    const desc = getFunctionDescriptor('std.pluck')!
+    const out = inferFunctionOutput(desc, collectionPerson, { field: 'age' })
+    expect(out).toEqual({ kind: 'collection', element: NUMBER })
+  })
+
+  it('returns collection<any> when field not in element record', () => {
+    const desc = getFunctionDescriptor('std.pluck')!
+    const out = inferFunctionOutput(desc, collectionPerson, { field: 'missing' })
+    expect(out).toEqual(collectionAny)
+  })
+
+  it('returns collection<any> when field param is not a string', () => {
+    const desc = getFunctionDescriptor('std.pluck')!
+    const out = inferFunctionOutput(desc, collectionPerson, {})
+    expect(out).toEqual(collectionAny)
+  })
+
+  it('returns collection<any> when upstream element is not a record', () => {
+    const desc = getFunctionDescriptor('std.pluck')!
+    const out = inferFunctionOutput(desc, collectionString, { field: 'name' })
+    expect(out).toEqual(collectionAny)
+  })
+
+  it('returns collection<any> when upstream is not a collection', () => {
+    const desc = getFunctionDescriptor('std.pluck')!
+    const out = inferFunctionOutput(desc, recordPerson, { field: 'name' })
+    expect(out).toEqual(collectionAny)
+  })
+})
+
+describe('inferFunctionOutput — passthrough (filter, sort, limit, unique)', () => {
+  it('filter preserves element type', () => {
+    const desc = getFunctionDescriptor('std.filter')!
+    const out = inferFunctionOutput(desc, collectionPerson, {})
+    expect(out).toEqual(collectionPerson)
+  })
+
+  it('sort preserves element type', () => {
+    const desc = getFunctionDescriptor('std.sort')!
+    const out = inferFunctionOutput(desc, collectionString, {})
+    expect(out).toEqual(collectionString)
+  })
+
+  it('limit preserves element type', () => {
+    const desc = getFunctionDescriptor('std.limit')!
+    const out = inferFunctionOutput(desc, collectionPerson, {})
+    expect(out).toEqual(collectionPerson)
+  })
+
+  it('unique preserves element type', () => {
+    const desc = getFunctionDescriptor('std.unique')!
+    const out = inferFunctionOutput(desc, collectionString, {})
+    expect(out).toEqual(collectionString)
+  })
+
+  it('filter with undefined upstream falls back to declared collection<any>', () => {
+    const desc = getFunctionDescriptor('std.filter')!
+    const out = inferFunctionOutput(desc, undefined, {})
+    expect(out).toEqual(collectionAny)
+  })
+})
+
+describe('inferFunctionOutput — static scalar outputs (count, sum, any, all)', () => {
+  it('count returns number regardless of upstream', () => {
+    const desc = getFunctionDescriptor('std.count')!
+    expect(inferFunctionOutput(desc, collectionPerson, {})).toEqual(NUMBER)
+    expect(inferFunctionOutput(desc, undefined, {})).toEqual(NUMBER)
+  })
+
+  it('sum returns number', () => {
+    const desc = getFunctionDescriptor('std.sum')!
+    expect(inferFunctionOutput(desc, collectionPerson, {})).toEqual(NUMBER)
+  })
+
+  it('any returns boolean', () => {
+    const desc = getFunctionDescriptor('std.any')!
+    expect(inferFunctionOutput(desc, collectionPerson, {})).toEqual(BOOLEAN)
+  })
+
+  it('all returns boolean', () => {
+    const desc = getFunctionDescriptor('std.all')!
+    expect(inferFunctionOutput(desc, collectionPerson, {})).toEqual(BOOLEAN)
+  })
+})
+
+describe('inferFunctionOutput — group_of (std.group)', () => {
+  it('group falls back to collection<any> for phase 3n', () => {
+    const desc = getFunctionDescriptor('std.group')!
+    const out = inferFunctionOutput(desc, collectionPerson, { field: 'name' })
+    expect(out).toEqual(collectionAny)
+  })
+
+  it('group falls back to collection<any> even without upstream', () => {
+    const desc = getFunctionDescriptor('std.group')!
+    const out = inferFunctionOutput(desc, undefined, {})
+    expect(out).toEqual(collectionAny)
+  })
+})
+
+describe('inferFunctionOutput — map', () => {
+  it('map stays at collection<any> since lambda body inspection is out of scope', () => {
+    const desc = getFunctionDescriptor('std.map')!
+    const out = inferFunctionOutput(desc, collectionPerson, {})
+    expect(out).toEqual(collectionAny)
   })
 })

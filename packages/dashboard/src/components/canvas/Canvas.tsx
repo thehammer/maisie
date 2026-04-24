@@ -17,9 +17,10 @@ import { canEmitComponent, canEmitEntity, canEmitView, emitComponent, emitEntity
 import { resolveComponent, refreshComponents } from '../../lib/components/resolver'
 import { refreshCompletionCatalog } from '../../lib/editor/mel-completion'
 import { placementMenu, wireMenu, surfaceMenu, paletteItemMenu } from '../../lib/canvas/context-actions'
-import type { Placement as PlacementType } from '../../lib/canvas/document'
+import type { Placement as PlacementType, Wire as WireType } from '../../lib/canvas/document'
 import type { BridgingChain } from '../../lib/canvas/chain-search'
-import type { MaisieValue, TypeExpr, ComponentDef } from '@maisie/shared'
+import type { MaisieValue, TypeExpr, ComponentDef, FunctionDescriptor } from '@maisie/shared'
+import { getFunctionDescriptor, inferFunctionOutput } from '@maisie/shared'
 
 // Pending wire during drag
 interface PendingWire {
@@ -666,6 +667,42 @@ function CanvasSurface({
     wireValidations.set(wire.id, validateWire(srcPorts?.output, tgtPorts?.input))
   }
 
+  // Build a map from placement id → inferred output TypeExpr.
+  // For entity/component placements, use the ports cache directly.
+  // For function placements, use inferFunctionOutput with the upstream type (from the
+  // wire targeting this placement's input port) and the placement's inline config.
+  const inferredOutputs = new Map<string, TypeExpr>()
+  // First pass: entity outputs (static from ports)
+  for (const p of canvas.doc.placements) {
+    const ports = placementPorts.get(p.id)
+    if (p.kind === 'entity' && ports?.output) {
+      inferredOutputs.set(p.id, ports.output)
+    }
+  }
+  // Second pass: function outputs (inferred from upstream + params)
+  // Must be done after entity outputs since function outputs depend on them.
+  // Process in topological order by walking the wire graph (limited to one pass;
+  // multi-hop chains are resolved on subsequent passes — for 3n, one pass suffices
+  // since the canvas typically has short pipelines).
+  for (const p of canvas.doc.placements) {
+    if (p.kind !== 'function') continue
+    const descriptor: FunctionDescriptor | undefined = getFunctionDescriptor(p.targetName)
+    if (!descriptor) continue
+    // Find the wire that targets this placement's input port
+    const inboundWire = canvas.doc.wires.find((w: WireType) => w.target.placementId === p.id)
+    const upstreamType = inboundWire
+      ? inferredOutputs.get(inboundWire.source.placementId)
+      : undefined
+    const params = (p.config ?? {}) as Record<string, unknown>
+    const output = inferFunctionOutput(descriptor, upstreamType, params)
+    inferredOutputs.set(p.id, output)
+  }
+
+  // Build set of function placement ids that have an inbound wire
+  const wiredInputs = new Set<string>(
+    canvas.doc.wires.map((w: WireType) => w.target.placementId)
+  )
+
   return (
     <div
       ref={combinedRef}
@@ -726,6 +763,9 @@ function CanvasSurface({
           onSelect={() => canvas.setSelectedId(p.id)}
           onDelete={() => canvas.removePlacement(p.id)}
           registerPort={registerPort}
+          outputType={inferredOutputs.get(p.id)}
+          inputType={placementPorts.get(p.id)?.input}
+          isWired={wiredInputs.has(p.id)}
         />
       ))}
 
@@ -749,9 +789,12 @@ interface PlacementWithPortsProps {
   onDelete: () => void
   onContextMenu?: (e: React.MouseEvent) => void
   registerPort: (key: string, el: HTMLElement | null) => void
+  outputType?: TypeExpr
+  inputType?: TypeExpr
+  isWired?: boolean
 }
 
-function PlacementWithPorts({ placement, selected, onSelect, onDelete, onContextMenu, registerPort }: PlacementWithPortsProps) {
+function PlacementWithPorts({ placement, selected, onSelect, onDelete, onContextMenu, registerPort, outputType, inputType, isWired }: PlacementWithPortsProps) {
   const outputRef = useCallback(
     (el: HTMLElement | null) => registerPort(`port:${placement.id}:output`, el),
     [placement.id, registerPort],
@@ -770,6 +813,9 @@ function PlacementWithPorts({ placement, selected, onSelect, onDelete, onContext
       onContextMenu={onContextMenu}
       outputPortRef={outputRef}
       inputPortRef={inputRef}
+      outputType={outputType}
+      inputType={inputType}
+      isWired={isWired}
     />
   )
 }

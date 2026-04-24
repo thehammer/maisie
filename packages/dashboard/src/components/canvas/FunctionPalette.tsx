@@ -13,7 +13,7 @@
 
 import { useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
-import { STD_FUNCTION_DESCRIPTORS } from '@maisie/shared'
+import { STD_FUNCTION_DESCRIPTORS, inferFunctionOutput } from '@maisie/shared'
 import type { FunctionDescriptor } from '@maisie/shared'
 import {
   classifyCompatibility,
@@ -61,8 +61,10 @@ export function FunctionPalette({ highlightInputTarget, highlightOutputTarget, o
       const inputStatus = highlightInputTarget
         ? classifyCompatibility(highlightInputTarget, fn.input)
         : 'unknown'
+      // For palette output compatibility, resolve the static output (no upstream known)
+      const staticOutput = inferFunctionOutput(fn, undefined, {})
       const outputStatus = highlightOutputTarget
-        ? classifyCompatibility(fn.output, highlightOutputTarget)
+        ? classifyCompatibility(staticOutput, highlightOutputTarget)
         : 'unknown'
       // When only one side is active, use that side's status.
       // When both are active, use the better of the two.

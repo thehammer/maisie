@@ -374,11 +374,30 @@ Sub-phases 3a–3e shipped on 2026-04-23.
 
 ---
 
-## Extension — Canvas Polish (Sub-phase 3m) ✓ COMPLETE 2026-04-13
+## Extension — Canvas Polish (Sub-phases 3m, 3n)
 
 *Added 2026-04-24.*
 
+### 3n — Schema visibility + type inferencer
+
+**Status: PLANNED.** Captured in detail in `docs/canvas-schema-visibility.md`.
+
+**Problem:** Canvas nodes are opaque about the data shapes they produce. Wires get color-coded, but the node itself doesn't show its output type — so users can't reason about which functions to chain or what field names to use in `pluck` / `get`. The pipeline `entity → first → text` validates structurally but silently produces `[object Object]` because `text` wants a string and `first` produces a record.
+
+**Solution:** Each node shows a shallow (one-level) view of its output type. Drilling deeper happens by adding a function (`first`, `get`, `pluck`, etc.) — the next node shows the deeper view. The canvas becomes a progressive data explorer instead of a JSON dumper.
+
+**What ships:**
+- Generalized type inferencer in `packages/dashboard/src/lib/canvas/type-inference.ts` (or `packages/shared/`) with signature `infer(upstreamType, functionId, params) → outputType`. Per-function rules cover passthrough (`filter`, `sort`, `unique`), reducers (`first`, `last`, `count`), projections (`pluck`, `get`), and aggregations (`sum`, `group`).
+- Function descriptor schema extended: `output` accepts `{ kind: 'element_of', ref: 'input' }`, `{ kind: 'field_of', ref: 'input', fieldParam: 'field' }`, etc. Existing entries updated to use these where applicable.
+- New user-facing function: `std.get` (primitive exists; previously not exposed). Enables the natural `first → get("name") → text` idiom.
+- Node panels: entity nodes show top-level fields with their types; function nodes (when input is wired) show their inferred output shape; scalar leaves show just the type.
+- `chain-search.ts` `inferFunctionOutput` refactored to use the new inferencer so chain suggestions get more precise.
+
+**Scope:** 2–3 sessions.
+
 ### 3m — Right-click context menus
+
+**Status: COMPLETE (2026-04-24).**
 
 **Goal:** Custom context menus replace the browser's native right-click menu on canvas surfaces, providing target-appropriate actions at the cursor.
 
@@ -688,6 +707,72 @@ That's the core authoring loop finished.
 | 3l: Persistence + round-trip | 1–2 | 26–30 |
 
 Extension total: **12–16 sessions** on top of the original 12–14 of 3a–3f.
+
+---
+
+## Phase 3n — Schema Visibility on Nodes + Generalized Type Inferencer
+
+**Status: COMPLETE — 2026-04-13**
+
+**Goal:** Canvas placement nodes show their output type one level deep. Function nodes infer their output from the actual upstream type and inline params. This turns the canvas into a progressive data explorer: each hop reveals the shape of the data at that point.
+
+**Reference:** `docs/canvas-schema-visibility.md` (full design discussion)
+
+### What shipped
+
+**`FunctionOutputSpec` union** (`packages/shared/src/function-registry-data.ts`):
+- Extended `FunctionDescriptor.output` from `TypeExpr` to `FunctionOutputSpec`
+- New discriminated kinds: `element_of`, `field_of`, `collection_of_field_of`, `group_of`
+- Updated descriptors: `first`/`last` → `element_of`; `pluck` → `collection_of_field_of`; `group` → `group_of`
+- `filter`/`sort`/`limit`/`unique`/`map` retain static `collection<any>` (passthrough handled by inferencer)
+
+**`inferFunctionOutput` in shared** (`packages/shared/src/type-inference.ts`):
+- Signature: `(descriptor, upstreamType, params) → TypeExpr`
+- Resolves all FunctionOutputSpec kinds against actual upstream type and inline param values
+- Passthrough polymorphism: filter/sort/limit/unique preserve `collection<T>` element type
+- `group_of` falls back to `collection<any>` (exact bucket-record construction deferred)
+- `map` stays at `collection<any>` (lambda body inspection out of scope)
+- Falls back to ANY / `collection<any>` for unresolvable inputs
+
+**`std.get`** (`packages/shared/src/std-lib.ts`, `function-registry-data.ts`):
+- New `FunctionDef` extracting one field from a record via the primitive `get` op
+- Descriptor uses `field_of` output spec with `fieldParam: 'field'`
+- Enables the idiomatic `first → get("name") → text` pipeline pattern
+
+**Chain-search refactor** (`packages/dashboard/src/lib/canvas/chain-search.ts`):
+- Removed local `inferFunctionOutput` and `PASSTHROUGH_FN_IDS`
+- Now delegates to the shared `inferFunctionOutput` with empty params `{}`
+- Behavior preserved: pluck/map/group still return `collection<any>` at search time (no params)
+
+**Schema panel on nodes** (`packages/dashboard/src/components/canvas/Placement.tsx`):
+- `SchemaPanel` sub-component renders one-level-deep type: scalars, record fields, collection element
+- Entity placements: always show output type from resolved ports
+- Function placements: show inferred output when wired; "wire an input" prompt when unwired
+- Component placements: show `inputType` with "expects" label (from resolved ports)
+- New props: `outputType`, `inputType`, `isWired`
+
+**Canvas wires up types** (`packages/dashboard/src/components/canvas/Canvas.tsx`):
+- `CanvasSurface` computes `inferredOutputs` map (entity outputs first, then function outputs using upstream + config)
+- `wiredInputs` set tracks which placements have an inbound wire
+- `PlacementWithPorts` forwards `outputType`, `inputType`, `isWired` to `Placement`
+
+**`FunctionPalette` updated**: uses `inferFunctionOutput(fn, undefined, {})` for output compatibility check (static fallback) instead of raw `descriptor.output`
+
+**CSS** (`packages/dashboard/src/styles.css`): `.canvas-placement-schema`, `.canvas-placement-schema-field`, `.canvas-placement-schema-name`, `.canvas-placement-schema-type`, `.canvas-placement-schema-prompt`, `.canvas-placement-schema-label`
+
+**Tests added/updated:**
+- `packages/shared/src/__tests__/type-inference.test.ts` — 40 new tests covering all inferencer cases
+- `packages/shared/src/__tests__/function-registry-data.test.ts` — updated for new output specs and 14-entry count
+- `packages/dashboard/src/lib/canvas/__tests__/chain-search.test.ts` — updated for shared inferencer signature + new first/last behavior
+
+### Deviations and edge cases
+
+- **`group_of` simplified:** Phase 3n falls back to `collection<any>` for group. Exact bucket-record construction (`collection<record<{[field]: T, items: collection<elementType>}>>`) is deferred — the inferencer would need to thread both the grouping field type and the element type simultaneously.
+- **`std.get` input port:** The descriptor declares `input: { kind: 'record', fields: {} }` (any record). The `satisfies` matcher correctly accepts any record input here since `record<{}>` with no required fields matches all records.
+- **Multi-hop inference in Canvas:** `inferredOutputs` is computed in two passes (entities first, then functions). Functions that feed other functions resolve correctly in the common case. A true topological sort would handle arbitrary depth; for typical pipelines (≤5 hops), two passes are sufficient. A third+ pass would be needed for function → function → function chains where the middle node isn't an entity.
+- **type-resolver.ts `resolveFunctionPorts`:** Updated to use `inferFunctionOutput(descriptor, undefined, {})` to get the static fallback output TypeExpr for wire validation. Wire colors remain correct.
+
+**Scope: 1 session.**
 
 ---
 

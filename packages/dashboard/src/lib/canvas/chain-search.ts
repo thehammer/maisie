@@ -7,7 +7,7 @@
  */
 
 import type { TypeExpr } from '@maisie/shared'
-import { satisfies, STD_FUNCTION_DESCRIPTORS, type FunctionDescriptor } from '@maisie/shared'
+import { satisfies, STD_FUNCTION_DESCRIPTORS, inferFunctionOutput, type FunctionDescriptor } from '@maisie/shared'
 
 export interface ChainStep {
   /** Std lib id, e.g. 'std.pluck'. */
@@ -78,7 +78,7 @@ export function findBridgingChains(
       // Can the current head type flow into this function's input?
       if (!satisfies(currentType, descriptor.input).ok) continue
 
-      const nextType = inferFunctionOutput(descriptor, currentType)
+      const nextType = inferFunctionOutput(descriptor, currentType, {})
       const step: ChainStep = {
         functionId: descriptor.id,
         descriptor,
@@ -99,43 +99,6 @@ export function findBridgingChains(
 
   // Shortest chains first
   return results.sort((a, b) => a.steps.length - b.steps.length)
-}
-
-/**
- * Functions that act as pure passthrough on the collection element type:
- * collection<T> → collection<T>. These preserve the element type.
- *
- * pluck, map, group transform the elements (element type changes), so they
- * are excluded — their output stays collection<any> at search time since the
- * transformation target isn't known until the user fills in inline params.
- */
-const PASSTHROUGH_FN_IDS = new Set(['std.filter', 'std.sort', 'std.limit', 'std.unique'])
-
-/**
- * Given a function descriptor and the actual input type, compute the output type.
- *
- * Polymorphic collection operations (filter, sort, limit, unique) preserve the
- * element type of the concrete input rather than returning collection<any>.
- *
- * Transform operations (pluck, map, group) return collection<any> because the
- * output element type depends on inline params the user hasn't filled in yet.
- */
-export function inferFunctionOutput(descriptor: FunctionDescriptor, inputType: TypeExpr): TypeExpr {
-  // Passthrough polymorphism: collection<T> → collection<T> for filter/sort/limit/unique
-  if (
-    PASSTHROUGH_FN_IDS.has(descriptor.id) &&
-    descriptor.output.kind === 'collection' &&
-    descriptor.output.element.kind === 'any' &&
-    inputType.kind === 'collection'
-  ) {
-    return { kind: 'collection', element: inputType.element }
-  }
-
-  // All other descriptors return their declared output type directly.
-  // For pluck/map at search time we don't know the field name, so the
-  // output stays collection<any> — which satisfies collection<any> targets.
-  // Users fill in the field name in the inspector after applying the chain.
-  return descriptor.output
 }
 
 /**

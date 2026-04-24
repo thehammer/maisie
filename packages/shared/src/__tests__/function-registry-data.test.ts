@@ -17,8 +17,8 @@ describe('STD_FUNCTION_DESCRIPTORS completeness', () => {
     }
   })
 
-  it('has 13 entries (one per std lib op)', () => {
-    expect(STD_FUNCTION_DESCRIPTORS).toHaveLength(13)
+  it('has 14 entries (one per std lib op, including std.get added in 3n)', () => {
+    expect(STD_FUNCTION_DESCRIPTORS).toHaveLength(14)
   })
 })
 
@@ -35,12 +35,13 @@ describe('FunctionDescriptor shape validation', () => {
     expect(typeof d.description).toBe('string')
     expect(d.description.length).toBeGreaterThan(0)
 
-    // Input and output TypeExprs
+    // Input is always a TypeExpr
     expect(d.input).toBeDefined()
     expect(typeof d.input.kind).toBe('string')
 
+    // Output is a FunctionOutputSpec (TypeExpr OR input-relative descriptor)
     expect(d.output).toBeDefined()
-    expect(typeof d.output.kind).toBe('string')
+    expect(typeof (d.output as { kind: string }).kind).toBe('string')
 
     // Params (if present) must have valid shape
     if (d.params) {
@@ -65,48 +66,65 @@ describe('FunctionDescriptor shape validation', () => {
 })
 
 describe('FunctionDescriptor input/output types', () => {
-  it('collection-in, collection-out functions use collection<any>', () => {
-    const collectionToCollection = ['std.filter', 'std.sort', 'std.limit', 'std.map', 'std.pluck', 'std.group', 'std.unique']
-    for (const id of collectionToCollection) {
+  it('static collection-in, collection-out functions use collection<any> or a static TypeExpr', () => {
+    // filter/sort/limit/map/unique have static collection output (passthrough via inferencer)
+    const staticCollectionToCollection = ['std.filter', 'std.sort', 'std.limit', 'std.map', 'std.unique']
+    for (const id of staticCollectionToCollection) {
       const d = getFunctionDescriptor(id)!
       expect(d.input.kind).toBe('collection')
-      expect(d.output.kind).toBe('collection')
+      expect((d.output as { kind: string }).kind).toBe('collection')
     }
+  })
+
+  it('pluck output is collection_of_field_of (input-relative)', () => {
+    const d = getFunctionDescriptor('std.pluck')!
+    expect(d.input.kind).toBe('collection')
+    expect((d.output as { kind: string }).kind).toBe('collection_of_field_of')
+  })
+
+  it('group output is group_of (input-relative)', () => {
+    const d = getFunctionDescriptor('std.group')!
+    expect(d.input.kind).toBe('collection')
+    expect((d.output as { kind: string }).kind).toBe('group_of')
   })
 
   it('aggregation functions produce scalar output', () => {
     const count = getFunctionDescriptor('std.count')!
     expect(count.input.kind).toBe('collection')
-    expect(count.output.kind).toBe('scalar')
-    if (count.output.kind === 'scalar') {
-      expect(count.output.type).toBe('number')
-    }
+    const countOut = count.output as { kind: string; type?: string }
+    expect(countOut.kind).toBe('scalar')
+    expect(countOut.type).toBe('number')
 
     const sum = getFunctionDescriptor('std.sum')!
-    expect(sum.output.kind).toBe('scalar')
-    if (sum.output.kind === 'scalar') {
-      expect(sum.output.type).toBe('number')
-    }
+    const sumOut = sum.output as { kind: string; type?: string }
+    expect(sumOut.kind).toBe('scalar')
+    expect(sumOut.type).toBe('number')
 
     const any = getFunctionDescriptor('std.any')!
-    expect(any.output.kind).toBe('scalar')
-    if (any.output.kind === 'scalar') {
-      expect(any.output.type).toBe('boolean')
-    }
+    const anyOut = any.output as { kind: string; type?: string }
+    expect(anyOut.kind).toBe('scalar')
+    expect(anyOut.type).toBe('boolean')
 
     const all = getFunctionDescriptor('std.all')!
-    expect(all.output.kind).toBe('scalar')
-    if (all.output.kind === 'scalar') {
-      expect(all.output.type).toBe('boolean')
-    }
+    const allOut = all.output as { kind: string; type?: string }
+    expect(allOut.kind).toBe('scalar')
+    expect(allOut.type).toBe('boolean')
   })
 
-  it('first and last produce any output (element type unknown)', () => {
+  it('first and last use element_of (input-relative) output', () => {
     const first = getFunctionDescriptor('std.first')!
-    expect(first.output.kind).toBe('any')
+    expect((first.output as { kind: string }).kind).toBe('element_of')
 
     const last = getFunctionDescriptor('std.last')!
-    expect(last.output.kind).toBe('any')
+    expect((last.output as { kind: string }).kind).toBe('element_of')
+  })
+
+  it('std.get uses field_of (input-relative) output with field param', () => {
+    const get = getFunctionDescriptor('std.get')!
+    expect(get.input.kind).toBe('record')
+    const out = get.output as { kind: string; fieldParam?: string }
+    expect(out.kind).toBe('field_of')
+    expect(out.fieldParam).toBe('field')
   })
 })
 
