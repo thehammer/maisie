@@ -45,19 +45,40 @@ export function createTransmissionClient(config: TransmissionConfig) {
       if (downloadDir) args["download-dir"] = downloadDir;
 
       if (url.startsWith("magnet:")) {
-        // Magnet URIs have no HTTP backing — pass to Transmission as `filename`,
-        // which it handles natively (info-hash lookup via DHT/trackers).
+        // Magnet URI — pass directly to Transmission as `filename`.
         args["filename"] = url;
       } else {
-        // HTTP(S) torrent-file URL. Fetch it ourselves and forward as base64
-        // metainfo so Transmission doesn't need to reach the URL itself
-        // (which may be blocked by the container's VPN routing).
-        const torrentRes = await fetch(url, { signal: AbortSignal.timeout(30_000), redirect: "follow" });
-        if (!torrentRes.ok) {
-          throw new Error(`Failed to fetch torrent: ${torrentRes.status} ${torrentRes.statusText}`);
+        // HTTP(S) URL. Many Prowlarr/indexer proxy URLs 301-redirect to a
+        // magnet: URI in the Location header — Bun's fetch can't follow
+        // those because magnet: isn't an HTTP scheme. Walk redirects
+        // manually and hand a magnet to Transmission as soon as we see one.
+        let current = url;
+        let res: Response | null = null;
+        for (let hop = 0; hop < 5; hop++) {
+          res = await fetch(current, { signal: AbortSignal.timeout(30_000), redirect: "manual" });
+          if (res.status >= 300 && res.status < 400) {
+            const loc = res.headers.get("location");
+            if (!loc) break;
+            if (loc.startsWith("magnet:")) {
+              args["filename"] = loc;
+              break;
+            }
+            current = new URL(loc, current).toString();
+            continue;
+          }
+          break;
         }
-        const torrentBuf = await torrentRes.arrayBuffer();
-        args["metainfo"] = Buffer.from(torrentBuf).toString("base64");
+
+        if (!args["filename"]) {
+          if (!res || !res.ok) {
+            throw new Error(`Failed to fetch torrent: ${res?.status ?? "?"} ${res?.statusText ?? "no response"}`);
+          }
+          // Real torrent file — base64-encode and forward as metainfo so
+          // Transmission doesn't need to reach the URL itself (which may be
+          // blocked by the container's VPN routing).
+          const torrentBuf = await res.arrayBuffer();
+          args["metainfo"] = Buffer.from(torrentBuf).toString("base64");
+        }
       }
 
       const result = await rpc("torrent-add", args);
