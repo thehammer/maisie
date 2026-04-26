@@ -54,6 +54,24 @@ if compgen -G "config/prowlarr-definitions/*.yml" > /dev/null; then
                 rm -rf /tmp/maisie-prowlarr-defs"
 fi
 
+# Readarr also runs outside docker-compose (bind mount to /opt/docker/readarr).
+# Sync our custom-scripts directory so the abs-scan notification target works.
+# The ABS auth token lives in .abs-token and must already exist on Tokyo
+# (one-time setup; see config/readarr-custom-scripts/README.md).
+if compgen -G "config/readarr-custom-scripts/*.sh" > /dev/null; then
+  echo "==> Syncing Readarr custom scripts..."
+  ssh "$TOKYO" "sudo mkdir -p /opt/docker/readarr/custom-scripts && \
+                sudo chown 1000:1000 /opt/docker/readarr/custom-scripts"
+  scp config/readarr-custom-scripts/*.sh "${TOKYO}:/tmp/"
+  ssh "$TOKYO" "for f in /tmp/abs-scan.sh; do \
+                  [ -f \"\$f\" ] || continue; \
+                  sudo cp \"\$f\" /opt/docker/readarr/custom-scripts/\$(basename \"\$f\"); \
+                  sudo chown 1000:1000 /opt/docker/readarr/custom-scripts/\$(basename \"\$f\"); \
+                  sudo chmod +x /opt/docker/readarr/custom-scripts/\$(basename \"\$f\"); \
+                  rm \"\$f\"; \
+                done"
+fi
+
 if $SYNC_ONLY; then
   echo "==> Sync complete (--sync mode, skipping rebuild)"
   exit 0
