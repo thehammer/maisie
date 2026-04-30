@@ -95,7 +95,7 @@ The plan is organized into a sequence of platform phases plus one evergreen stre
 Phase 0: Foundations              [COMPLETE]
 Phase 1: The Data Platform        [COMPLETE — 2026-04-22]
 Phase 2: The Presentation Platform [COMPLETE — 2026-04-23]
-Phase 3: Visual Authoring         [3a-3e + 3g-3m COMPLETE; 3n PLANNED; 3f ongoing]
+Phase 3: Visual Authoring         [3a-3e + 3g-3n COMPLETE — 2026-04-24; 3f ongoing]
 Phase 4: The Agent Platform       [CORE COMPLETE — 2026-04-23; 4e autonomous loop deferred]
 Phase 5: Distribution             [PLANNED]
 Phase 6: Alternative Clients      [DEFERRED]
@@ -237,13 +237,13 @@ Components as the unified unit of UI. Mirrors the data platform in structure: ba
 
 ## Phase 3 — Visual Authoring
 
-**Status: Core complete (2026-04-23); extension 3g–3l complete (2026-04-13).** 1492 tests. Sub-phases 3a–3e and 3g–3l shipped. 3f (self-hosting) is ongoing.
+**Status: Core complete (2026-04-23); extensions 3g–3n complete (2026-04-24).** 1569 tests. Sub-phases 3a–3e and 3g–3n shipped. 3f (self-hosting) is ongoing.
 
 The UX surface where entities and components are designed visually. The structural type system enables bidirectional authoring: start from data (bottom-up, see what component contracts you satisfy), start from design (top-down, derive the entity shape you need), or expand outward from any point. The tooling should support all three directions without privileging any.
 
-### What shipped (3a–3e, 3g–3l)
+### What shipped (3a–3e, 3g–3n)
 
-11 sub-phases per `docs/visual-authoring-plan.md`:
+13 sub-phases per `docs/visual-authoring-plan.md`:
 
 - **3a** — Canvas surface with palette (entities + components) + inspector; drag from palette to canvas; placement selection, movement, and deletion. @dnd-kit/core for drag-and-drop.
 - **3b** — Wires between placement ports. Structural validation via `satisfies` from Phase 2d. Color-coded wires: green (compatible), red (incompatible with error details), gray (unknown). SVG cubic bezier curves with fat invisible hit targets.
@@ -256,6 +256,8 @@ The UX surface where entities and components are designed visually. The structur
 - **3j** — Auto-suggest transform chains. BFS over function signatures finds bridging chains; popover with one-click apply inserts function placements + wires.
 - **3k** — Views as first-class catalog entries. `views` table, registry, CRUD, "Save as View" canvas action. Cards bind views directly. ViewCard resolves entity → chain → component at render time.
 - **3l** — Canvas persistence + round-trip editing. `canvas_documents` table, autosave (1500ms debounce), restore on mount, clear button with confirm dialog. `hydrateView/Entity/Component` functions reconstruct CanvasDocuments from saved artifacts. "Edit in Canvas" button in Studio editor.
+- **3m** — Right-click context menus + visible delete affordances. ContextMenu component with target-specific actions (placement / wire / surface / palette item). × buttons on placements (hover/selected) and on selected wires. @dnd-kit pointer-event conflict fixed.
+- **3n** — Schema visibility on canvas nodes + generalized type inferencer. `inferFunctionOutput` in shared resolves output specs (`element_of`, `field_of`, `collection_of_field_of`, `group_of`) against actual upstream types and inline params. `std.get` added. Placement nodes show shallow output shape; wired functions show inferred output. Inline parameter inputs on function placements with Enter/Escape to blur.
 
 ### What's ongoing (3f)
 
