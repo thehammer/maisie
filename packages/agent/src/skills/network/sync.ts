@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { devices } from "../../services/schema";
 import { publish } from "../../services/mqtt";
-import { TOPICS } from "@maisie/shared";
+import { TOPICS } from "../../topics";
 import { lookupOui } from "./oui-lookup";
 import type { createUniFiClient } from "./unifi-client";
 

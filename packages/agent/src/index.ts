@@ -16,7 +16,7 @@ import { createUniFiClientFromEnv } from "./skills/network/unifi-client";
 import { syncDevices } from "./skills/network/sync";
 import { ensureOuiDatabase } from "./skills/network/oui-lookup";
 import { publish } from "./services/mqtt";
-import { TOPICS } from "@maisie/shared";
+import { TOPICS } from "./topics";
 import { createDsmClientFromEnv } from "./skills/synology/dsm-client";
 import { getNasHealth } from "./skills/synology/health";
 import { getPlexStatus } from "./skills/media/plex-status";
