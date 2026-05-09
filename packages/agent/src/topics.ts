@@ -65,6 +65,20 @@ export const TOPICS = {
     supplyLow: "home/hp-printer/supply_low",
     error: "home/hp-printer/error",
   },
+  ble: {
+    devices: {
+      discovered: "home/ble/devices/discovered",
+      updated: "home/ble/devices/updated",
+      lost: "home/ble/devices/lost",
+    },
+    state: (mac: string) => `home/ble/state/${mac.replace(/:/g, "")}` as const,
+    command: (mac: string) => `home/ble/command/${mac.replace(/:/g, "")}` as const,
+    commandResult: (mac: string) => `home/ble/command/${mac.replace(/:/g, "")}/result` as const,
+    gateway: {
+      status: (node: string) => `home/ble/gateway/${node}/status` as const,
+      scan: (node: string) => `home/ble/gateway/${node}/scan` as const,
+    },
+  },
   system: {
     agent: {
       health: (skill: string) => `home/system/agent/${skill}/health` as const,
@@ -78,5 +92,9 @@ export const TOPICS = {
     hevc: {
       status: "home/system/hevc/status",
     },
+    docker: {
+      checkStarted: "home/system/docker/check_started",
+      checkCompleted: "home/system/docker/check_completed",
+    },
   },
-} as const;
+} as const

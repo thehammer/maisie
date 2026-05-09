@@ -17,7 +17,7 @@ import { basename, dirname, extname, join } from "path";
 import { eq, desc } from "drizzle-orm";
 import { nightlyRuns, nightlyFiles } from "../../services/schema";
 import { publish } from "../../services/mqtt";
-import { TOPICS } from "@maisie/shared";
+import { TOPICS } from "../../topics";
 import { probeFile, cleanFile } from "../media/media-cleaner";
 import type { createDsmClient } from "../synology/dsm-client";
 import Database from "bun:sqlite";
