@@ -31,10 +31,6 @@
         "typescript": "^5.7.0",
       },
     },
-    "packages/ble-gateway": {
-      "name": "@maisie/ble-gateway",
-      "version": "0.1.0",
-    },
     "packages/cli": {
       "name": "@maisie/cli",
       "version": "0.1.0",
@@ -417,8 +413,6 @@
     "@lezer/lr": ["@lezer/lr@1.4.10", "", { "dependencies": { "@lezer/common": "^1.0.0" } }, "sha512-rnCpTIBafOx4mRp43xOxDJbFipJm/c0cia/V5TiGlhmMa+wsSdoGmUN3w5Bqrks/09Q/D4tNAmWaT8p6NRi77A=="],
 
     "@maisie/agent": ["@maisie/agent@workspace:packages/agent"],
-
-    "@maisie/ble-gateway": ["@maisie/ble-gateway@workspace:packages/ble-gateway"],
 
     "@maisie/cli": ["@maisie/cli@workspace:packages/cli"],
 
