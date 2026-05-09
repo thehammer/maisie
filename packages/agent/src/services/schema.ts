@@ -172,3 +172,23 @@ export const pluginConfigs = sqliteTable('plugin_configs', {
   envOverrides: text('env_overrides').notNull().default('{}'), // JSON: Record<string,string>
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 })
+
+/**
+ * ViewDefs — named view definitions for the three-layer entity + component system.
+ * Each view binds an entity field to a renderer component.
+ */
+export const views = sqliteTable('views', {
+  name: text('name').primaryKey(),
+  description: text('description').notNull(),
+  sourceEntity: text('source_entity').notNull(),
+  sourceField: text('source_field').notNull(),
+  /** Direct HTTP endpoint for ViewCard to fetch data from (e.g. '/api/services/status') */
+  sourceEndpoint: text('source_endpoint').notNull(),
+  /** JSON array of chain transforms — empty for initial conversions */
+  chain: text('chain').notNull().default('[]'),
+  /** Base or derived component name (e.g. 'json', 'service-chips') */
+  component: text('component').notNull(),
+  /** JSON object of props passed to the renderer component */
+  componentProps: text('component_props').notNull().default('{}'),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+})

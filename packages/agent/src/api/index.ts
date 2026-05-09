@@ -21,6 +21,8 @@ import { createPluginsRouter } from "./plugins";
 import { createPersonasRouter } from "./personas";
 import { createLayoutRouter } from "./layout";
 import { createPluginActionRouter } from "./plugin-actions";
+import { createServicesRouter } from "./services";
+import { createViewsRouter } from "./views";
 import type { Agent } from "../agent/index";
 import type { MaisiePlugin } from "@maisie/shared";
 
@@ -32,6 +34,8 @@ export function createApi(services: Services, agent?: Agent, plugins: MaisiePlug
   app.use("/*", cors());
 
   app.route("/api", createHealthRouter(services));
+  app.route("/api", createServicesRouter(services));
+  app.route("/api", createViewsRouter(services));
   app.route("/api", createDevicesRouter(services));
   app.route("/api", createNetworkRouter(services));
   app.route("/api", createNasRouter(services));

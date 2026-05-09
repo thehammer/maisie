@@ -38,6 +38,7 @@ import { createTransmissionClientFromEnv } from "./skills/media/transmission-cli
 import { createAudiobookshelfClientFromEnv } from "./skills/media/audiobookshelf-client";
 import { autoPopulateChannels, pushLineup } from "./skills/network/synthetic-hdhr";
 import { initEpgService } from "./services/epg";
+import { seedBuiltInViews } from "./services/view-loader";
 import { createAgent } from "./agent/index";
 import { discoverPlugins } from "./services/plugin-registry";
 import type { MaisiePlugin } from "@maisie/shared";
@@ -66,6 +67,9 @@ async function main() {
   // Initialize database
   const db = initDb();
   console.log("  ✓ Database initialized");
+
+  // Seed built-in view definitions (skips any that already exist)
+  await seedBuiltInViews(db);
 
   // Connect to MQTT broker
   const mqtt = await createMqttClient();

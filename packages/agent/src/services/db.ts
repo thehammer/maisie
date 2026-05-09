@@ -203,6 +203,18 @@ function migrate(sqlite: Database) {
       env_overrides TEXT NOT NULL DEFAULT '{}',
       updated_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS views (
+      name TEXT PRIMARY KEY,
+      description TEXT NOT NULL,
+      source_entity TEXT NOT NULL,
+      source_field TEXT NOT NULL,
+      source_endpoint TEXT NOT NULL,
+      chain TEXT NOT NULL DEFAULT '[]',
+      component TEXT NOT NULL,
+      component_props TEXT NOT NULL DEFAULT '{}',
+      updated_at INTEGER NOT NULL
+    );
   `);
 
   // Column migrations — ALTER TABLE ADD COLUMN for columns added after initial release

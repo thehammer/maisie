@@ -13,6 +13,9 @@ if (!isWidget) {
 }
 
 const App = lazy(() => import("./App").then((m) => ({ default: m.App })));
+const AppNext = lazy(() =>
+  import("./AppNext").then((m) => ({ default: m.AppNext })),
+);
 const MediaCalendarWidget = lazy(() =>
   import("./widgets/MediaCalendarWidget").then((m) => ({
     default: m.MediaCalendarWidget,
@@ -56,9 +59,10 @@ const widgets: Record<string, React.LazyExoticComponent<React.ComponentType>> = 
 
 function Root() {
   const Widget = widgets[path];
+  const isNext = path === "/next" || path.startsWith("/next/");
   return (
     <Suspense fallback={null}>
-      {Widget ? <Widget /> : <App />}
+      {Widget ? <Widget /> : isNext ? <AppNext /> : <App />}
     </Suspense>
   );
 }
