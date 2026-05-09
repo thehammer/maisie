@@ -11,10 +11,11 @@
  * A depends on self.B which depends on self.A.
  */
 
-import type { AddressResolver, MaisieValue, MaisieRecord, MaisieFunction, EntityDef, FieldDef, ExprNode } from '@maisie/shared'
+import type { AddressResolver, MaisieValue, MaisieRecord, MaisieFunction, EntityDef, FieldDef, ExprNode, ViewDef } from '@maisie/shared'
 import { evalExprAsync, STD_LIB } from '@maisie/shared'
 import { entityRegistry } from './entity-registry'
 import { registry } from './registry'
+import { viewRegistry } from './view-registry'
 
 // ActionContext is a minimal context object passed to plugin actions.
 // In Phase 2b we only need enough for action.execute() to work.
@@ -158,6 +159,11 @@ export function createAddressResolver(actionContext: ActionContext): AddressReso
     // Special sentinel: return the live entity list as entity descriptors.
     if (actionName === '__catalog_items') {
       return entityRegistry.list().map(entityToDescriptor) as MaisieValue
+    }
+
+    // Views sentinel — return the live view list as descriptors.
+    if (actionName === '__views_items') {
+      return viewRegistry.list().map(viewToDescriptor) as MaisieValue
     }
 
     // Memory sentinels — dispatched to memory operations provided in actionContext.
@@ -337,6 +343,22 @@ export function createAddressResolver(actionContext: ActionContext): AddressReso
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Convert a ViewDef to a plain descriptor record suitable for MEL queries.
+ * This is the value shape returned by `views.items`.
+ */
+function viewToDescriptor(view: ViewDef): MaisieRecord {
+  const entityAddress = view.source.field
+    ? `${view.source.entity}.${view.source.field}`
+    : view.source.entity
+  return {
+    name: view.name,
+    description: view.description ?? null,
+    entityAddress,
+    component: view.component,
+  } as MaisieRecord
+}
 
 /**
  * Convert an EntityDef to a plain descriptor record suitable for MEL queries.

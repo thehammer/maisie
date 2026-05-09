@@ -67,6 +67,24 @@ export class EntityRegistry {
       },
     }
     this.entities.set('memory', memoryEntity)
+
+    // Register the synthetic views entity. Its 'items' field dispatches to the
+    // view registry via a sentinel action name that the address resolver intercepts.
+    const viewsEntity: EntityDef = {
+      name: 'views',
+      description: 'All saved views in the system',
+      source: 'plugin',
+      pluginName: 'core',
+      section: 'system',
+      fields: {
+        items: {
+          kind: 'data',
+          type: 'collection',
+          actionName: '__views_items',
+        },
+      },
+    }
+    this.entities.set('views', viewsEntity)
   }
 
   /** Register an entity. Throws if validation fails. */
