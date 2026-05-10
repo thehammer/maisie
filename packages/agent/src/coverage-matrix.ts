@@ -78,10 +78,16 @@ export const COVERAGE_MATRIX: CoverageEntry[] = [
   {
     cardId: "DockerUpgradesCard",
     description: "Docker image upgrade status",
-    visual: false,
-    scriptable: false,
+    visual: true,
+    scriptable: true,
     agentic: false,
-    notes: "Not yet converted.",
+    notes:
+      "Wave 1: rendered via ViewCard (docker-upgrades view) in AppNext home page. " +
+      "Entity: maintenance.dockerUpgrades backed by /api/maintenance/docker/status. " +
+      "Component: json with expanded:true (Wave 1 fallback). " +
+      "Write paths (check-all, per-service check, autoUpdate toggle) added to maintenance.ts " +
+      "to unblock legacy card but not exposed via ViewDef. " +
+      "Per-item agentic invoke deferred to Wave 5.",
   },
   {
     cardId: "NowPlayingCard",

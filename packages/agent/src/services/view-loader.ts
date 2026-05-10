@@ -26,6 +26,14 @@ const BUILT_IN_VIEWS = [
     component: 'service-chips',
     componentProps: {} as Record<string, unknown>,
   },
+  {
+    name: 'docker-upgrades',
+    description: 'Docker container image upgrade status',
+    source: { entity: 'maintenance', field: 'dockerUpgrades', endpoint: '/api/maintenance/docker/status' },
+    chain: [] as unknown[],
+    component: 'json',
+    componentProps: { expanded: true } as Record<string, unknown>,
+  },
 ] as const
 
 /**
