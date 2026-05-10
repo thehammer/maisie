@@ -26,6 +26,14 @@ const BUILT_IN_VIEWS = [
     component: 'service-chips',
     componentProps: {} as Record<string, unknown>,
   },
+  {
+    name: 'now-playing',
+    description: 'Plex currently-playing sessions',
+    source: { entity: 'plex', field: 'nowPlaying', endpoint: '/api/plex/now-playing' },
+    chain: [] as unknown[],
+    component: 'json',
+    componentProps: { expanded: false } as Record<string, unknown>,
+  },
 ] as const
 
 /**
