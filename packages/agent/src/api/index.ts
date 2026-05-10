@@ -34,6 +34,8 @@ import { createViewStore } from "@maisie/plugin-core/src/view-store";
 import { createCanvasRouter } from "@maisie/plugin-core/src/canvas-routes";
 import { createCanvasDocumentStore } from "@maisie/plugin-core/src/canvas-document-store";
 import { entityRegistry } from "@maisie/plugin-core";
+import { createServicesRouter } from "./services";
+import { createViewsRouter } from "./views";
 import type { Agent } from "../agent/index";
 import type { MaisiePlugin } from "@maisie/shared";
 
@@ -81,6 +83,8 @@ export function createApi(services: Services, agent?: Agent, plugins: MaisiePlug
   app.route("/api", evalRouter);
 
   app.route("/api", createHealthRouter(services));
+  app.route("/api", createServicesRouter(services));
+  app.route("/api", createViewsRouter(services));
   app.route("/api", createDevicesRouter(services));
   app.route("/api", createNetworkRouter(services));
   app.route("/api", createNasRouter(services));

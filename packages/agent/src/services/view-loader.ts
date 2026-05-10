@@ -3,10 +3,58 @@
  *
  * Called once after the database is initialized, before the API starts.
  * Views that fail validation are logged and skipped (not fatal).
+ *
+ * Also exposes seedBuiltInViews() which inserts platform-shipped ViewDefs that
+ * have not yet been stored (idempotent — skips existing entries).
  */
 
 import { viewRegistry } from '@maisie/plugin-core'
 import { createViewStore } from '@maisie/plugin-core/src/view-store'
+import { views } from './schema'
+import { eq } from 'drizzle-orm'
+import type { getDb } from './db'
+
+type Db = ReturnType<typeof getDb>
+
+/** Built-in views shipped with the platform — seeded once at first boot */
+const BUILT_IN_VIEWS = [
+  {
+    name: 'services-status',
+    description: 'Health status of all connected services',
+    source: { entity: 'services', field: 'status', endpoint: '/api/services/status' },
+    chain: [] as unknown[],
+    component: 'service-chips',
+    componentProps: {} as Record<string, unknown>,
+  },
+] as const
+
+/**
+ * Seed built-in views that do not yet exist in the database.
+ * Called once during agent startup, after the database is initialised.
+ */
+export async function seedBuiltInViews(db: Db): Promise<void> {
+  for (const def of BUILT_IN_VIEWS) {
+    const existing = await db
+      .select({ name: views.name })
+      .from(views)
+      .where(eq(views.name, def.name))
+      .get()
+    if (!existing) {
+      await db.insert(views).values({
+        name: def.name,
+        description: def.description,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        source: def.source as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        chain: def.chain as any,
+        component: def.component,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        componentProps: def.componentProps as any,
+      })
+      console.log(`  ✓ View seeded: ${def.name}`)
+    }
+  }
+}
 
 export async function loadViewsIntoRegistry(db: unknown): Promise<void> {
   const store = createViewStore(db as any)

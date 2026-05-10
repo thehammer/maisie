@@ -24,7 +24,12 @@ interface ChainStep {
 interface ViewDef {
   name: string;
   description?: string;
-  source: { entity: string; field?: string };
+  source: {
+    entity: string;
+    field?: string;
+    /** Optional direct HTTP endpoint — if present, ViewCard fetches this instead of the entity resolver */
+    endpoint?: string;
+  };
   chain: ChainStep[];
   component: string;
   componentProps?: Record<string, unknown>;
@@ -59,21 +64,32 @@ export function ViewCard({ viewName, titleOverride }: ViewCardProps) {
         if (cancelled) return;
         setView(viewDef);
 
-        // Step 2: fetch the source entity field
-        const field = viewDef.source.field ?? "result";
-        const entityRes = await fetch(
-          `/api/entities/${encodeURIComponent(viewDef.source.entity)}/${encodeURIComponent(field)}`,
-        );
-        if (!entityRes.ok) {
-          setError(`Could not fetch entity "${viewDef.source.entity}.${field}"`);
-          return;
+        // Step 2: fetch the source entity field.
+        // If the view has a direct endpoint, use it. Otherwise route through the entity resolver.
+        let value: MaisieValue;
+        if (viewDef.source.endpoint) {
+          const directRes = await fetch(viewDef.source.endpoint);
+          if (!directRes.ok) {
+            setError(`Could not fetch data from "${viewDef.source.endpoint}" (HTTP ${directRes.status})`);
+            return;
+          }
+          value = await directRes.json() as MaisieValue;
+        } else {
+          const field = viewDef.source.field ?? "result";
+          const entityRes = await fetch(
+            `/api/entities/${encodeURIComponent(viewDef.source.entity)}/${encodeURIComponent(field)}`,
+          );
+          if (!entityRes.ok) {
+            setError(`Could not fetch entity "${viewDef.source.entity}.${field}"`);
+            return;
+          }
+          const entityBody = await entityRes.json() as unknown;
+          // Entity field values are wrapped in { value: ... }
+          value =
+            entityBody !== null && typeof entityBody === "object" && "value" in (entityBody as object)
+              ? (entityBody as { value: MaisieValue }).value
+              : (entityBody as MaisieValue);
         }
-        const entityBody = await entityRes.json() as unknown;
-        // Entity field values are wrapped in { value: ... }
-        let value: MaisieValue =
-          entityBody !== null && typeof entityBody === "object" && "value" in (entityBody as object)
-            ? (entityBody as { value: MaisieValue }).value
-            : (entityBody as MaisieValue);
 
         if (cancelled) return;
 
