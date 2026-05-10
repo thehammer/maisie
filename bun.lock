@@ -163,6 +163,14 @@
         "zod": "^4.3.6",
       },
     },
+    "packages/plugin-synthetic": {
+      "name": "@maisie/plugin-synthetic",
+      "version": "0.1.0",
+      "dependencies": {
+        "@maisie/shared": "workspace:*",
+        "zod": "^4.3.6",
+      },
+    },
     "packages/plugin-unifi": {
       "name": "@maisie/plugin-unifi",
       "version": "0.1.0",
@@ -437,6 +445,8 @@
     "@maisie/plugin-sonarr": ["@maisie/plugin-sonarr@workspace:packages/plugin-sonarr"],
 
     "@maisie/plugin-synology": ["@maisie/plugin-synology@workspace:packages/plugin-synology"],
+
+    "@maisie/plugin-synthetic": ["@maisie/plugin-synthetic@workspace:packages/plugin-synthetic"],
 
     "@maisie/plugin-unifi": ["@maisie/plugin-unifi@workspace:packages/plugin-unifi"],
 
