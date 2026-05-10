@@ -26,6 +26,20 @@ const BUILT_IN_VIEWS = [
     component: 'service-chips',
     componentProps: {} as Record<string, unknown>,
   },
+  {
+    name: 'calibre-enrichment',
+    description: 'Calibre book metadata enrichment status — gap breakdown and queue counts',
+    source: { entity: 'calibre', field: 'enrichment', endpoint: '/api/calibre/enrichment/status' },
+    chain: [] as unknown[],
+    // Wave 5 follow-up: expose reviewBook(bookId, "approve"|"reject") as an ai.tier:'advise'
+    // PluginAction with per-item invocation. The ViewDef will need a component that renders
+    // the EnrichmentEntry list with inline action buttons wired to the agentic invoke surface.
+    // Source endpoint for the queue: GET /api/calibre/enrichment/queue?status=enriched&limit=20
+    //
+    // Wave 2: derive calibre-enrichment-stats component (progress bar, stat rows, gap breakdown list).
+    component: 'json',
+    componentProps: { expanded: true } as Record<string, unknown>,
+  },
 ] as const
 
 /**
