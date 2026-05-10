@@ -70,10 +70,22 @@ export const COVERAGE_MATRIX: CoverageEntry[] = [
   {
     cardId: "NightlyCard",
     description: "Nightly maintenance task status",
-    visual: false,
-    scriptable: false,
+    visual: true,
+    scriptable: true,
     agentic: false,
-    notes: "Not yet converted.",
+    notes:
+      "PARTIAL CONVERSION. " +
+      "Read display converted: ViewCard (nightly-status view) in AppNext home page. " +
+      "Entity: maintenance.nightly backed by /api/maintenance/nightly/status. " +
+      "Component: json with expanded:true (Wave 1 fallback). " +
+      "KEPT LEGACY: NightlyCard.tsx retained for start/stop buttons " +
+      "(POST /api/maintenance/nightly/start, /stop). " +
+      "Start/stop deferred to Wave 5 agentic surface. " +
+      "EXCEPTION[animation-loop]: CSS progress bar animation during active runs " +
+      "(progress-fill green keyframe loop driven by processedFiles/totalFiles) is outside " +
+      "the component DSL scope — imperative-rendering exception type 'animation-loop'. " +
+      "Formally documented: this exception is permanent; animation state cannot be expressed " +
+      "in a declarative ViewDef chain.",
   },
   {
     cardId: "DockerUpgradesCard",

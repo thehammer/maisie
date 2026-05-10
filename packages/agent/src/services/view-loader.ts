@@ -26,6 +26,14 @@ const BUILT_IN_VIEWS = [
     component: 'service-chips',
     componentProps: {} as Record<string, unknown>,
   },
+  {
+    name: 'nightly-status',
+    description: 'Nightly maintenance run status — task list, timing, recent runs',
+    source: { entity: 'maintenance', field: 'nightly', endpoint: '/api/maintenance/nightly/status' },
+    chain: [] as unknown[],
+    component: 'json',
+    componentProps: { expanded: true } as Record<string, unknown>,
+  },
 ] as const
 
 /**

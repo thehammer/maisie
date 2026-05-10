@@ -89,6 +89,8 @@ function HomePage() {
       </div>
       {/* Wave 1 — ServiceStatus: entity + view → ViewCard */}
       <ViewCard viewName="services-status" titleOverride="Services" />
+      {/* Wave 1 — NightlyCard (partial): read display only; start/stop remain in legacy NightlyCard */}
+      <ViewCard viewName="nightly-status" titleOverride="Nightly Maintenance" />
     </div>
   );
 }
