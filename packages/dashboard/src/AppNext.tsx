@@ -69,6 +69,8 @@ export function AppNext() {
       <main style={{ flex: 1, overflow: "auto" }}>
         {page === "home" ? (
           <HomePage />
+        ) : page === "network" ? (
+          <NetworkPage />
         ) : page === "studio" ? (
           // Studio is already three-layer — reuse it directly
           <StudioPage onBack={() => setPage("home")} />
@@ -89,6 +91,17 @@ function HomePage() {
       </div>
       {/* Wave 1 — ServiceStatus: entity + view → ViewCard */}
       <ViewCard viewName="services-status" titleOverride="Services" />
+    </div>
+  );
+}
+
+function NetworkPage() {
+  return (
+    <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#4b5563", marginBottom: 4 }}>
+        Network
+      </div>
+      <ViewCard viewName="network-summary" titleOverride="Network" />
     </div>
   );
 }
