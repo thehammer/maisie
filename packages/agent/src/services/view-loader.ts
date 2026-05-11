@@ -45,6 +45,14 @@ const BUILT_IN_VIEWS = [
     component: 'json',
     componentProps: { expanded: false } as Record<string, unknown>,
   },
+  {
+    name: 'network-summary',
+    description: 'UniFi network device summary — counts, alerts, misplaced IoT',
+    source: { entity: 'network', field: 'summary', endpoint: '/api/devices/summary' },
+    chain: [] as unknown[],
+    component: 'json',
+    componentProps: { expanded: true } as Record<string, unknown>,
+  },
 ] as const
 
 /**

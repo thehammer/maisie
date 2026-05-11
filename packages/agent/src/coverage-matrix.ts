@@ -36,10 +36,16 @@ export const COVERAGE_MATRIX: CoverageEntry[] = [
   {
     cardId: "NetworkCard",
     description: "UniFi device list",
-    visual: false,
-    scriptable: false,
+    visual: true,
+    scriptable: true,
     agentic: false,
-    notes: "Not yet converted.",
+    notes:
+      "Wave 1: rendered via ViewCard (network-summary view) in AppNext network page. " +
+      "Entity: network.summary backed by /api/devices/summary aggregating endpoint. " +
+      "Component: json with expanded:true (Wave 1 fallback). " +
+      "Derived network-summary component (big numbers, conditional badge, misplaced IoT list) " +
+      "deferred to Wave 2. " +
+      "Agentic exposure deferred.",
   },
   {
     cardId: "PlexCard",

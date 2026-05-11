@@ -71,6 +71,8 @@ export function AppNext() {
           <HomePage />
         ) : page === "media" ? (
           <MediaPage />
+        ) : page === "network" ? (
+          <NetworkPage />
         ) : page === "studio" ? (
           // Studio is already three-layer — reuse it directly
           <StudioPage onBack={() => setPage("home")} />
@@ -104,6 +106,17 @@ function MediaPage() {
         Media
       </div>
       <ViewCard viewName="now-playing" titleOverride="Now Playing" />
+    </div>
+  );
+}
+
+function NetworkPage() {
+  return (
+    <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#4b5563", marginBottom: 4 }}>
+        Network
+      </div>
+      <ViewCard viewName="network-summary" titleOverride="Network" />
     </div>
   );
 }
