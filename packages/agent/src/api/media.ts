@@ -41,6 +41,17 @@ export function createMediaRouter(services: Pick<Services, "db" | "plex" | "rada
     }
   });
 
+  router.get("/plex/now-playing", async (c) => {
+    if (!services.plex) return c.json({ error: "Plex not configured" }, 503);
+    try {
+      const status = await getPlexStatus(services.plex!);
+      return c.json(status.nowPlaying);
+    } catch (err) {
+      console.error("[plex] Error:", err);
+      return c.json({ error: String(err) }, 500);
+    }
+  });
+
   router.get("/plex/shows", async (c) => {
     if (!services.plex) return c.json({ error: "Plex not connected" }, 503);
     const title = c.req.query("title");

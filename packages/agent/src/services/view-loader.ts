@@ -27,6 +27,44 @@ const BUILT_IN_VIEWS = [
     componentProps: {} as Record<string, unknown>,
   },
   {
+    name: 'youtube-cleanup',
+    description: 'YouTube cleanup status — likes and subs remaining, progress',
+    source: { entity: 'youtube', field: 'cleanup', endpoint: '/api/youtube/cleanup/status' },
+    chain: [] as unknown[],
+    component: 'json',
+    componentProps: { expanded: true } as Record<string, unknown>,
+    // Wave 5 follow-up: expose runCleanup as an ai.tier:'act' PluginAction so the
+    // agent persona can trigger it. The ViewCard component will surface a button
+    // via the agentic invoke pattern once that tier is implemented.
+  },
+  {
+    name: 'now-playing',
+    description: 'Plex currently-playing sessions',
+    source: { entity: 'plex', field: 'nowPlaying', endpoint: '/api/plex/now-playing' },
+    chain: [] as unknown[],
+    component: 'json',
+    componentProps: { expanded: false } as Record<string, unknown>,
+  },
+  {
+    name: 'network-summary',
+    description: 'UniFi network device summary — counts, alerts, misplaced IoT',
+    source: { entity: 'network', field: 'summary', endpoint: '/api/devices/summary' },
+    chain: [] as unknown[],
+    component: 'json',
+    componentProps: { expanded: true } as Record<string, unknown>,
+  },
+  {
+    name: 'calibre-enrichment',
+    description: 'Calibre book metadata enrichment status — gap breakdown and queue counts',
+    source: { entity: 'calibre', field: 'enrichment', endpoint: '/api/calibre/enrichment/status' },
+    chain: [] as unknown[],
+    component: 'json',
+    componentProps: { expanded: true } as Record<string, unknown>,
+    // Wave 2: derive calibre-enrichment-stats component (progress bar, stat rows, gap breakdown list).
+    // Wave 5 follow-up: expose reviewBook(bookId, "approve"|"reject") as an ai.tier:'advise'
+    // PluginAction with per-item invocation.
+  },
+  {
     name: 'docker-upgrades',
     description: 'Docker container image upgrade status',
     source: { entity: 'maintenance', field: 'dockerUpgrades', endpoint: '/api/maintenance/docker/status' },
