@@ -115,6 +115,21 @@ export const COVERAGE_MATRIX: CoverageEntry[] = [
       "Write path (Run Now → POST /api/youtube/cleanup/run) deferred to Wave 5 agentic surface. " +
       "Conditional hide when nothing to do is not replicated in Wave 1.",
   },
+  {
+    cardId: "CalibreEnrichmentCard",
+    description: "Calibre book metadata enrichment status with per-item approve/reject queue",
+    visual: true,
+    scriptable: true,
+    agentic: false,
+    notes:
+      "Wave 1: rendered via ViewCard (calibre-enrichment view) in AppNext. " +
+      "Entity: calibre.enrichment backed by /api/calibre/enrichment/status. " +
+      "Component: json with expanded:true (Wave 1 fallback). " +
+      "This is the richest proof point for Phase 3P: per-item approve/reject, write path, " +
+      "and conditional sections are all Wave 5 agentic surface work. " +
+      "Wave 2: derive calibre-enrichment-stats component (progress bar, gap breakdown). " +
+      "Wave 5: per-item review queue with approve/reject via agentic invoke tier.",
+  },
 ];
 
 /** Returns all cards that have both visual and scriptable conversion complete. */

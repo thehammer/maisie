@@ -53,6 +53,17 @@ const BUILT_IN_VIEWS = [
     component: 'json',
     componentProps: { expanded: true } as Record<string, unknown>,
   },
+  {
+    name: 'calibre-enrichment',
+    description: 'Calibre book metadata enrichment status — gap breakdown and queue counts',
+    source: { entity: 'calibre', field: 'enrichment', endpoint: '/api/calibre/enrichment/status' },
+    chain: [] as unknown[],
+    component: 'json',
+    componentProps: { expanded: true } as Record<string, unknown>,
+    // Wave 2: derive calibre-enrichment-stats component (progress bar, stat rows, gap breakdown list).
+    // Wave 5 follow-up: expose reviewBook(bookId, "approve"|"reject") as an ai.tier:'advise'
+    // PluginAction with per-item invocation.
+  },
 ] as const
 
 /**
