@@ -7,6 +7,56 @@ export function createDevicesRouter(services: Pick<Services, "db">) {
   const { db } = services;
   const router = new Hono();
 
+  router.get("/devices/summary", (c) => {
+    const DEFAULT_VLAN_TYPES = new Set([
+      "computer", "phone", "tablet", "server", "network", "camera",
+      "gaming", "streaming", "unknown", "ap", "wearable",
+      "tuner", "av", "display",
+    ]);
+
+    const allDevices = db.select().from(devices).all();
+
+    const byStatus: Record<string, number> = {};
+    const byType: Record<string, number> = {};
+    for (const d of allDevices) {
+      byStatus[d.status] = (byStatus[d.status] || 0) + 1;
+      byType[d.deviceType] = (byType[d.deviceType] || 0) + 1;
+    }
+
+    const newCount = byStatus["new"] || 0;
+    const suspiciousCount = byStatus["suspicious"] || 0;
+    const alertCount = newCount + suspiciousCount;
+
+    const misplacedIot = allDevices
+      .filter(
+        (d) =>
+          d.networkSegment === "Default" &&
+          !DEFAULT_VLAN_TYPES.has(d.deviceType) &&
+          d.status !== "new",
+      )
+      .map((d) => ({
+        name: d.deviceDescription || d.hostname || d.mac,
+        type: d.deviceType,
+        ip: d.ip || null,
+      }));
+
+    const topTypes = Object.entries(byType)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([type, count]) => ({ type, count }));
+
+    return c.json({
+      total: allDevices.length,
+      trusted: byStatus["trusted"] || 0,
+      newDevices: newCount,
+      suspicious: suspiciousCount,
+      alertCount,
+      topTypes,
+      misplacedIot,
+      misplacedIotCount: misplacedIot.length,
+    });
+  });
+
   router.get("/devices", (c) => {
     const allDevices = db.select().from(devices).all();
     return c.json(allDevices);
