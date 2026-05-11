@@ -26,6 +26,17 @@ const BUILT_IN_VIEWS = [
     component: 'service-chips',
     componentProps: {} as Record<string, unknown>,
   },
+  {
+    name: 'youtube-cleanup',
+    description: 'YouTube cleanup status — likes and subs remaining, progress',
+    source: { entity: 'youtube', field: 'cleanup', endpoint: '/api/youtube/cleanup/status' },
+    chain: [] as unknown[],
+    component: 'json',
+    componentProps: { expanded: true } as Record<string, unknown>,
+    // Wave 5 follow-up: expose runCleanup as an ai.tier:'act' PluginAction so the
+    // agent persona can trigger it. The ViewCard component will surface a button
+    // via the agentic invoke pattern once that tier is implemented.
+  },
 ] as const
 
 /**
