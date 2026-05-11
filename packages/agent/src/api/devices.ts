@@ -19,8 +19,10 @@ export function createDevicesRouter(services: Pick<Services, "db">) {
     const byStatus: Record<string, number> = {};
     const byType: Record<string, number> = {};
     for (const d of allDevices) {
-      byStatus[d.status] = (byStatus[d.status] || 0) + 1;
-      byType[d.deviceType] = (byType[d.deviceType] || 0) + 1;
+      const status = d.status ?? "unknown";
+      const type = d.deviceType ?? "unknown";
+      byStatus[status] = (byStatus[status] || 0) + 1;
+      byType[type] = (byType[type] || 0) + 1;
     }
 
     const newCount = byStatus["new"] || 0;
@@ -31,7 +33,7 @@ export function createDevicesRouter(services: Pick<Services, "db">) {
       .filter(
         (d) =>
           d.networkSegment === "Default" &&
-          !DEFAULT_VLAN_TYPES.has(d.deviceType) &&
+          !DEFAULT_VLAN_TYPES.has(d.deviceType ?? "unknown") &&
           d.status !== "new",
       )
       .map((d) => ({

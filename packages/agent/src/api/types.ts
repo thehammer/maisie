@@ -17,6 +17,8 @@ import type { ProwlarrClient } from "../skills/media/prowlarr-client";
 import type { ReadarrClient } from "../skills/media/readarr-client";
 import type { TransmissionClient } from "../skills/media/transmission-client";
 import type { AudiobookshelfClient } from "../skills/media/audiobookshelf-client";
+import type { createBleRegistry } from "../skills/ble/registry";
+import type { createBleMqttBridge } from "../skills/ble/mqtt-bridge";
 
 type Db = ReturnType<typeof import("../services/db").initDb>;
 type UniFi = ReturnType<typeof createUniFiClient>;
@@ -30,6 +32,8 @@ type Ha = ReturnType<typeof createHaClient>;
 type Calibre = ReturnType<typeof createCalibreClient>;
 type Ps4 = ReturnType<typeof createPs4Client>;
 type Protect = ReturnType<typeof createProtectClient>;
+type BleRegistry = ReturnType<typeof createBleRegistry>;
+type BleMqttBridge = ReturnType<typeof createBleMqttBridge>;
 
 export interface Services {
   db: Db;
@@ -52,4 +56,6 @@ export interface Services {
   transmission: TransmissionClient | null;
   readarr: ReadarrClient | null;
   audiobookshelf: AudiobookshelfClient | null;
+  bleRegistry: BleRegistry | null;
+  bleBridge: BleMqttBridge | null;
 }

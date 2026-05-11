@@ -48,7 +48,7 @@ export function createMaintenanceRouter(_services: Pick<Services, "db">) {
   // Write endpoints — added now so the legacy DockerUpgradesCard keeps working.
   // Not exposed via ViewDef; write-path ViewCard wiring is deferred to Wave 5.
   router.post("/maintenance/docker/check", async (c) => {
-    const body = await c.req.json<{ service?: string }>().catch(() => ({}));
+    const body = await c.req.json().catch(() => ({})) as { service?: string };
     const result = await triggerDockerUpgradeCheck(body.service);
     if (!result.started) return c.json({ error: result.reason }, 409);
     return c.json({ ok: true });
@@ -56,7 +56,7 @@ export function createMaintenanceRouter(_services: Pick<Services, "db">) {
 
   router.patch("/maintenance/docker/services/:service", async (c) => {
     const service = c.req.param("service");
-    const body = await c.req.json<{ autoUpdate?: boolean }>().catch(() => ({}));
+    const body = await c.req.json().catch(() => ({})) as { autoUpdate?: boolean };
     if (typeof body.autoUpdate !== "boolean") {
       return c.json({ error: "autoUpdate (boolean) required" }, 400);
     }
