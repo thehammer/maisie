@@ -86,10 +86,15 @@ export const COVERAGE_MATRIX: CoverageEntry[] = [
   {
     cardId: "NowPlayingCard",
     description: "Plex now playing",
-    visual: false,
-    scriptable: false,
+    visual: true,
+    scriptable: true,
     agentic: false,
-    notes: "Not yet converted.",
+    notes:
+      "Wave 1: rendered via ViewCard (now-playing view) in AppNext media page. " +
+      "Entity: plex.nowPlaying sentinel backed by /api/plex/now-playing. " +
+      "Component: json (Wave 1 fallback). " +
+      "Derived now-playing-sessions component deferred to Wave 2. " +
+      "Agentic exposure deferred.",
   },
   {
     cardId: "YouTubeCleanupCard",

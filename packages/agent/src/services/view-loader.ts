@@ -37,6 +37,14 @@ const BUILT_IN_VIEWS = [
     // agent persona can trigger it. The ViewCard component will surface a button
     // via the agentic invoke pattern once that tier is implemented.
   },
+  {
+    name: 'now-playing',
+    description: 'Plex currently-playing sessions',
+    source: { entity: 'plex', field: 'nowPlaying', endpoint: '/api/plex/now-playing' },
+    chain: [] as unknown[],
+    component: 'json',
+    componentProps: { expanded: false } as Record<string, unknown>,
+  },
 ] as const
 
 /**
