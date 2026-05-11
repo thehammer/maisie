@@ -95,6 +95,8 @@ function HomePage() {
       <ViewCard viewName="services-status" titleOverride="Services" />
       {/* Wave 1 — YouTubeCleanupCard: entity + view → ViewCard */}
       <ViewCard viewName="youtube-cleanup" titleOverride="YouTube Cleanup" />
+      {/* Wave 1 — DockerUpgrades: entity + view → ViewCard */}
+      <ViewCard viewName="docker-upgrades" titleOverride="Docker Updates" />
     </div>
   );
 }
@@ -106,6 +108,8 @@ function MediaPage() {
         Media
       </div>
       <ViewCard viewName="now-playing" titleOverride="Now Playing" />
+      {/* Wave 1 — CalibreEnrichmentCard: entity + view → ViewCard */}
+      <ViewCard viewName="calibre-enrichment" titleOverride="Calibre Enrichment" />
     </div>
   );
 }
@@ -117,19 +121,6 @@ function NetworkPage() {
         Network
       </div>
       <ViewCard viewName="network-summary" titleOverride="Network" />
-    </div>
-  );
-}
-
-/** Media page — library management cards. */
-function MediaPage() {
-  return (
-    <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#4b5563", marginBottom: 4 }}>
-        Media
-      </div>
-      {/* Wave 1 — CalibreEnrichmentCard: entity + view → ViewCard */}
-      <ViewCard viewName="calibre-enrichment" titleOverride="Calibre Enrichment" />
     </div>
   );
 }

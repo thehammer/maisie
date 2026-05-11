@@ -64,6 +64,14 @@ const BUILT_IN_VIEWS = [
     // Wave 5 follow-up: expose reviewBook(bookId, "approve"|"reject") as an ai.tier:'advise'
     // PluginAction with per-item invocation.
   },
+  {
+    name: 'docker-upgrades',
+    description: 'Docker container image upgrade status',
+    source: { entity: 'maintenance', field: 'dockerUpgrades', endpoint: '/api/maintenance/docker/status' },
+    chain: [] as unknown[],
+    component: 'json',
+    componentProps: { expanded: true } as Record<string, unknown>,
+  },
 ] as const
 
 /**
