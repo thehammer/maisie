@@ -92,10 +92,28 @@ export const COVERAGE_MATRIX: CoverageEntry[] = [
   {
     cardId: "NowPlayingCard",
     description: "Plex now playing",
-    visual: false,
-    scriptable: false,
+    visual: true,
+    scriptable: true,
     agentic: false,
-    notes: "Not yet converted.",
+    notes:
+      "Wave 1: rendered via ViewCard (now-playing view) in AppNext media page. " +
+      "Entity: plex.nowPlaying sentinel backed by /api/plex/now-playing. " +
+      "Component: json (Wave 1 fallback). " +
+      "Derived now-playing-sessions component deferred to Wave 2. " +
+      "Agentic exposure deferred.",
+  },
+  {
+    cardId: "YouTubeCleanupCard",
+    description: "YouTube cleanup status — likes/subs remaining, quota, last run",
+    visual: true,
+    scriptable: true,
+    agentic: false,
+    notes:
+      "Wave 1: rendered via ViewCard (youtube-cleanup view) in AppNext home page. " +
+      "Entity: youtube.cleanup backed by /api/youtube/cleanup/status. " +
+      "Component: json with expanded:true (Wave 1 fallback). " +
+      "Write path (Run Now → POST /api/youtube/cleanup/run) deferred to Wave 5 agentic surface. " +
+      "Conditional hide when nothing to do is not replicated in Wave 1.",
   },
 ];
 

@@ -69,6 +69,8 @@ export function AppNext() {
       <main style={{ flex: 1, overflow: "auto" }}>
         {page === "home" ? (
           <HomePage />
+        ) : page === "media" ? (
+          <MediaPage />
         ) : page === "network" ? (
           <NetworkPage />
         ) : page === "studio" ? (
@@ -91,6 +93,19 @@ function HomePage() {
       </div>
       {/* Wave 1 — ServiceStatus: entity + view → ViewCard */}
       <ViewCard viewName="services-status" titleOverride="Services" />
+      {/* Wave 1 — YouTubeCleanupCard: entity + view → ViewCard */}
+      <ViewCard viewName="youtube-cleanup" titleOverride="YouTube Cleanup" />
+    </div>
+  );
+}
+
+function MediaPage() {
+  return (
+    <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#4b5563", marginBottom: 4 }}>
+        Media
+      </div>
+      <ViewCard viewName="now-playing" titleOverride="Now Playing" />
     </div>
   );
 }
