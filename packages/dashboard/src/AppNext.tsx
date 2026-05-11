@@ -91,6 +91,8 @@ function HomePage() {
       </div>
       {/* Wave 1 — ServiceStatus: entity + view → ViewCard */}
       <ViewCard viewName="services-status" titleOverride="Services" />
+      {/* Wave 1 — YouTubeCleanupCard: entity + view → ViewCard */}
+      <ViewCard viewName="youtube-cleanup" titleOverride="YouTube Cleanup" />
     </div>
   );
 }

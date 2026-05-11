@@ -96,6 +96,19 @@ export const COVERAGE_MATRIX: CoverageEntry[] = [
       "Derived now-playing-sessions component deferred to Wave 2. " +
       "Agentic exposure deferred.",
   },
+  {
+    cardId: "YouTubeCleanupCard",
+    description: "YouTube cleanup status — likes/subs remaining, quota, last run",
+    visual: true,
+    scriptable: true,
+    agentic: false,
+    notes:
+      "Wave 1: rendered via ViewCard (youtube-cleanup view) in AppNext home page. " +
+      "Entity: youtube.cleanup backed by /api/youtube/cleanup/status. " +
+      "Component: json with expanded:true (Wave 1 fallback). " +
+      "Write path (Run Now → POST /api/youtube/cleanup/run) deferred to Wave 5 agentic surface. " +
+      "Conditional hide when nothing to do is not replicated in Wave 1.",
+  },
 ];
 
 /** Returns all cards that have both visual and scriptable conversion complete. */
