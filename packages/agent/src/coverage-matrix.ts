@@ -36,10 +36,16 @@ export const COVERAGE_MATRIX: CoverageEntry[] = [
   {
     cardId: "NetworkCard",
     description: "UniFi device list",
-    visual: false,
-    scriptable: false,
+    visual: true,
+    scriptable: true,
     agentic: false,
-    notes: "Not yet converted.",
+    notes:
+      "Wave 1: rendered via ViewCard (network-summary view) in AppNext network page. " +
+      "Entity: network.summary backed by /api/devices/summary aggregating endpoint. " +
+      "Component: json with expanded:true (Wave 1 fallback). " +
+      "Derived network-summary component (big numbers, conditional badge, misplaced IoT list) " +
+      "deferred to Wave 2. " +
+      "Agentic exposure deferred.",
   },
   {
     cardId: "PlexCard",
@@ -90,18 +96,57 @@ export const COVERAGE_MATRIX: CoverageEntry[] = [
   {
     cardId: "DockerUpgradesCard",
     description: "Docker image upgrade status",
-    visual: false,
-    scriptable: false,
+    visual: true,
+    scriptable: true,
     agentic: false,
-    notes: "Not yet converted.",
+    notes:
+      "Wave 1: rendered via ViewCard (docker-upgrades view) in AppNext home page. " +
+      "Entity: maintenance.dockerUpgrades backed by /api/maintenance/docker/status. " +
+      "Component: json with expanded:true (Wave 1 fallback). " +
+      "Write paths (check-all, per-service check, autoUpdate toggle) added to maintenance.ts " +
+      "to unblock legacy card but not exposed via ViewDef. " +
+      "Per-item agentic invoke deferred to Wave 5.",
   },
   {
     cardId: "NowPlayingCard",
     description: "Plex now playing",
-    visual: false,
-    scriptable: false,
+    visual: true,
+    scriptable: true,
     agentic: false,
-    notes: "Not yet converted.",
+    notes:
+      "Wave 1: rendered via ViewCard (now-playing view) in AppNext media page. " +
+      "Entity: plex.nowPlaying sentinel backed by /api/plex/now-playing. " +
+      "Component: json (Wave 1 fallback). " +
+      "Derived now-playing-sessions component deferred to Wave 2. " +
+      "Agentic exposure deferred.",
+  },
+  {
+    cardId: "YouTubeCleanupCard",
+    description: "YouTube cleanup status — likes/subs remaining, quota, last run",
+    visual: true,
+    scriptable: true,
+    agentic: false,
+    notes:
+      "Wave 1: rendered via ViewCard (youtube-cleanup view) in AppNext home page. " +
+      "Entity: youtube.cleanup backed by /api/youtube/cleanup/status. " +
+      "Component: json with expanded:true (Wave 1 fallback). " +
+      "Write path (Run Now → POST /api/youtube/cleanup/run) deferred to Wave 5 agentic surface. " +
+      "Conditional hide when nothing to do is not replicated in Wave 1.",
+  },
+  {
+    cardId: "CalibreEnrichmentCard",
+    description: "Calibre book metadata enrichment status with per-item approve/reject queue",
+    visual: true,
+    scriptable: true,
+    agentic: false,
+    notes:
+      "Wave 1: rendered via ViewCard (calibre-enrichment view) in AppNext. " +
+      "Entity: calibre.enrichment backed by /api/calibre/enrichment/status. " +
+      "Component: json with expanded:true (Wave 1 fallback). " +
+      "This is the richest proof point for Phase 3P: per-item approve/reject, write path, " +
+      "and conditional sections are all Wave 5 agentic surface work. " +
+      "Wave 2: derive calibre-enrichment-stats component (progress bar, gap breakdown). " +
+      "Wave 5: per-item review queue with approve/reject via agentic invoke tier.",
   },
 ];
 
