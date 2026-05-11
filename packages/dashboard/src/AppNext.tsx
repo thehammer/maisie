@@ -97,6 +97,8 @@ function HomePage() {
       <ViewCard viewName="youtube-cleanup" titleOverride="YouTube Cleanup" />
       {/* Wave 1 — DockerUpgrades: entity + view → ViewCard */}
       <ViewCard viewName="docker-upgrades" titleOverride="Docker Updates" />
+      {/* Wave 1 — NightlyCard (partial): read display only; start/stop remain in legacy NightlyCard */}
+      <ViewCard viewName="nightly-status" titleOverride="Nightly Maintenance" />
     </div>
   );
 }
