@@ -24,6 +24,7 @@ export type MaisieFieldType =
   | 'boolean'
   | 'bytes'          // Storage/transfer size in bytes → renders as "1.2 GB"
   | 'percentage'     // 0–100 → renders as progress bar
+  | 'gauge'          // 0–100 → renders as semi-circle arc gauge
   | 'status'         // Named state from shared vocabulary → colored badge
   | 'image'          // URL to image → <img> thumbnail
   | 'timestamp'      // ISO 8601 date → relative time "2h ago"

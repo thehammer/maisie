@@ -44,12 +44,24 @@ export interface BytesRendererConfig {
 
 export interface PercentageRendererConfig {
   type: 'percentage'
+  /** Visual style: 'bar' = progress bar (default), 'text' = plain number. */
+  style?: 'bar' | 'text'
   /** Show a progress bar behind the number (default: true). */
   showBar?: boolean
   /** Warning threshold 0–100 — bar turns amber above this (default: 70). */
   warnAt?: number
   /** Critical threshold 0–100 — bar turns red above this (default: 90). */
   critAt?: number
+}
+
+export interface GaugeRendererConfig {
+  type: 'gauge'
+  /** Warning threshold 0–100 — arc turns amber above this (default: 70). */
+  warnAt?: number
+  /** Critical threshold 0–100 — arc turns red above this (default: 90). */
+  critAt?: number
+  /** Optional label shown inside the gauge arc. */
+  label?: string
 }
 
 export interface StatusRendererConfig {
@@ -200,6 +212,7 @@ export type RendererConfig =
   | BooleanRendererConfig
   | BytesRendererConfig
   | PercentageRendererConfig
+  | GaugeRendererConfig
   | StatusRendererConfig
   | ImageRendererConfig
   | TimestampRendererConfig
@@ -259,6 +272,7 @@ export const RENDERER_DEFAULTS: { [K in RendererConfig['type']]: Extract<Rendere
   boolean:     { type: 'boolean', trueLabel: 'Yes', falseLabel: 'No' },
   bytes:       { type: 'bytes' },
   percentage:  { type: 'percentage', showBar: true, warnAt: 70, critAt: 90 },
+  gauge:       { type: 'gauge', warnAt: 70, critAt: 90 },
   status:      { type: 'status' },
   image:       { type: 'image', aspectRatio: 'auto', fit: 'cover' },
   timestamp:   { type: 'timestamp', format: 'relative' },
