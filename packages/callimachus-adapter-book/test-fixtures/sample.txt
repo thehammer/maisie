@@ -1,0 +1,131 @@
+Chapter 1: Arrival
+
+The transport skimmed low over the grey ocean, banking hard as it approached the island facility. Vance pressed her face against the cold viewport, watching the whitecapped waves blur beneath them.
+
+"First time off-planet?" said the man beside her. He wore a faded investigator's coat, collar turned up against the recycled air.
+
+She shook her head. "Third. But first time coming here voluntarily."
+
+The man smiled thinly. He hadn't introduced himself yet, but she'd seen his name on the mission brief: Marit. Formerly attached to the Ordinate's intelligence division, currently listed as detached.
+
+"Voluntary is a matter of perspective," Marit said, and turned back to the window.
+
+The facility sprawled across the cliffside like something grown rather than built. Vance could make out a dozen distinct wings, each joined by covered walkways that swayed in the coastal wind.
+
+* * *
+
+Processing took two hours. Vance submitted to the biometric scan, the retinal log, and the psychological index without complaint. Marit went through the same procedure in the adjacent booth, his answers clipped and practiced.
+
+When they emerged into the main atrium, a young aide was waiting with a data-slate and an expression of bureaucratic exhaustion.
+
+"You've been assigned to the eastern annex," the aide said. "Meals are at six, twelve, and nineteen hundred. The archive is locked between zero-two and six hundred."
+
+"What about the lower levels?" Vance asked.
+
+The aide's expression didn't change. "Those are not part of your assignment."
+
+She made a note of it anyway.
+
+* * *
+
+That night, Vance stood on the narrow balcony outside her quarters and looked at the sea. The lights from the facility caught the foam on the rocks below. She could hear the ventilation system's low hum and, beneath that, the distant rhythm of the tide.
+
+Marit appeared in the doorway behind her, holding two cups of something warm.
+
+"You couldn't sleep either," he said. It wasn't a question.
+
+"I was going over the files." She accepted the cup. "The dates don't line up. The incident report says fourteen months ago, but the maintenance logs show the system was flagged six weeks before that."
+
+Marit stared at the water. "Someone adjusted the timeline."
+
+"Or someone forgot to."
+
+"In my experience," he said, "facilities like this don't forget."
+
+
+Chapter 2: Inquiry
+
+The archive occupied the entirety of the third sublevel. Vance had requisitioned access that morning, presenting the authorisation codes from the mission brief. The desk officer had checked them twice, then a third time, before finally buzzing her through.
+
+Marit was already inside, bent over a reader station in the far corner.
+
+"How did you get in?" she asked.
+
+He looked up. "Politely."
+
+The archive was organised by incident classification rather than date, which meant that finding the relevant files required navigating a taxonomy that seemed to have been designed to discourage exactly the kind of search Vance was conducting. She worked methodically, starting with the broadest category and narrowing down.
+
+* * *
+
+By the third hour, she had assembled a partial picture. The facility had been commissioned as a research outpost. Standard function: environmental monitoring, geological survey, some signals work. But eighteen months ago, the signals work had abruptly ceased, replaced by a new classification that Vance didn't recognise.
+
+She flagged the classification and brought it to Marit.
+
+He looked at it for a long moment. "That's a containment designation," he said quietly.
+
+"What were they containing?"
+
+"That's the question, isn't it."
+
+* * *
+
+They found the lead researcher's terminal on the fourth sublevel, behind a door that required Marit's override codes — codes he produced without explanation. Vance decided not to ask yet.
+
+The terminal had been wiped, but incompletely. Fragments remained in the buffer: partial logs, image thumbnails, a sequence of coordinates. Vance copied everything to her data-slate and began the reconstruction.
+
+The coordinates resolved to a location two hundred kilometres offshore. Nothing on any chart she could access.
+
+"There's a secondary facility," she said.
+
+Marit stood very still. "Then we need to get there before anyone realises we've found it."
+
+
+Chapter 3: Confrontation
+
+The boat was small and fast, a repurposed survey skiff that Marit had apparently arranged the previous evening. Vance didn't ask how. The sea was rough, the horizon a flat grey line that was indistinguishable from the sky.
+
+"You've been here before," she said, over the engine noise. Not a question this time.
+
+Marit kept his eyes on the navigation display. "Once. A long time ago. Under different circumstances."
+
+"Different how?"
+
+"I was on the other side of the investigation."
+
+Vance absorbed this. She'd suspected something like it, but the confirmation changed the texture of things. She recalibrated her estimation of the risk they were running.
+
+"Do they know you?"
+
+"Some of them will." He adjusted their heading fractionally. "Which is why you need to be the one who does the talking when we arrive."
+
+* * *
+
+The secondary facility was smaller than the main complex, half-submerged into the rock of a sea stack that rose from the water like a broken tooth. There was a single dock, unmanned when they arrived. The main entry was sealed but not locked — a detail that made Vance's hand move to the sidearm she wasn't carrying.
+
+Inside, the corridors were lit by emergency strips. Most of the equipment had been stripped out, but recent disturbance patterns in the dust told a different story: someone had been here in the last week.
+
+"Marit," she said quietly.
+
+He was already looking at what she'd found. In the central chamber, arranged with a precision that suggested deliberate placement rather than abandonment, were seven data cores. Each was labelled with the same classification she'd seen in the archive.
+
+"They were never destroyed," he said.
+
+"No." She crouched beside the nearest core. "They were waiting."
+
+* * *
+
+They were halfway through documenting the cores when the lights came on. Full illumination, sudden and complete. Vance straightened and turned.
+
+Three figures stood at the chamber entrance. She recognised none of them, but she recognised the manner: the careful stillness, the way attention was distributed across the room rather than fixed on any single point. Professionals.
+
+"Investigator Vance," said the one in the centre, a woman with close-cropped grey hair. "We were wondering when you'd find your way here."
+
+Beside her, Vance heard Marit exhale slowly.
+
+"You know them," she said, not taking her eyes off the three.
+
+"I trained them," he said. "A long time ago."
+
+The woman with grey hair tilted her head slightly. "Hello, Marit. You look well."
+
+"I've had practice," he said, "at looking like something I'm not."
