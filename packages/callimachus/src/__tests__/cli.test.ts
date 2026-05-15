@@ -163,7 +163,8 @@ describe('calli corpus remove', () => {
 })
 
 describe('stub subcommands', () => {
-  const stubs = ['index', 'reindex', 'watch', 'inspect', 'correct', 'export']
+  // 'index' is now a real command, so excluded from the stub list
+  const stubs = ['reindex', 'watch', 'inspect', 'correct', 'export']
 
   for (const cmd of stubs) {
     it(`${cmd} exits with code 2`, async () => {

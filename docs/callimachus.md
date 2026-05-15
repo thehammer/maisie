@@ -24,8 +24,8 @@ This package delivers the **foundation** that follow-on implementation plans bui
 | Stub CLI subcommands (`index`, `reindex`, `watch`, `inspect`, `correct`, `export`) | ✅ stub — exit 2 |
 | `book` adapter — EPUB + plain-text ingestion (`@maisie/callimachus-adapter-book`) | ✅ done |
 | `code` and `wiki` adapters | ❌ follow-on |
-| Indexing pipeline | ❌ follow-on |
-| LLM integration | ❌ follow-on |
+| Indexing pipeline | ✅ done |
+| LLM integration (Anthropic SDK, `calli index`) | ✅ done |
 | MCP tool surface | ❌ follow-on |
 | Watcher | ❌ follow-on |
 | Agent persona (Calli/Callista) | ❌ follow-on |
@@ -86,14 +86,57 @@ Supports `.epub`, `.txt`, and `.md`. Each source is chunked into a chapter/scene
 
 ---
 
+## Indexing pipeline
+
+Run `calli index` to drive a registered adapter through four passes:
+
+| Pass | What it does |
+|---|---|
+| `chunk` | Discovers sources and streams raw chunks into the DB (content-addressed — resumable) |
+| `extract_structure` | Calls `adapter.extractStructure()` on each chunk to populate `parent_path` |
+| `extract_semantic` | Calls `adapter.extractWithLlm()` per chunk to extract entities and chunk-level summaries |
+| `summarize` | Calls `adapter.summarize()` bottom-up to produce depth-level summaries |
+
+```bash
+# Full index (requires ANTHROPIC_API_KEY)
+ANTHROPIC_API_KEY=sk-... calli index <corpus_id>
+
+# Offline — chunks and structure only, no LLM calls
+calli index <corpus_id> --offline
+
+# Dry-run — count what would be indexed, write nothing
+calli index <corpus_id> --dry-run
+
+# Restrict passes
+calli index <corpus_id> --pass=chunk,extract_structure
+
+# Resume from a specific chunk
+calli index <corpus_id> --from-chunk=<sha256>
+
+# Use a different model
+calli index <corpus_id> --model=claude-opus-4-20250514
+```
+
+**Environment variables:**
+- `ANTHROPIC_API_KEY` — required for LLM-driven passes (omit with `--offline` or `--dry-run`)
+- `CALLIMACHUS_DB` — path to the SQLite database (default: `./data/callimachus.db`)
+
+**Exit codes:**
+- `0` — success
+- `1` — argument or lookup error
+- `2` — adapter not registered for corpus kind
+- `3` — one or more passes failed
+
+---
+
 ## Next
 
 Follow-on background jobs needed (see PRD §5 for specifications):
 
 1. ~~**Book adapter** — EPUB/PDF chunker, chapter/scene splitting~~ ✅ done
-2. **Code adapter** — TypeScript/Python AST chunker, file/function splitting (`packages/callimachus-adapter-code`)
-3. **Wiki adapter** — Markdown/Obsidian chunker (`packages/callimachus-adapter-wiki`)
-4. **Indexing pipeline** — Pass 1 (structure), Pass 2 (LLM semantic extraction), entity deduplication
+2. ~~**Indexing pipeline** — Pass 1 (structure), Pass 2 (LLM semantic extraction), entity deduplication~~ ✅ done
+3. **Code adapter** — TypeScript/Python AST chunker, file/function splitting (`packages/callimachus-adapter-code`)
+4. **Wiki adapter** — Markdown/Obsidian chunker (`packages/callimachus-adapter-wiki`)
 5. **MCP tool surface** — `corpus_list`, `search`, `entity`, `read`, `summarize` tools
 6. **Watcher** — Filesystem watch + incremental reindex on change
 7. **Corrections subsystem** — Persist and apply user-authored corrections

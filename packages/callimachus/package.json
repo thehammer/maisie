@@ -11,9 +11,13 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0",
     "@maisie/shared": "workspace:*",
     "drizzle-orm": "^0.38.0",
     "zod": "^4.3.6"
+  },
+  "optionalDependencies": {
+    "@maisie/callimachus-adapter-book": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -109,7 +109,8 @@ export const corrections = sqliteTable('corrections', {
 export const runs = sqliteTable('runs', {
   id: text('id').primaryKey(),
   corpus_id: text('corpus_id').notNull(),
-  pass: integer('pass').notNull(),
+  /** Named pass identifier: 'chunk' | 'extract_structure' | 'extract_semantic' | 'summarize' */
+  pass: text('pass').notNull(),
   started_at: text('started_at').notNull(),
   finished_at: text('finished_at'),
   status: text('status').notNull().default('running'),
