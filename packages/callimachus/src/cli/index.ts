@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { corpusCommand } from './corpus'
+import { indexCommand } from './index-cmd'
 import { stubCommand } from './stubs'
 import { c } from './format'
 
@@ -10,7 +11,7 @@ ${c.bold}calli${c.reset} — Callimachus CLI
 
 ${c.bold}Usage:${c.reset}
   calli corpus <add|list|status|remove>  Manage corpora
-  calli index <id>                       Index a corpus    ${c.dim}[not yet implemented]${c.reset}
+  calli index <id>                       Index a corpus
   calli reindex <id>                     Re-index a corpus ${c.dim}[not yet implemented]${c.reset}
   calli watch <id>                       Watch and auto-reindex ${c.dim}[not yet implemented]${c.reset}
   calli inspect <id> <path>              Inspect indexed data   ${c.dim}[not yet implemented]${c.reset}
@@ -42,6 +43,8 @@ async function main(): Promise<void> {
       break
     // Stub subcommands — not yet implemented in the skeleton
     case 'index':
+      await indexCommand(args.slice(1))
+      break
     case 'reindex':
     case 'watch':
     case 'inspect':

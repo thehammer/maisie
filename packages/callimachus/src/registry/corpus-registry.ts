@@ -26,7 +26,7 @@ type AddInput = z.infer<typeof AddInputSchema>
 export interface Run {
   id: string
   corpus_id: string
-  pass: number
+  pass: string
   started_at: string
   finished_at: string | null
   status: string
