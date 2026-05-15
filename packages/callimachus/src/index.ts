@@ -28,3 +28,9 @@ export { runIndex } from './pipeline/indexer'
 export type { IndexOptions, IndexResult, PassName, PassStats } from './pipeline/types'
 export { AnthropicLlmClient } from './pipeline/llm/anthropic-client'
 export { DryRunLlmClient } from './pipeline/llm/dry-run-client'
+
+// Tool surface
+export { QueryService } from './tools/query-service'
+export * from './tools/types'
+export { createHttpApp } from './http/server'
+export { registerTools } from './mcp/register-tools'
