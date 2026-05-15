@@ -22,7 +22,8 @@ This package delivers the **foundation** that follow-on implementation plans bui
 | `CorpusRegistry` service (`add`, `list`, `get`, `status`, `remove`) | ✅ done |
 | `calli corpus` CLI subcommands | ✅ done |
 | Stub CLI subcommands (`index`, `reindex`, `watch`, `inspect`, `correct`, `export`) | ✅ stub — exit 2 |
-| Adapter implementations (`book`, `code`, `wiki`) | ❌ follow-on |
+| `book` adapter — EPUB + plain-text ingestion (`@maisie/callimachus-adapter-book`) | ✅ done |
+| `code` and `wiki` adapters | ❌ follow-on |
 | Indexing pipeline | ❌ follow-on |
 | LLM integration | ❌ follow-on |
 | MCP tool surface | ❌ follow-on |
@@ -61,11 +62,35 @@ CALLIMACHUS_DB=/tmp/test.db bun packages/callimachus/src/cli/index.ts corpus lis
 
 ---
 
+## Book adapter
+
+```ts
+import { AdapterRegistry } from '@maisie/callimachus'
+import { createBookAdapter } from '@maisie/callimachus-adapter-book'
+
+const registry = new AdapterRegistry()
+registry.register(createBookAdapter({ corpus_id: 'xenos' }))
+
+const adapter = registry.get('book')!
+const sources = await adapter.discover('/path/to/book.epub')
+for (const source of sources) {
+  for await (const chunk of adapter.chunk(source)) {
+    console.log(chunk.location.uri, chunk.kind, chunk.byte_length)
+  }
+}
+```
+
+Supports `.epub`, `.txt`, and `.md`. Each source is chunked into a chapter/scene tree:
+- `ch/<N>` — chapter chunk
+- `ch/<N>/sc/<M>` — scene chunk
+
+---
+
 ## Next
 
 Follow-on background jobs needed (see PRD §5 for specifications):
 
-1. **Book adapter** — EPUB/PDF chunker, chapter/scene splitting (`packages/callimachus-adapter-book`)
+1. ~~**Book adapter** — EPUB/PDF chunker, chapter/scene splitting~~ ✅ done
 2. **Code adapter** — TypeScript/Python AST chunker, file/function splitting (`packages/callimachus-adapter-code`)
 3. **Wiki adapter** — Markdown/Obsidian chunker (`packages/callimachus-adapter-wiki`)
 4. **Indexing pipeline** — Pass 1 (structure), Pass 2 (LLM semantic extraction), entity deduplication
