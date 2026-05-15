@@ -1,0 +1,22 @@
+{
+  "name": "@maisie/callimachus",
+  "version": "0.1.0",
+  "description": "Queryable index over arbitrary corpora — books, codebases, wikis — exposed to LLMs as a structured tool surface",
+  "main": "src/index.ts",
+  "bin": {
+    "calli": "./src/cli/index.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@maisie/shared": "workspace:*",
+    "drizzle-orm": "^0.38.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.0"
+  }
+}
