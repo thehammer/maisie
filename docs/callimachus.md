@@ -26,7 +26,7 @@ This package delivers the **foundation** that follow-on implementation plans bui
 | `code` and `wiki` adapters | ❌ follow-on |
 | Indexing pipeline | ✅ done |
 | LLM integration (Anthropic SDK, `calli index`) | ✅ done |
-| MCP tool surface | ❌ follow-on |
+| MCP tool surface (`QueryService`, `calli mcp`, `calli serve`) | ✅ done |
 | Watcher | ❌ follow-on |
 | Agent persona (Calli/Callista) | ❌ follow-on |
 
@@ -137,7 +137,76 @@ Follow-on background jobs needed (see PRD §5 for specifications):
 2. ~~**Indexing pipeline** — Pass 1 (structure), Pass 2 (LLM semantic extraction), entity deduplication~~ ✅ done
 3. **Code adapter** — TypeScript/Python AST chunker, file/function splitting (`packages/callimachus-adapter-code`)
 4. **Wiki adapter** — Markdown/Obsidian chunker (`packages/callimachus-adapter-wiki`)
-5. **MCP tool surface** — `corpus_list`, `search`, `entity`, `read`, `summarize` tools
+5. ~~**MCP tool surface** — `corpus_list`, `search`, `entity`, `read`, `summarize` tools~~ ✅ done
 6. **Watcher** — Filesystem watch + incremental reindex on change
 7. **Corrections subsystem** — Persist and apply user-authored corrections
 8. **Agent persona wiring** — Wire Calli/Callista persona into `packages/agent`
+
+---
+
+## Tool surface
+
+The MCP tool surface exposes the indexed corpus data to LLMs via two transports:
+
+### MCP stdio (`calli mcp`)
+
+Starts a JSON-RPC 2.0 server over stdin/stdout for use as an MCP server by Claude Desktop, the Anthropic agent SDK, or any MCP-compatible client:
+
+```bash
+calli mcp
+```
+
+Register in Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "callimachus": {
+      "command": "calli",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+### HTTP API (`calli serve`)
+
+Starts a Hono HTTP server for REST access:
+
+```bash
+calli serve                       # default: 127.0.0.1:7460
+calli serve --port=8080
+calli serve --port=8080 --host=0.0.0.0
+```
+
+### Tools
+
+| Tool | HTTP | Description |
+|---|---|---|
+| `corpus_list` | `GET /v1/corpora` | List registered corpora with chunk/entity counts |
+| `corpus_overview` | `GET /v1/corpora/:id/overview` | Top entities and summary for a corpus |
+| `search` | `POST /v1/corpora/:id/search` | Semantic / structural / hybrid search |
+| `entity` | `GET /v1/corpora/:id/entities/:name_or_id` | Look up entity by name or ID |
+| `entity_edges` | `POST /v1/corpora/:id/entities/:id/edges` | Outgoing edges from an entity |
+| `entity_meet` | `POST /v1/corpora/:id/entities/meet` | Co-occurrence locations for two entities |
+| `read` | `POST /v1/corpora/:id/read` | Read chunk content by calli:// URI |
+| `summarize` | `POST /v1/corpora/:id/summarize` | Retrieve pre-computed summary for a target |
+| `related` | `POST /v1/corpora/:id/related` | Entities related to a given entity |
+
+### Programmatic use
+
+```ts
+import { openDb, AdapterRegistry, CorpusRegistry, QueryService, createHttpApp, registerTools } from '@maisie/callimachus'
+
+const db = openDb()
+const adapters = new AdapterRegistry()
+const registry = new CorpusRegistry(db, adapters)
+const queryService = new QueryService({ db, registry, adapters })
+
+// HTTP
+const app = createHttpApp(queryService)
+
+// MCP
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+const server = new McpServer({ name: 'callimachus', version: '0.1.0' })
+registerTools(server, queryService)
+```
